@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../common/tab_refresh.dart';
 import '../tours/my_tours_view.dart';
 import '../tours/tour_list_screen.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Tab "Chuyến đi": tour đã mua, hành trình đang đi và đã hoàn thành.
 /// Nội dung là màn "Tour của tôi" sẵn có, giữ nguyên logic vé và hành trình.
@@ -40,13 +41,13 @@ class _TripsTabState extends State<TripsTab> with RefreshOnTabReturn {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Padding(
+            Padding(
               padding: EdgeInsets.fromLTRB(18, 16, 18, 4),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Chuyến đi của tôi',
+                    context.l10n.tripsTitle,
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w800,
@@ -56,7 +57,7 @@ class _TripsTabState extends State<TripsTab> with RefreshOnTabReturn {
                   ),
                   SizedBox(height: 2),
                   Text(
-                    'Vé đã mua, hành trình đang đi và đã hoàn thành',
+                    context.l10n.tripsSubtitle,
                     style: TextStyle(fontSize: 13, color: TripsPalette.muted),
                   ),
                 ],

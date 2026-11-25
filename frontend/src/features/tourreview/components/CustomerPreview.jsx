@@ -216,8 +216,8 @@ function StopSheet({ stop, onClose }) {
                 <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-100">
                   <HelpCircle size={16} className="text-sky-600 shrink-0" />
                   <span className="min-w-0">
-                    <span className="block text-[11.5px] font-bold text-slate-800">Câu đố văn hoá</span>
-                    <span className="block text-[10.5px] text-slate-500">{quizCount} câu trắc nghiệm</span>
+                    <span className="block text-[11.5px] font-bold text-slate-800">Câu đố văn hóa</span>
+                    <span className="block text-[10.5px] text-slate-500">{quizCount} câu đố</span>
                   </span>
                 </div>
               )}
@@ -225,7 +225,7 @@ function StopSheet({ stop, onClose }) {
                 <div key={a.id || i} className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-100">
                   <Footprints size={16} className="text-sky-600 shrink-0" />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[11.5px] font-bold text-slate-800">{a.activityName || "Hoạt động thực địa"}</span>
+                    <span className="block text-[11.5px] font-bold text-slate-800">{a.activityName || "Trải nghiệm thực tế"}</span>
                     <span className="block text-[10.5px] text-slate-500">
                       {[activityDuration(a.durationSeconds), "quét QR tại điểm để xác nhận"].filter(Boolean).join(" · ")}
                     </span>
@@ -446,6 +446,24 @@ export default function CustomerPreview({ tour }) {
                     );
                   })}
                   {dates.length > 12 && <span className="px-2 py-1.5 rounded-full bg-slate-100 text-[10.5px] font-semibold text-slate-600 self-center">+{dates.length - 12} ngày</span>}
+                </div>
+              </>
+            )}
+
+            {(tour.departureTime || tour.meetingPoint || tour.pickupInfo) && (
+              <>
+                <SectionTitle>Khởi hành và tập trung</SectionTitle>
+                <div className="mx-3.5 rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5 text-[11.5px]">
+                  {[[Clock, "Giờ khởi hành", tour.departureTime], [MapPin, "Địa điểm tập trung", tour.meetingPoint], [Route, "Giờ đón và điểm đón", tour.pickupInfo]]
+                    .filter(([, , v]) => v).map(([Icon, k, v]) => (
+                      <div key={k} className="flex gap-2">
+                        <Icon size={13} className="mt-0.5 shrink-0 text-emerald-600" />
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900">{k}</p>
+                          <p className="text-slate-600 whitespace-pre-line">{v}</p>
+                        </div>
+                      </div>
+                    ))}
                 </div>
               </>
             )}

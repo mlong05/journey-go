@@ -1,5 +1,6 @@
 import 'package:google_sign_in/google_sign_in.dart';
 import '../constants/api_constants.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Dịch vụ Google Sign-In dùng cho Android (Mobile Tourist App).
 /// API google_sign_in 6.x: dùng GoogleSignIn() trực tiếp + signIn().
@@ -33,12 +34,12 @@ class GoogleAuthService {
     await init();
     final GoogleSignInAccount? account = await _instance!.signIn();
     if (account == null) {
-      throw Exception('Người dùng đã huỷ đăng nhập Google.');
+      throw Exception(appL10n.googleCancelled);
     }
     final GoogleSignInAuthentication auth = await account.authentication;
     final String? idToken = auth.idToken;
     if (idToken == null || idToken.isEmpty) {
-      throw Exception('Không lấy được idToken từ Google. Vui lòng thử lại.');
+      throw Exception(appL10n.googleNoToken);
     }
     return idToken;
   }

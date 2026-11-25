@@ -13,6 +13,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../l10n/locale_controller.dart';
 import '../common/bright.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/models/refund_model.dart';
@@ -24,6 +25,7 @@ import '../../core/services/refund_service.dart';
 import '../../core/services/token_storage.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/navigation.dart';
+import '../tours/departure_info.dart';
 import 'payment_screen.dart';
 import 'refund_form_screen.dart';
 
@@ -124,7 +126,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Không thể tải chi tiết đơn.';
+        _error = context.l10n.bdLoadFailed;
         _loading = false;
       });
     }
@@ -197,7 +199,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         await _load();
         if (!mounted) return;
         _showToast(
-          'Đã xác nhận thanh toán thành công!',
+          context.l10n.bdPaymentConfirmedToast,
           icon: Icons.check_circle_rounded,
           color: AppCultureColors.heritageJade,
         );
@@ -215,9 +217,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           result.message.isNotEmpty
               ? result.message
               : superseded
-                  ? 'Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán '
-                      'bởi một giao dịch khác.'
-                  : 'Giao dịch đã được xác nhận không thành công.',
+                  ? context.l10n.paySuperseded
+                  : context.l10n.bdTxnFailedConfirmed,
           icon: superseded
               ? Icons.swap_horiz_rounded
               : Icons.cancel_rounded,
@@ -232,14 +233,14 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       _showToast(
         result.message.isNotEmpty
             ? result.message
-            : 'Chưa xác minh được kết quả. Nếu bạn đã thanh toán, vui lòng thử lại sau ít phút.',
+            : context.l10n.bdUnverified,
         icon: Icons.info_rounded,
         color: AppCultureColors.warning,
       );
     } catch (_) {
       if (!mounted) return;
       _showToast(
-        'Không kiểm tra được trạng thái thanh toán. Vui lòng thử lại.',
+        context.l10n.payStatusCheckFailed,
         icon: Icons.info_rounded,
         color: AppCultureColors.warning,
       );
@@ -315,25 +316,24 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         return AlertDialog(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-          title: const Text(
-            'Hủy đơn đặt tour',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          title: Text(
+            ctx.l10n.bdCancelTitle,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Sau khi hủy, chỗ đã giữ sẽ được trả lại cho khách khác. '
-                'Bạn không thể hoàn tác thao tác này.',
-                style: TextStyle(fontSize: 13, height: 1.4),
+              Text(
+                ctx.l10n.bdCancelMessage,
+                style: const TextStyle(fontSize: 13, height: 1.4),
               ),
               const SizedBox(height: 14),
               TextField(
                 controller: controller,
                 maxLines: 3,
-                decoration: const InputDecoration(
-                  hintText: 'Lý do hủy (không bắt buộc)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  hintText: ctx.l10n.bdCancelReasonHint,
+                  border: const OutlineInputBorder(),
                 ),
               ),
             ],
@@ -341,14 +341,14 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Giữ đơn'),
+              child: Text(ctx.l10n.bdKeepBooking),
             ),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
               style: FilledButton.styleFrom(
                 backgroundColor: AppCultureColors.error,
               ),
-              child: const Text('Hủy đơn'),
+              child: Text(ctx.l10n.coCancelBooking),
             ),
           ],
         );
@@ -362,8 +362,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       await _bookingService.cancelBooking(booking.id, reason: reason.isEmpty ? null : reason);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã hủy đơn. Chỗ đã giữ được giải phóng.'),
+        SnackBar(
+          content: Text(context.l10n.bdCancelledToast),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -380,8 +380,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Không thể hủy đơn. Vui lòng thử lại.'),
+        SnackBar(
+          content: Text(context.l10n.bdCancelFailed),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -411,9 +411,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             Navigator.of(context).pop(true);
           },
         ),
-        title: const Text(
-          'Chi Tiết Đơn',
-          style: TextStyle(
+        title: Text(
+          context.l10n.bdTitle,
+          style: const TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w800,
             color: AppCultureColors.textDark,
@@ -451,7 +451,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             ElevatedButton.icon(
               onPressed: _load,
               icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Thử lại'),
+              label: Text(context.l10n.commonRetry),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppCultureColors.heritageJade,
                 foregroundColor: Colors.white,
@@ -493,7 +493,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _busy ? null : _cancelBooking,
                   icon: const Icon(Icons.close_rounded, size: 18),
-                  label: const Text('Hủy đơn'),
+                  label: Text(context.l10n.coCancelBooking),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppCultureColors.error,
                     side: const BorderSide(color: AppCultureColors.error),
@@ -512,7 +512,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   onPressed: _openPayment,
                   icon: const Icon(Icons.account_balance_wallet_rounded, size: 19),
                   label: Text(
-                    'Thanh toán ${booking.formattedTotal}',
+                    context.l10n.coPayAmount(booking.formattedTotal),
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                   style: FilledButton.styleFrom(
@@ -539,6 +539,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         _buildHeroHeader(booking),
         const SizedBox(height: 14),
         _buildStatusTimeline(booking),
+        if (_showDepartureInfo(booking)) ...[
+          const SizedBox(height: 14),
+          _buildDepartureCard(booking),
+        ],
         const SizedBox(height: 14),
         _buildPassengersCard(booking),
         const SizedBox(height: 14),
@@ -566,16 +570,15 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               color: AppCultureColors.rewardBg,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.info_outline_rounded,
+                const Icon(Icons.info_outline_rounded,
                     size: 16, color: AppCultureColors.rewardText),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Yêu cầu hoàn tiền chỉ được gửi trước ngày khởi hành của tour. '
-                    'Bạn đã trải nghiệm hoặc tour đã hoàn thành nên không thể gửi yêu cầu.',
-                    style: TextStyle(
+                    context.l10n.bdRefundWindowClosed,
+                    style: const TextStyle(
                       fontSize: 12,
                       height: 1.35,
                       color: AppCultureColors.rewardText,
@@ -594,6 +597,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   /// Thẻ hero sáng: nền trắng → ngọc nhạt, chữ màu mực, tổng tiền màu xanh ngọc đậm.
   Widget _buildHeroHeader(BookingModel booking) {
     final tone = _statusTone(booking.status);
+    final l10n = context.l10n;
     const eyebrow = TextStyle(
       fontSize: 11.5,
       fontWeight: FontWeight.w700,
@@ -614,7 +618,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('MÃ ĐƠN', style: eyebrow),
+                    Text(l10n.bdEyebrowCode, style: eyebrow),
                     const SizedBox(height: 3),
                     Text(
                       booking.bookingCode.isEmpty ? '#${booking.id}' : booking.bookingCode,
@@ -633,7 +637,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           ),
           const SizedBox(height: 14),
           Text(
-            booking.tourTitle.isEmpty ? 'Tour trải nghiệm' : booking.tourTitle,
+            booking.tourTitle.isEmpty ? l10n.payTourFallback : booking.tourTitle,
             style: const TextStyle(
               fontSize: 17,
               height: 1.3,
@@ -656,8 +660,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 Expanded(
                   child: Text(
                     booking.formattedExperienceDate.isEmpty
-                        ? 'Chưa có ngày trải nghiệm'
-                        : 'Ngày trải nghiệm: ${booking.formattedExperienceDate}',
+                        ? l10n.bdNoExperienceDate
+                        : l10n.tdExperienceDate(booking.formattedExperienceDate),
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -676,7 +680,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('TỔNG TIỀN', style: eyebrow),
+                    Text(l10n.bdEyebrowTotal, style: eyebrow),
                     const SizedBox(height: 3),
                     Text(
                       booking.formattedTotal,
@@ -699,7 +703,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     border: Border.all(color: AppTone.brass.soft),
                   ),
                   child: Text(
-                    '${booking.experienceCount} trải nghiệm',
+                    l10n.bdExperienceCount(booking.experienceCount),
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -741,39 +745,40 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     // "không thực hiện" (chỗ đã được trả lại) ⇒ hiện đúng sự thật.
     final closed = booking.isCancelled || booking.isExpired;
     final cancelled = booking.isCancelled;
+    final l10n = context.l10n;
 
     final steps = <_StatusStep>[
       _StatusStep(
-        'Đặt tour',
+        l10n.bdStepBooked,
         booking.formattedCreatedAt.isEmpty
-            ? 'Đã tạo đơn'
+            ? l10n.bdStepBookedCreated
             : booking.formattedCreatedAt,
         done: true,
       ),
       _StatusStep(
-        'Thanh toán',
-        booking.paidAt != null ? booking.formattedPaidAt : 'Chưa thanh toán',
+        l10n.bdStepPayment,
+        booking.paidAt != null ? booking.formattedPaidAt : l10n.bdStepNotPaid,
         done: booking.paidAt != null,
         active: booking.paidAt == null && booking.isPendingPayment,
       ),
       _StatusStep(
-        'Xác nhận',
+        l10n.bdStepConfirmed,
         booking.confirmedAt != null
             ? formatDateTimeVn(booking.confirmedAt)
             : closed
                 // Đơn chưa từng được xác nhận ⇒ chỗ đã được trả lại.
-                ? (cancelled ? 'Đơn đã hủy' : 'Đơn đã hết hạn')
-                : 'Chờ thanh toán',
+                ? (cancelled ? l10n.mbBookingCancelled : l10n.mbBookingExpired)
+                : l10n.statusPendingPayment,
         done: booking.confirmedAt != null,
         active: !closed && booking.paidAt != null && booking.confirmedAt == null,
       ),
       _StatusStep(
-        'Hoàn thành',
+        l10n.bdStepCompleted,
         booking.completedAt != null
             ? formatDateTimeVn(booking.completedAt)
             : closed
-                ? 'Không thực hiện'
-                : 'Chưa trải nghiệm',
+                ? l10n.bdStepNotDone
+                : l10n.bdStepNotExperienced,
         done: booking.completedAt != null,
         active: booking.isConfirmed,
       ),
@@ -783,7 +788,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _CardTitle(icon: Icons.timeline_rounded, text: 'Tiến trình đơn'),
+          _CardTitle(icon: Icons.timeline_rounded, text: l10n.bdProgressTitle),
           const SizedBox(height: 14),
           ...steps.asMap().entries.map((e) {
             final isLast = e.key == steps.length - 1;
@@ -804,8 +809,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Còn ${booking.countdownText} để thanh toán. '
-                      'Quá hạn, chỗ đã giữ sẽ được trả lại cho khách khác.',
+                      l10n.bdCountdownHint(booking.countdownText),
                       style: const TextStyle(
                         fontSize: 12,
                         height: 1.35,
@@ -920,13 +924,13 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: _CardTitle(
-                    icon: Icons.map_outlined, text: 'Trải nghiệm trong đơn'),
+                    icon: Icons.map_outlined, text: context.l10n.bdExperiencesTitle),
               ),
               if (holds.isNotEmpty)
                 Text(
-                  '${holds.length} mục',
+                  context.l10n.bdItemCount(holds.length),
                   style: const TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
@@ -936,15 +940,15 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             ],
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Mỗi trải nghiệm trong tour chiếm 1 chỗ trong ngày bạn chọn.',
-            style: TextStyle(fontSize: 11.5, color: AppCultureColors.textMuted),
+          Text(
+            context.l10n.bdExperiencesHint,
+            style: const TextStyle(fontSize: 11.5, color: AppCultureColors.textMuted),
           ),
           const SizedBox(height: 12),
           if (holds.isEmpty)
-            const Text(
-              'Đơn này không ghi nhận trải nghiệm nào.',
-              style: TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
+            Text(
+              context.l10n.bdNoExperiences,
+              style: const TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
             )
           else
             ...holds.map((h) => _buildExperienceRow(booking, h)),
@@ -952,7 +956,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             const SizedBox(height: 4),
             const Divider(height: 16, color: AppCultureColors.borderLight),
             _buildInfoRow(
-              'Tổng giá trải nghiệm',
+              context.l10n.bdExperiencesTotal,
               booking.formattedTotal,
               bold: true,
             ),
@@ -985,7 +989,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  hold.experienceTitle ?? 'Trải nghiệm #${hold.experienceId ?? '-'}',
+                  hold.experienceTitle ?? context.l10n.bdExperienceNumber('${hold.experienceId ?? '-'}'),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -1035,41 +1039,70 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   // ── Thông tin đơn ───────────────────────────────────────────────────────
-  Widget _buildOrderInfoCard(BookingModel booking) {
+  /// Thông tin khởi hành chỉ hữu ích khi đơn còn hiệu lực (đang giữ chỗ / đã xác nhận, chưa hoàn tiền).
+  bool _showDepartureInfo(BookingModel booking) =>
+      (booking.status == BookingStatus.confirmed || booking.status == BookingStatus.pendingPayment) &&
+      _refunds.isEmpty &&
+      DepartureInfoList.hasAny(booking.departureTime, booking.meetingPoint, booking.pickupInfo);
+
+  Widget _buildDepartureCard(BookingModel booking) {
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _CardTitle(icon: Icons.receipt_long_rounded, text: 'Thông tin đơn'),
+          _CardTitle(icon: Icons.directions_bus_rounded, text: context.l10n.bdDepartureTitle),
+          const SizedBox(height: 12),
+          DepartureInfoList(
+            departureTime: booking.departureTime,
+            meetingPoint: booking.meetingPoint,
+            pickupInfo: booking.pickupInfo,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderInfoCard(BookingModel booking) {
+    final l10n = context.l10n;
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _CardTitle(icon: Icons.receipt_long_rounded, text: l10n.bdOrderInfoTitle),
           const SizedBox(height: 12),
           _buildInfoRow(
-            'Mã đơn',
+            l10n.bdRowCode,
             booking.bookingCode.isEmpty ? '#${booking.id}' : booking.bookingCode,
           ),
-          _buildInfoRow('Tour', booking.tourTitle.isEmpty ? '—' : booking.tourTitle),
-          _buildInfoRow('Ngày trải nghiệm',
+          _buildInfoRow(l10n.bdRowTour, booking.tourTitle.isEmpty ? '—' : booking.tourTitle),
+          _buildInfoRow(l10n.payExperienceDate,
               booking.formattedExperienceDate.isEmpty
                   ? '—'
                   : booking.formattedExperienceDate),
-          _buildInfoRow('Số trải nghiệm',
-              '${booking.experienceCount} trải nghiệm'),
-          _buildInfoRow('Tạo lúc', booking.formattedCreatedAt),
-          if (booking.paymentDeadline != null)
-            _buildInfoRow('Hạn thanh toán',
+          _buildInfoRow(l10n.bdRowExperienceCount,
+              l10n.bdExperienceCount(booking.experienceCount)),
+          // Chỉ giữ mốc thời gian có ích theo trạng thái (giờ giao dịch chi tiết đã có ở
+          // "Lịch sử thanh toán"; xác nhận diễn ra ngay khi thanh toán nên không lặp lại):
+          //  • Chờ thanh toán: Đặt lúc + Hạn thanh toán
+          //  • Đã thanh toán:  Thanh toán lúc (+ Hoàn thành)
+          //  • Hủy / hết hạn:  Đặt lúc
+          if (booking.isPaid && (booking.paidAt ?? booking.confirmedAt) != null)
+            _buildInfoRow(l10n.bdRowPaidAt,
+                formatDateTimeVn(booking.paidAt ?? booking.confirmedAt))
+          else
+            _buildInfoRow(l10n.bdRowBookedAt, booking.formattedCreatedAt),
+          if (booking.isPendingPayment && booking.paymentDeadline != null)
+            _buildInfoRow(l10n.bdRowDeadline,
                 formatDateTimeVn(booking.paymentDeadline)),
-          if (booking.paidAt != null)
-            _buildInfoRow('Đã thanh toán', booking.formattedPaidAt),
-          if (booking.confirmedAt != null)
-            _buildInfoRow('Xác nhận', formatDateTimeVn(booking.confirmedAt)),
           if (booking.completedAt != null)
             _buildInfoRow(
-                'Hoàn thành', formatDateTimeVn(booking.completedAt)),
+                l10n.bdStepCompleted, formatDateTimeVn(booking.completedAt)),
           if (booking.cancellationReason != null &&
               booking.cancellationReason!.isNotEmpty)
-            _buildInfoRow('Lý do hủy', booking.cancellationReason!),
+            _buildInfoRow(l10n.bdRowCancelReason, booking.cancellationReason!),
           const SizedBox(height: 4),
           const Divider(height: 16, color: AppCultureColors.borderLight),
-          _buildInfoRow('Tổng thanh toán', booking.formattedTotal, bold: true),
+          _buildInfoRow(l10n.tdTotalPayment, booking.formattedTotal, bold: true),
         ],
       ),
     );
@@ -1100,8 +1133,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         children: [
           Row(
             children: [
-              const _CardTitle(
-                  icon: Icons.groups_rounded, text: 'Hành khách trong nhóm'),
+              _CardTitle(
+                  icon: Icons.groups_rounded, text: context.l10n.bdPassengersTitle),
               const Spacer(),
               Container(
                 padding:
@@ -1111,7 +1144,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  '${passengers.length} người',
+                  context.l10n.bdPeopleCount(passengers.length),
                   style: const TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
@@ -1123,7 +1156,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Số người tham gia đã nhập khi đặt tour.',
+            context.l10n.bdPassengersHint,
             style: const TextStyle(
                 fontSize: 11.5, color: AppCultureColors.textMuted),
           ),
@@ -1143,17 +1176,16 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   color: AppCultureColors.jadeLight.withValues(alpha: 0.55),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Row(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.mark_email_read_outlined,
+                    const Icon(Icons.mark_email_read_outlined,
                         size: 16, color: AppCultureColors.jadeDark),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Gửi lời mời để hành khách tạo tài khoản JourneyGo và xem tour cùng nhóm. '
-                        'Lời mời hết hạn sau 24 giờ.',
-                        style: TextStyle(
+                        context.l10n.bdInviteHint,
+                        style: const TextStyle(
                           fontSize: 11.5,
                           height: 1.4,
                           color: AppCultureColors.jadeDark,
@@ -1223,9 +1255,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                         color: AppCultureColors.jadeLight,
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text(
-                        'Người đặt',
-                        style: TextStyle(
+                      child: Text(
+                        context.l10n.bdBookerTag,
+                        style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                           color: AppCultureColors.jadeDark,
@@ -1250,7 +1282,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 OutlinedButton.icon(
                   onPressed: _busy ? null : () => _invitePassenger(booking, p),
                   icon: const Icon(Icons.mail_outline_rounded, size: 15),
-                  label: Text(p.invitationExpired ? 'Gửi lại lời mời' : 'Mời tham gia'),
+                  label: Text(p.invitationExpired ? context.l10n.bdResendInvite : context.l10n.bdInvite),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppCultureColors.heritageJade,
                     side: const BorderSide(color: AppCultureColors.heritageJade),
@@ -1272,16 +1304,17 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   String _passengerSubtitle(BookingPassengerModel p, bool masked) {
+    final l10n = context.l10n;
     final parts = <String>[
       if (p.guestTypeLabel.isNotEmpty) p.guestTypeLabel,
-      if (p.ageAtExperience != null) '${p.ageAtExperience} tuổi',
+      if (p.ageAtExperience != null) l10n.bdAge(p.ageAtExperience!),
     ];
     if (masked) {
-      parts.add('Thông tin cá nhân được ẩn');
+      parts.add(l10n.bdInfoHidden);
     } else if (p.email != null && p.email!.isNotEmpty) {
       parts.add(p.email!);
     } else if (p.emailRequired) {
-      parts.add('Chưa có email');
+      parts.add(l10n.bdNoEmail);
     }
     return parts.join(' · ');
   }
@@ -1351,7 +1384,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       _load();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Đã gửi lời mời tới $email'),
+          content: Text(context.l10n.bdInviteSent(email)),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -1375,22 +1408,22 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Nhập email người được mời'),
+        title: Text(ctx.l10n.bdInviteEmailTitle),
         content: TextField(
           controller: controller,
           autofocus: true,
           keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Email',
-            hintText: 'vidu@gmail.com',
+            hintText: ctx.l10n.bdEmailExample,
           ),
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+              onPressed: () => Navigator.pop(ctx), child: Text(ctx.l10n.commonCancel)),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, controller.text),
-            child: const Text('Gửi lời mời'),
+            child: Text(ctx.l10n.bdSendInvite),
           ),
         ],
       ),
@@ -1403,13 +1436,13 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _CardTitle(
-              icon: Icons.account_balance_wallet_rounded, text: 'Lịch sử thanh toán'),
+          _CardTitle(
+              icon: Icons.account_balance_wallet_rounded, text: context.l10n.bdPaymentHistory),
           const SizedBox(height: 12),
           if (_payments.isEmpty)
-            const Text(
-              'Chưa có giao dịch thanh toán nào.',
-              style: TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
+            Text(
+              context.l10n.bdNoPayments,
+              style: const TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
             )
           else
             ..._payments.map(_buildPaymentRow),
@@ -1444,9 +1477,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Hủy chuyến & hoàn tiền',
-                      style: TextStyle(
+                    Text(
+                      context.l10n.bdRefundEntryTitle,
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: AppCultureColors.textDark,
@@ -1455,8 +1488,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     const SizedBox(height: 2),
                     Text(
                       date.isEmpty
-                          ? 'Gửi yêu cầu trước ngày khởi hành'
-                          : 'Gửi yêu cầu trước ngày $date',
+                          ? context.l10n.bdRefundEntryHint
+                          : context.l10n.bdRefundEntryHintDate(date),
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppCultureColors.textMuted,
@@ -1480,8 +1513,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _CardTitle(
-              icon: Icons.assignment_return_outlined, text: 'Yêu cầu hoàn tiền'),
+          _CardTitle(
+              icon: Icons.assignment_return_outlined, text: context.l10n.bdRefundRequests),
           const SizedBox(height: 12),
           ..._refunds.map(_buildRefundRow),
         ],
@@ -1529,8 +1562,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               children: [
                 Text(
                   processing
-                      ? 'Đang trong quá trình hoàn tiền'
-                      : 'Đã xử lý hoàn tiền',
+                      ? context.l10n.tdRefundProcessingTitle
+                      : context.l10n.tdRefundDoneTitle,
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
@@ -1542,10 +1575,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 const SizedBox(height: 3),
                 Text(
                   processing
-                      ? 'Yêu cầu ${latest.refundCode.isEmpty ? '#${latest.id}' : latest.refundCode} đang được xử lý. '
-                          'Bạn có thể theo dõi từng bước trong "Lịch sử xử lý hoàn tiền" bên dưới.'
-                      : 'Yêu cầu ${latest.refundCode.isEmpty ? '#${latest.id}' : latest.refundCode} đã được xử lý: '
-                          '${latest.statusLabel}.',
+                      ? context.l10n.bdRefundProcessingDetail(
+                          latest.refundCode.isEmpty ? '#${latest.id}' : latest.refundCode)
+                      : context.l10n.bdRefundDoneDetail(
+                          latest.refundCode.isEmpty ? '#${latest.id}' : latest.refundCode, latest.statusLabel),
                   style: TextStyle(
                     fontSize: 11.5,
                     height: 1.35,
@@ -1590,12 +1623,12 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _CardTitle(
-              icon: Icons.history_rounded, text: 'Lịch sử xử lý hoàn tiền'),
+          _CardTitle(
+              icon: Icons.history_rounded, text: context.l10n.bdAuditTitle),
           const SizedBox(height: 4),
-          const Text(
-            'Các bước xử lý được ghi nhận theo thứ tự thời gian — cũ nhất ở trên, mới nhất ở dưới.',
-            style: TextStyle(fontSize: 11.5, color: AppCultureColors.textMuted),
+          Text(
+            context.l10n.bdAuditHint,
+            style: const TextStyle(fontSize: 11.5, color: AppCultureColors.textMuted),
           ),
           const SizedBox(height: 14),
           ...entries.asMap().entries.map((e) {
@@ -1679,7 +1712,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   ],
                   const SizedBox(height: 3),
                   Text(
-                    '${entry.refund.refundCode.isEmpty ? 'Yêu cầu #${entry.refund.id}' : entry.refund.refundCode}'
+                    '${entry.refund.refundCode.isEmpty ? context.l10n.bdRefundNumber(entry.refund.id) : entry.refund.refundCode}'
                     '${log.createdAt != null ? ' • ${formatDateTimeVn(log.createdAt)}' : ''}',
                     style: const TextStyle(
                       fontSize: 10.5,
@@ -1699,72 +1732,72 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   _AuditTone _auditTone(String? action) {
     switch (action) {
       case 'CREATED':
-        return const _AuditTone(
-          'Đã gửi yêu cầu hoàn tiền',
+        return _AuditTone(
+          context.l10n.auditCreated,
           Icons.send_rounded,
           AppCultureColors.oceanDark,
           AppCultureColors.oceanLight,
         );
       case 'APPROVED':
-        return const _AuditTone(
-          'Quản trị viên đã duyệt yêu cầu',
+        return _AuditTone(
+          context.l10n.auditApproved,
           Icons.verified_rounded,
           AppCultureColors.jadeDark,
           AppCultureColors.jadeLight,
         );
       case 'REJECTED':
-        return const _AuditTone(
-          'Yêu cầu bị từ chối',
+        return _AuditTone(
+          context.l10n.auditRejected,
           Icons.do_not_disturb_rounded,
           AppCultureColors.error,
           AppCultureColors.lacquer50,
         );
       case 'CANCELLED':
-        return const _AuditTone(
-          'Yêu cầu đã được hủy',
+        return _AuditTone(
+          context.l10n.auditCancelled,
           Icons.cancel_rounded,
           AppCultureColors.error,
           AppCultureColors.lacquer50,
         );
       case 'VNPAY_REQUEST_SENT':
-        return const _AuditTone(
-          'Đã gửi yêu cầu hoàn tiền tới VNPay',
+        return _AuditTone(
+          context.l10n.auditVnpaySent,
           Icons.cloud_upload_rounded,
           AppCultureColors.rewardText,
           AppCultureColors.rewardBg,
         );
       case 'VNPAY_RESPONSE':
       case 'VNPAY_STATUS_UPDATED':
-        return const _AuditTone(
-          'VNPay phản hồi kết quả hoàn tiền',
+        return _AuditTone(
+          context.l10n.auditVnpayResponse,
           Icons.cloud_sync_rounded,
           AppCultureColors.oceanDark,
           AppCultureColors.oceanLight,
         );
       case 'MANUAL_TRANSFER_RECORDED':
-        return const _AuditTone(
-          'Đã ghi nhận chuyển khoản thủ công',
+        return _AuditTone(
+          context.l10n.auditManualRecorded,
           Icons.payments_rounded,
           AppCultureColors.jadeDark,
           AppCultureColors.jadeLight,
         );
       case 'MANUAL_TRANSFER_CONFIRMED':
-        return const _AuditTone(
-          'Đã xác nhận chuyển khoản — hoàn tiền thành công',
+        return _AuditTone(
+          context.l10n.auditManualConfirmed,
           Icons.check_circle_rounded,
           AppCultureColors.jadeDark,
           AppCultureColors.jadeLight,
         );
       case 'STATUS_UPDATED':
-        return const _AuditTone(
-          'Cập nhật trạng thái yêu cầu',
+        return _AuditTone(
+          context.l10n.auditStatusUpdated,
           Icons.sync_rounded,
           AppCultureColors.textMuted,
           AppCultureColors.surfaceSubtle,
         );
       default:
-        return const _AuditTone(
-          'Cập nhật yêu cầu hoàn tiền',
+        return _AuditTone(
+          context.l10n.auditOther,
           Icons.info_rounded,
           AppCultureColors.textMuted,
           AppCultureColors.surfaceSubtle,
@@ -1788,31 +1821,31 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   /// Trạng thái của một slot hold — phụ thuộc BOTH trạng thái đơn và cờ `released`.
   _HoldTone _holdTone(BookingModel booking, SlotHoldModel hold) {
     if (hold.released) {
-      return const _HoldTone(
-        'Đã trả lại',
+      return _HoldTone(
+        context.l10n.holdReleased,
         Icons.event_busy_rounded,
         AppCultureColors.textLight,
         AppCultureColors.surfaceSubtle,
       );
     }
     if (booking.isConfirmed || booking.isCompleted) {
-      return const _HoldTone(
-        'Đã xác nhận',
+      return _HoldTone(
+        context.l10n.statusConfirmed,
         Icons.verified_rounded,
         AppCultureColors.jadeDark,
         AppCultureColors.jadeLight,
       );
     }
     if (booking.isCancelled || booking.isExpired) {
-      return const _HoldTone(
-        'Đã giải phóng',
+      return _HoldTone(
+        context.l10n.holdFreed,
         Icons.event_busy_rounded,
         AppCultureColors.error,
         AppCultureColors.lacquer50,
       );
     }
-    return const _HoldTone(
-      'Đang giữ chỗ',
+    return _HoldTone(
+      context.l10n.holdHolding,
       Icons.lock_clock_rounded,
       AppCultureColors.rewardText,
       AppCultureColors.rewardBg,
@@ -1823,48 +1856,48 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   _StatusTone _statusTone(String status) {
     switch (status) {
       case 'CONFIRMED':
-        return const _StatusTone(
-          'Đã xác nhận',
+        return _StatusTone(
+          context.l10n.statusConfirmed,
           Icons.check_circle_rounded,
           AppCultureColors.jadeDark,
           AppCultureColors.jadeLight,
-          'Thanh toán thành công — chỗ của bạn đã được xác nhận.',
+          context.l10n.bdHintConfirmed,
         );
       case 'COMPLETED':
-        return const _StatusTone(
-          'Đã hoàn thành',
+        return _StatusTone(
+          context.l10n.statusCompleted,
           Icons.workspace_premium_rounded,
           AppCultureColors.oceanDark,
           AppCultureColors.oceanLight,
-          'Bạn đã hoàn thành trải nghiệm. Cảm ơn bạn đã đồng hành!',
+          context.l10n.bdHintCompleted,
         );
       case 'PENDING_PAYMENT':
-        return const _StatusTone(
-          'Chờ thanh toán',
+        return _StatusTone(
+          context.l10n.statusPendingPayment,
           Icons.schedule_rounded,
           AppCultureColors.rewardText,
           AppCultureColors.rewardBg,
-          'Đơn đang chờ thanh toán — hãy hoàn tất trong hạn 10 phút.',
+          context.l10n.bdHintPending,
         );
       case 'CANCELLED':
-        return const _StatusTone(
-          'Đã hủy',
+        return _StatusTone(
+          context.l10n.statusCancelled,
           Icons.cancel_rounded,
           AppCultureColors.error,
           AppCultureColors.lacquer50,
-          'Đơn đã được hủy và chỗ đã được trả lại.',
+          context.l10n.bdHintCancelled,
         );
       case 'EXPIRED':
-        return const _StatusTone(
-          'Đã hết hạn',
+        return _StatusTone(
+          context.l10n.statusExpired,
           Icons.timer_off_rounded,
           AppCultureColors.textMuted,
           AppCultureColors.surfaceSubtle,
-          'Đơn quá hạn thanh toán — chỗ đã được giải phóng.',
+          context.l10n.tdBookingExpiredMessage,
         );
       default:
-        return const _StatusTone(
-          'Không rõ',
+        return _StatusTone(
+          context.l10n.statusUnknown,
           Icons.help_outline_rounded,
           AppCultureColors.textMuted,
           AppCultureColors.surfaceSubtle,
@@ -1965,7 +1998,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Giao dịch ${formatDateTimeVn(payment.createdAt)}',
+                      context.l10n.bdTransactionAt(formatDateTimeVn(payment.createdAt)),
                       style: const TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
@@ -1981,8 +2014,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     if (isSuperseded) ...[
                       const SizedBox(height: 2),
                       Text(
-                        'Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán '
-                        'bởi một giao dịch khác.',
+                        context.l10n.paySuperseded,
                         style: const TextStyle(
                             fontSize: 10.5,
                             color: AppCultureColors.textMuted,
@@ -1992,7 +2024,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     if (isStuck) ...[
                       const SizedBox(height: 2),
                       Text(
-                        'Chưa nhận được xác nhận từ VNPay. Nếu bạn đã thanh toán, hãy kiểm tra lại.',
+                        context.l10n.bdStuckHint,
                         style: const TextStyle(
                             fontSize: 10.5,
                             color: AppCultureColors.textMuted,
@@ -2062,7 +2094,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               ),
             const SizedBox(width: 5),
             Text(
-              isChecking ? 'Đang kiểm tra' : 'Kiểm tra lại',
+              isChecking ? context.l10n.bdChecking : context.l10n.payCheckAgain,
               style: const TextStyle(
                 fontSize: 10.5,
                 fontWeight: FontWeight.w800,
@@ -2099,7 +2131,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               children: [
                 Text(
                   refund.refundCode.isEmpty
-                      ? 'Yêu cầu #${refund.id}'
+                      ? context.l10n.bdRefundNumber(refund.id)
                       : refund.refundCode,
                   style: const TextStyle(
                     fontSize: 12.5,
@@ -2115,7 +2147,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                       ? '${refund.statusLabel} • ${refund.approvedReasonName}'
                       : refund.reasonSummary.isNotEmpty
                           ? '${refund.statusLabel} • ${refund.reasonSummary}'
-                          : '${refund.statusLabel} • Chờ quản trị viên phân loại',
+                          : context.l10n.bdRefundAwaitingTriage(refund.statusLabel),
                   style: const TextStyle(
                       fontSize: 11, color: AppCultureColors.textMuted),
                   maxLines: 2,
@@ -2129,7 +2161,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             // đề xuất ⇒ hiển thị "Chờ phân loại" thay vì "0 đ".
             refund.displayAmount != null && refund.displayAmount! > 0
                 ? refund.formattedEffectiveAmount
-                : 'Chờ phân loại',
+                : context.l10n.bdAwaitingTriage,
             style: TextStyle(
               fontSize: 12.5,
               fontWeight: FontWeight.w800,
@@ -2146,23 +2178,23 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   /// Màu/nhãn/icon của trạng thái một yêu cầu hoàn tiền.
   _AuditTone _refundTone(RefundModel refund) {
     if (refund.isRefunded) {
-      return const _AuditTone(
-        'Đã hoàn tiền',
+      return _AuditTone(
+        context.l10n.refundToneRefunded,
         Icons.assignment_turned_in_rounded,
         AppCultureColors.heritageJade,
         AppCultureColors.jadeLight,
       );
     }
     if (refund.isRejected || refund.isFailed) {
-      return const _AuditTone(
-        'Từ chối',
+      return _AuditTone(
+        context.l10n.refundToneRejected,
         Icons.do_not_disturb_rounded,
         AppCultureColors.error,
         AppCultureColors.lacquer50,
       );
     }
-    return const _AuditTone(
-        'Đang xử lý',
+    return _AuditTone(
+        context.l10n.payStatusProcessing,
         Icons.pending_actions_rounded,
         AppCultureColors.warning,
         AppCultureColors.rewardBg,

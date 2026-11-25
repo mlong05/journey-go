@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, CalendarCheck2, Lock } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarCheck2, Lock, MapPin } from "lucide-react";
 import { issueFor } from "../../hooks/useTourDraft";
+import { Field, TextInput, TextArea } from "../FormKit";
+import { LIMITS } from "../../constants";
 
 const WEEKDAYS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 const pad = (n) => String(n).padStart(2, "0");
@@ -25,6 +27,20 @@ const weekdayMon0 = (y, m, d) => (new Date(y, m, d).getDay() + 6) % 7;
 export default function ScheduleStep({ tour, issues, readOnly, isLive, onSave }) {
   const today = todayVN();
   const [selected, setSelected] = useState(() => new Set(tour.departureDates || []));
+  // Thông tin khởi hành dùng chung cho mọi ngày (chữ tự do).
+  const [info, setInfo] = useState(() => ({
+    departureTime: tour.departureTime || "",
+    meetingPoint: tour.meetingPoint || "",
+    pickupInfo: tour.pickupInfo || "",
+  }));
+  const save = (dates, nextInfo) => {
+    if (!readOnly) onSave({ departureDates: [...dates].sort(), ...nextInfo });
+  };
+  const updateInfo = (patch) => {
+    const next = { ...info, ...patch };
+    setInfo(next);
+    save(selected, next);
+  };
   const [cursor, setCursor] = useState(() => {
     const first = (tour.departureDates || []).find((d) => d > today) || today;
     const [y, m] = first.split("-").map(Number);
@@ -40,7 +56,7 @@ export default function ScheduleStep({ tour, issues, readOnly, isLive, onSave })
   const commit = (next) => {
     bookedDates.forEach((d) => next.add(d));
     setSelected(next);
-    if (!readOnly) onSave({ departureDates: [...next].sort() });
+    save(next, info);
   };
 
   const days = monthDays(cursor.y, cursor.m);
@@ -75,9 +91,32 @@ export default function ScheduleStep({ tour, issues, readOnly, isLive, onSave })
   const futureSelected = [...selected].filter((s) => s > today).sort();
   const leading = weekdayMon0(cursor.y, cursor.m, 1);
   const error = issueFor(issues, "SCHEDULE", "departureDates");
+  const infoErr = (f) => issueFor(issues, "SCHEDULE", f);
 
   return (
     <div className="space-y-5">
+      <section className="rounded-2xl border border-slate-200 p-4 space-y-4">
+        <div>
+          <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-900"><MapPin size={15} className="text-emerald-600" />Thông tin khởi hành</h3>
+          <p className="text-[11px] text-slate-500 mt-0.5">Áp dụng cho mọi ngày khởi hành bên dưới. Khách thấy ngay trên trang tour và trong vé.</p>
+        </div>
+        <Field label="Giờ khởi hành" required hint='Ghi tự do, ví dụ "08:00 sáng" hoặc "7h30".' error={infoErr("departureTime")}>
+          <TextInput value={info.departureTime} limit={LIMITS.TEXT.DEPARTURE_TIME} disabled={readOnly} placeholder="08:00 sáng"
+            wrapperClassName="sm:max-w-xs" error={infoErr("departureTime")}
+            onChange={(e) => updateInfo({ departureTime: e.target.value })} />
+        </Field>
+        <Field label="Địa điểm tập trung" required error={infoErr("meetingPoint")}>
+          <TextArea rows={2} value={info.meetingPoint} limit={LIMITS.TEXT.MEETING_POINT} disabled={readOnly}
+            placeholder="Hội quán Phúc Kiến, 46 Trần Phú, phường Hội An, Đà Nẵng. Có mặt trước 15 phút."
+            error={infoErr("meetingPoint")} onChange={(e) => updateInfo({ meetingPoint: e.target.value })} />
+        </Field>
+        <Field label="Giờ đón và điểm đón" hint="Không bắt buộc. Để trống nếu tour không đón tận nơi.">
+          <TextArea rows={3} value={info.pickupInfo} limit={LIMITS.TEXT.PICKUP_INFO} disabled={readOnly}
+            placeholder={"07:15 – 07:40: đón miễn phí tại khách sạn trong bán kính 3 km quanh phố cổ.\nKhách ngoài bán kính tự đến điểm tập trung."}
+            onChange={(e) => updateInfo({ pickupInfo: e.target.value })} />
+        </Field>
+      </section>
+
       {tour.tourFormat === "MULTI_DAY" && (
         <div className="p-3 rounded-xl border border-sky-200 bg-sky-50 text-xs text-sky-800">
           Tour nhiều ngày: ngày được chọn là <b>ngày khởi hành</b>; chỗ được giữ trong suốt {tour.durationDays || "các"} ngày của tour.

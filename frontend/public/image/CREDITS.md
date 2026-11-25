@@ -9,4 +9,14 @@ Màn đăng nhập hiển thị dòng ghi nguồn ("Ảnh: … · giấy phép")
 | `trangan-boats.jpg` | Thuyền nan ở Tràng An, Ninh Bình | Jakub Hałun | CC BY 4.0 | https://commons.wikimedia.org/wiki/File:Trang_An_Landscape_Complex,_Ninh_Binh_Province,_Vietnam,_20240202_1446_5304.jpg |
 | `hoian-lanterns.jpg` | Đèn lồng phố cổ Hội An | Mig Gilbert from Brighton | CC BY-SA 2.0 | https://commons.wikimedia.org/wiki/File:Lanterns_in_Hoi_An_(40480642302).jpg |
 
-Các ảnh đã được thu nhỏ về chiều rộng 1600px, không chỉnh sửa nội dung.
+### Ảnh trang chủ (`hero/`)
+
+`mucangchai-terraces.jpg` là ảnh nền banner trang chủ (`src/features/tourist/components/HomePage.jsx`); hai ảnh còn lại hiện chưa dùng. Trang không hiện tên tác giả, nguồn chỉ ghi ở đây. Bản thu nhỏ 1280px của Wikimedia.
+
+| File | Nội dung | Tác giả | Giấy phép | Nguồn |
+|---|---|---|---|---|
+| `hero/hoian-chuacau.jpg` | Chùa Cầu, Hội An (về đêm) | Alexkom000 | CC BY 4.0 | https://commons.wikimedia.org/wiki/File:2024-12-20_Japanese_Bridge_in_Hoi_An.jpg |
+| `hero/mucangchai-terraces.jpg` | Ruộng bậc thang Chế Cu Nha, Mù Cang Chải | Doan Tuan (danny_pham93) | CC0 | https://commons.wikimedia.org/wiki/File:Terraces_in_Che_Cu_Nha_commune,_Mu_Cang_Chai_(Unsplash).jpg |
+| `hero/muine-fishing-boats.jpg` | Thuyền đánh cá ở làng chài Mũi Né | Trevor Mills | CC BY 2.0 | https://commons.wikimedia.org/wiki/File:Fishing_Boats,_Mui_Ne.jpg |
+
+Các ảnh ở bảng trên cùng đã được thu nhỏ về chiều rộng 1600px, không chỉnh sửa nội dung.

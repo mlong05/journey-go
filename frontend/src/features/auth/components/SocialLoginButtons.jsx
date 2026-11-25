@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useT } from "@/i18n";
 
 /**
  * Các nút đăng nhập nhanh Google, Facebook/SSO, Apple
@@ -11,6 +12,7 @@ export default function SocialLoginButtons({
   onGoogleLogin,
   loading = false,
 }) {
+  const t = useT();
   return (
     <div className="w-full space-y-4 pt-1">
       {/* Phân cách OR */}
@@ -19,7 +21,7 @@ export default function SocialLoginButtons({
           <div className="w-full border-t border-slate-200" />
         </div>
         <span className="relative bg-white px-4 text-xs font-semibold text-slate-400 uppercase tracking-widest">
-          HOẶC
+          {t("misc.social.or")}
         </span>
       </div>
 
@@ -36,7 +38,7 @@ export default function SocialLoginButtons({
               onSocialLogin("Google");
             }
           }}
-          title="Đăng nhập với Google"
+          title={t("misc.social.googleTitle")}
           className="h-12 w-full rounded-2xl border border-slate-200/80 bg-slate-50/70 hover:bg-slate-100 flex items-center justify-center cursor-pointer transition-all shadow-xs hover:shadow-sm active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed group"
         >
           <svg className="w-5 h-5 shrink-0 transition-transform group-hover:scale-110" viewBox="0 0 24 24">
@@ -63,8 +65,8 @@ export default function SocialLoginButtons({
         <button
           type="button"
           disabled={loading}
-          onClick={() => onSocialLogin?.("Doanh nghiệp")}
-          title="Đăng nhập tài khoản Đối tác & Doanh nghiệp"
+          onClick={() => onSocialLogin?.(t("misc.social.enterprise"))}
+          title={t("misc.social.enterpriseTitle")}
           className="h-12 w-full rounded-2xl border border-slate-200/80 bg-slate-50/70 hover:bg-slate-100 flex items-center justify-center cursor-pointer transition-all shadow-xs hover:shadow-sm active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed group"
         >
           <svg className="w-5 h-5 text-[#1877F2] shrink-0 fill-current transition-transform group-hover:scale-110" viewBox="0 0 24 24">
@@ -77,7 +79,7 @@ export default function SocialLoginButtons({
           type="button"
           disabled={loading}
           onClick={() => onSocialLogin?.("Apple")}
-          title="Đăng nhập với Apple ID"
+          title={t("misc.social.appleTitle")}
           className="h-12 w-full rounded-2xl border border-slate-200/80 bg-slate-50/70 hover:bg-slate-100 flex items-center justify-center cursor-pointer transition-all shadow-xs hover:shadow-sm active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed group"
         >
           <svg className="w-5 h-5 text-slate-900 shrink-0 fill-current transition-transform group-hover:scale-110" viewBox="0 0 24 24">

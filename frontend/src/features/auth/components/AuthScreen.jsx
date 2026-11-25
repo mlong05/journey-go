@@ -22,19 +22,14 @@ import HeritageLandmarksArt from "./HeritageLandmarksArt";
 import BronzeDrumMotif from "@/components/ui/BronzeDrumMotif";
 import { translateAuthError } from "@/services/errorMessage";
 
-/**
- * Trang du khách cần quay lại sau khi đăng nhập / đăng ký (`/login?callbackUrl=/tours/38`).
- * Chỉ nhận đường dẫn nội bộ (bắt đầu bằng một dấu "/") để tránh chuyển hướng ra trang ngoài.
- */
-function touristCallback(defaultPath) {
-  if (typeof window === "undefined") return defaultPath;
-  const url = new URLSearchParams(window.location.search).get("callbackUrl");
-  return url && url.startsWith("/") && !url.startsWith("//") && !url.startsWith("/\\") ? url : defaultPath;
-}
+import { resolvePostLoginPath, readLoginReasonMessage } from "@/services/authRedirect";
+import { getLocale, translate, useT } from "@/i18n";
+import LanguageSwitcher from "@/components/common/LanguageSwitcher";
 
 export default function AuthScreen({ initialTab = "login" }) {
   const router = useRouter();
   const { loginWithGoogle } = useAuth();
+  const t = useT();
 
   // Tab chuyển đổi: "login" (Đăng nhập) | "register" (Đăng ký tài khoản)
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -82,6 +77,24 @@ export default function AuthScreen({ initialTab = "login" }) {
     }, 3800);
   };
 
+  // Bị chuyển tới đây vì hết phiên / chưa đăng nhập (?reason=expired|required) ⇒ báo rõ lý do.
+  useEffect(() => {
+    const reason = typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("reason")
+      : null;
+    const msg = reason === "expired"
+      ? translate(getLocale(), "misc.auth.reasonExpired")
+      : reason === "required"
+        ? translate(getLocale(), "misc.auth.reasonRequired")
+        : readLoginReasonMessage();
+    if (!msg) return undefined;
+    const timer = setTimeout(() => {
+      setToast({ type: "info", message: msg });
+      setTimeout(() => setToast(null), 6000);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+
   // ============================================================================
   // XỬ LÝ ĐĂNG NHẬP
   // ============================================================================
@@ -92,11 +105,11 @@ export default function AuthScreen({ initialTab = "login" }) {
     const password = loginForm.password;
 
     if (!email) {
-      showToast("error", "Vui lòng nhập Email hoặc Tên tài khoản.");
+      showToast("error", t("misc.auth.errEmptyEmail"));
       return;
     }
     if (!password) {
-      showToast("error", "Vui lòng nhập Mật khẩu bảo mật.");
+      showToast("error", t("misc.auth.errEmptyPassword"));
       return;
     }
 
@@ -110,7 +123,7 @@ export default function AuthScreen({ initialTab = "login" }) {
       const refreshToken = payload?.refreshToken;
 
       if (!user) {
-        throw new Error(result?.message || "Không nhận được dữ liệu người dùng từ máy chủ.");
+        throw new Error(result?.message || t("misc.auth.errNoUserData"));
       }
 
       // ==========================================================================
@@ -121,36 +134,36 @@ export default function AuthScreen({ initialTab = "login" }) {
       // ==========================================================================
       if (user.active === false) {
         setLoading(false);
-        showToast(
-          "error",
-          "Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên để được hướng dẫn khôi phục."
-        );
+        showToast("error", t("misc.auth.errAccountDisabled"));
         return;
       }
 
       const roleStr = String(user.role || "").toUpperCase();
 
       let targetPath = "/";
-      let roleTitle = "Du khách khám phá";
-      let roleScope = "Khám phá danh lam thắng cảnh & di sản";
+      let roleTitle = t("misc.role.tourist.titleExplorer");
+      let roleScope = t("misc.role.tourist.scopeFull");
 
       if (roleStr === "ADMIN") {
         targetPath = ROUTES.ADMIN || "/admin";
-        roleTitle = "Quản trị viên";
-        roleScope = "Quản trị hệ thống & vận hành";
+        roleTitle = t("misc.role.admin.title");
+        roleScope = t("misc.role.admin.scope");
       } else if (roleStr === "CONTENT_MODERATOR") {
         targetPath = ROUTES.MODERATOR || "/moderator";
-        roleTitle = "Kiểm duyệt viên";
-        roleScope = "Thẩm định hồ sơ & nội dung";
+        roleTitle = t("misc.role.moderator.title");
+        roleScope = t("misc.role.moderator.scope");
       } else if (roleStr === "CONTENT_PROVIDER") {
         targetPath = ROUTES.PROVIDER || "/provider";
-        roleTitle = "Đối tác cung cấp nội dung";
-        roleScope = "Nội dung, tour, doanh thu & tất toán";
+        roleTitle = t("misc.role.provider.title");
+        roleScope = t("misc.role.provider.scopeFull");
       } else {
-        targetPath = touristCallback(ROUTES.HOME || "/");
-        roleTitle = "Du khách khám phá";
-        roleScope = "Khám phá di sản";
+        targetPath = ROUTES.HOME || "/";
+        roleTitle = t("misc.role.tourist.titleExplorer");
+        roleScope = t("misc.role.tourist.scope");
       }
+      // Quay lại đúng trang đang mở trước khi đăng nhập (callbackUrl), nếu thuộc khu vực của vai trò.
+      const rolePath = targetPath;
+      targetPath = resolvePostLoginPath(roleStr);
 
       const authSession = {
         user: {
@@ -169,7 +182,7 @@ export default function AuthScreen({ initialTab = "login" }) {
         accessToken,
         refreshToken,
         role: roleStr.toLowerCase(),
-        rolePath: targetPath,
+        rolePath,
         loginAt: new Date().toISOString(),
         rememberMe: loginForm.rememberMe,
       };
@@ -191,10 +204,10 @@ export default function AuthScreen({ initialTab = "login" }) {
       setFeedbackModal({
         isOpen: true,
         type: "login",
-        title: "Xác thực hành trình thành công!",
-        subtitle: `Chào mừng bạn quay trở lại. Đang mở ${roleTitle} trên nền tảng JourneyGo...`,
+        title: t("misc.auth.loginSuccessTitle"),
+        subtitle: t("misc.auth.loginSuccessSubtitle", { roleTitle }),
         roleBadge: roleTitle,
-        targetLabel: targetPath === "/" ? "Cổng Khám Phá" : targetPath,
+        targetLabel: targetPath === "/" ? t("misc.auth.explorePortal") : targetPath,
         redirectPath: targetPath,
       });
 
@@ -206,7 +219,7 @@ export default function AuthScreen({ initialTab = "login" }) {
       console.error("[Login Error]", err);
       const errMsg = translateAuthError(
         err,
-        "Đăng nhập thất bại. Vui lòng kiểm tra lại Email và Mật khẩu."
+        t("misc.auth.loginFailedCheck")
       );
       showToast("error", errMsg);
       setLoading(false);
@@ -220,13 +233,13 @@ export default function AuthScreen({ initialTab = "login" }) {
     e.preventDefault();
 
     // Cùng bộ kiểm tra với RegisterForm (lỗi chi tiết đã hiện dưới từng ô) — báo lỗi đầu tiên.
-    const firstError = Object.values(validateRegister(registerForm))[0];
+    const firstError = Object.values(validateRegister(registerForm, t))[0];
     if (firstError) {
       showToast("error", `${firstError}.`);
       return;
     }
     if (!registerForm.agreeTerms) {
-      showToast("error", "Vui lòng đồng ý với Điều khoản & Quy chế hoạt động.");
+      showToast("error", t("misc.auth.errAgreeTerms"));
       return;
     }
 
@@ -244,7 +257,7 @@ export default function AuthScreen({ initialTab = "login" }) {
       });
 
       if (result?.success === false) {
-        throw new Error(result?.message || "Đăng ký không thành công. Vui lòng thử lại.");
+        throw new Error(result?.message || t("misc.auth.registerFailedRetry"));
       }
 
       // Đăng ký xong KHÔNG tự đăng nhập/chuyển trang: ở lại trang xác thực, chuyển sang tab
@@ -252,10 +265,10 @@ export default function AuthScreen({ initialTab = "login" }) {
       setLoading(false);
       setLoginForm((prev) => ({ ...prev, identifier: registerForm.email.trim(), password: "" }));
       setActiveTab("login");
-      showToast("success", "Đăng ký thành công! Vui lòng đăng nhập để tiếp tục.");
+      showToast("success", t("misc.auth.registerSuccessToast"));
     } catch (err) {
       console.error("[Register Error]", err);
-      showToast("error", err?.message || "Đăng ký không thành công. Vui lòng thử lại.");
+      showToast("error", err?.message || t("misc.auth.registerFailedRetry"));
       setLoading(false);
     }
   };
@@ -268,7 +281,7 @@ export default function AuthScreen({ initialTab = "login" }) {
   const handleGoogleCredentialResponse = async (response) => {
     // response.credential chính là chuỗi Google ID Token từ Google SDK
     if (!response?.credential) {
-      showToast("error", "Không nhận được ID Token từ Google.");
+      showToast("error", t("misc.auth.errNoGoogleToken"));
       return;
     }
 
@@ -287,25 +300,23 @@ export default function AuthScreen({ initialTab = "login" }) {
         // ==========================================================================
         if (user?.active === false) {
           setLoading(false);
-          showToast(
-            "error",
-            "Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên để được hướng dẫn khôi phục."
-          );
+          showToast("error", t("misc.auth.errAccountDisabled"));
           return;
         }
 
-        const roleTitle = res.roleTitle || "Người dùng";
-        const rolePath = res.targetPath || ROUTES.HOME || "/";
-        // Du khách (đường dẫn mặc định là trang chủ) quay lại đúng trang đang xem trước khi đăng nhập.
-        const targetPath = rolePath === (ROUTES.HOME || "/") ? touristCallback(rolePath) : rolePath;
+        const roleTitle = res.roleTitle || t("misc.role.user");
+        // Quay lại đúng trang đang xem trước khi đăng nhập (callbackUrl), nếu thuộc khu vực của vai trò.
+        const targetPath = resolvePostLoginPath(user?.role);
 
         setFeedbackModal({
           isOpen: true,
           type: "login",
-          title: "Đăng nhập Google thành công!",
-          subtitle: `Chào mừng ${user?.fullName || user?.email || "bạn"}. Đang kết nối phiên làm việc...`,
+          title: t("misc.auth.googleSuccessTitle"),
+          subtitle: t("misc.auth.googleSuccessSubtitle", {
+            name: user?.fullName || user?.email || t("misc.auth.defaultUserName"),
+          }),
           roleBadge: roleTitle,
-          targetLabel: targetPath === "/" ? "Trang chủ" : targetPath,
+          targetLabel: targetPath === "/" ? t("misc.auth.homeLabel") : targetPath,
           redirectPath: targetPath,
         });
 
@@ -314,11 +325,11 @@ export default function AuthScreen({ initialTab = "login" }) {
           router.push(targetPath);
         }, 1250);
       } else {
-        showToast("error", res?.error || "Đăng nhập Google thất bại.");
+        showToast("error", res?.error || t("misc.auth.googleFailedDot"));
       }
     } catch (err) {
       console.error("[Google Login Error]", err);
-      showToast("error", translateAuthError(err, "Đăng nhập Google thất bại."));
+      showToast("error", translateAuthError(err, t("misc.auth.googleFailedDot")));
     } finally {
       setLoading(false);
     }
@@ -387,13 +398,13 @@ export default function AuthScreen({ initialTab = "login" }) {
 
   const handleGoogleClick = () => {
     if (typeof window === "undefined" || !window.google?.accounts?.id) {
-      showToast("error", "Google SDK chưa sẵn sàng, vui lòng thử lại sau giây lát.");
+      showToast("error", t("misc.auth.googleSdkNotReady"));
       return;
     }
 
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     if (!clientId || clientId.includes("your-google-client-id")) {
-      showToast("info", "Vui lòng cấu hình NEXT_PUBLIC_GOOGLE_CLIENT_ID hợp lệ trong .env.local.");
+      showToast("info", t("misc.auth.googleClientIdMissing"));
       return;
     }
 
@@ -411,7 +422,7 @@ export default function AuthScreen({ initialTab = "login" }) {
       window.google.accounts.id.prompt();
     } catch (err) {
       console.error("[Google OAuth Prompt Error]", err);
-      showToast("error", "Không mở được cửa sổ đăng nhập Google. Vui lòng thử lại.");
+      showToast("error", t("misc.auth.googlePopupFailed"));
     }
   };
 
@@ -425,7 +436,7 @@ export default function AuthScreen({ initialTab = "login" }) {
     }
 
     // Chỉ Google hiện có luồng xác thực thật; các nhà cung cấp khác chưa hỗ trợ.
-    showToast("info", `Đăng nhập bằng ${providerName} hiện chưa được hỗ trợ.`);
+    showToast("info", t("misc.auth.socialUnsupported", { provider: providerName }));
   };
 
   return (
@@ -483,8 +494,8 @@ export default function AuthScreen({ initialTab = "login" }) {
 
 
         {/* Logo thương hiệu (giống thanh bên trang quản trị) */}
-        <header className="relative z-10 shrink-0 px-6 sm:px-10 xl:px-14 pt-5 [@media(max-height:760px)]:pt-3 flex items-center justify-between gap-4">
-          <Link href={ROUTES.HOME} className="flex items-center gap-1.5 min-w-0" title="Về trang chủ JourneyGo">
+        <header className="relative z-20 shrink-0 px-6 sm:px-10 xl:px-14 pt-5 [@media(max-height:760px)]:pt-3 flex items-center justify-between gap-4">
+          <Link href={ROUTES.HOME} className="flex items-center gap-1.5 min-w-0" title={t("misc.auth.homeTitle")}>
             <Image
               src="/image/logo-emblem.png"
               alt="JourneyGo"
@@ -495,7 +506,7 @@ export default function AuthScreen({ initialTab = "login" }) {
             />
             <Image
               src="/image/logo-wordmark.png"
-              alt="JourneyGo - đồng hành cùng bạn trong chuyến đi"
+              alt={t("misc.auth.logoWordmarkAlt")}
               width={424}
               height={104}
               priority
@@ -503,14 +514,17 @@ export default function AuthScreen({ initialTab = "login" }) {
             />
           </Link>
 
-          {/* Trên mobile không có cột ảnh nên nút về trang chủ nằm ở đây */}
-          <Link
-            href={ROUTES.HOME}
-            className="lg:hidden inline-flex items-center gap-1.5 h-9 px-3 rounded-xl border border-stone-200 text-xs font-semibold text-slate-600 hover:text-emerald-700 hover:border-emerald-200 transition-colors shrink-0"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Trang chủ
-          </Link>
+          <div className="flex items-center gap-2 shrink-0 sm:mr-28">
+            <LanguageSwitcher />
+            {/* Trên mobile không có cột ảnh nên nút về trang chủ nằm ở đây */}
+            <Link
+              href={ROUTES.HOME}
+              className="lg:hidden inline-flex items-center gap-1.5 h-10 px-3 rounded-xl border border-stone-200 text-xs font-semibold text-slate-600 hover:text-emerald-700 hover:border-emerald-200 transition-colors shrink-0"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              {t("misc.auth.homeLabel")}
+            </Link>
+          </div>
         </header>
 
         {/* Vùng form chiếm phần còn lại của màn hình, căn giữa; không hiện thanh cuộn
@@ -531,7 +545,7 @@ export default function AuthScreen({ initialTab = "login" }) {
                   setActiveTab("login");
                   showToast(
                     "success",
-                    "Đặt lại mật khẩu thành công! Vui lòng đăng nhập với mật khẩu mới."
+                    t("misc.auth.resetSuccessToast")
                   );
                 }}
               />
@@ -541,15 +555,15 @@ export default function AuthScreen({ initialTab = "login" }) {
                   {activeTab !== "login" && (
                     <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700 leading-normal">
                       <span className="w-5 h-px bg-amber-600/60" />
-                      Gia nhập hành trình
+                      {t("misc.auth.joinJourney")}
                     </p>
                   )}
                   <h1 className="font-jakarta text-[26px] xl:text-[30px] font-bold text-emerald-900 tracking-tight leading-[1.3]">
-                    {activeTab === "login" ? "Chào mừng bạn quay trở lại" : "Đăng ký tài khoản"}
+                    {activeTab === "login" ? t("misc.auth.welcomeBack") : t("misc.auth.registerAccount")}
                   </h1>
                   {activeTab !== "login" && (
                     <p className="text-sm font-medium text-stone-500 leading-normal">
-                      Tạo tài khoản để đặt trải nghiệm cùng người bản địa
+                      {t("misc.auth.registerSubtitle")}
                     </p>
                   )}
                 </div>
@@ -585,13 +599,13 @@ export default function AuthScreen({ initialTab = "login" }) {
                 />
 
                 <p className="text-center text-sm text-slate-600 leading-normal">
-                  {activeTab === "login" ? "Chưa có tài khoản? " : "Đã có tài khoản? "}
+                  {activeTab === "login" ? t("misc.auth.noAccount") : t("misc.auth.haveAccount")}
                   <button
                     type="button"
                     onClick={() => setActiveTab(activeTab === "login" ? "register" : "login")}
                     className="font-bold text-emerald-800 hover:text-emerald-600 transition-colors cursor-pointer"
                   >
-                    {activeTab === "login" ? "Đăng ký ngay" : "Đăng nhập ngay"}
+                    {activeTab === "login" ? t("misc.auth.registerNow") : t("misc.auth.loginNow")}
                   </button>
                 </p>
               </>
@@ -605,7 +619,7 @@ export default function AuthScreen({ initialTab = "login" }) {
         {/* Chân trang: dòng bản quyền gọn, nằm trong luồng */}
         <footer className="relative z-10 shrink-0 pb-4 pt-1">
           <p className="text-center text-[11px] text-slate-400 leading-normal">
-            Bảo hộ bởi JourneyGo Identity Service • Phiên bản 2.5
+            {t("misc.auth.footerCopyright")}
           </p>
         </footer>
       </div>

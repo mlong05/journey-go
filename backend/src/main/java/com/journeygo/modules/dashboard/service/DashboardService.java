@@ -185,8 +185,105 @@ public class DashboardService {
         updates.sort(Comparator.comparing(ProviderDashboardResponse.ModerationUpdate::createdAt,
                 Comparator.nullsLast(Comparator.reverseOrder())));
 
+        boolean hourly = "today".equals(period.key);
         return new ProviderDashboardResponse(period.key, destinations, checkIns, revenue, missions, rows,
-                updates.stream().limit(UPDATE_LIMIT).toList());
+                updates.stream().limit(UPDATE_LIMIT).toList(), hourly ? "hour" : "day",
+                providerSeries(userId, period.key));
+    }
+
+    /**
+     * Chuỗi số liệu cho biểu đồ "diễn biến theo thời gian", kỳ này đặt cạnh kỳ trước:
+     *   • today: theo giờ, 0h → giờ hiện tại, so với cùng giờ hôm qua;
+     *   • week : 7 ngày gần nhất (theo ngày lịch), so với 7 ngày liền trước;
+     *   • month: ngày 1 → hôm nay, so với cùng ngày tháng trước (ngày không có ở tháng trước ⇒ null).
+     * Doanh thu / lượt đặt tính theo thời điểm thanh toán (giống ô Doanh thu); check-in theo thời điểm check-in.
+     */
+    private List<ProviderDashboardResponse.SeriesPoint> providerSeries(Long userId, String rangeKey) {
+        ZonedDateTime now = ZonedDateTime.now(VN_ZONE);
+        LocalDate today = now.toLocalDate();
+        boolean hourly = "today".equals(rangeKey);
+        Duration step = hourly ? Duration.ofHours(1) : Duration.ofDays(1);
+
+        List<ZonedDateTime> cur = new ArrayList<>();
+        List<ZonedDateTime> prev = new ArrayList<>();
+        if (hourly) {
+            ZonedDateTime start = today.atStartOfDay(VN_ZONE);
+            for (int h = 0; h <= now.getHour(); h++) {
+                cur.add(start.plusHours(h));
+                prev.add(start.minusDays(1).plusHours(h));
+            }
+        } else if ("week".equals(rangeKey)) {
+            for (int i = 6; i >= 0; i--) {
+                LocalDate d = today.minusDays(i);
+                cur.add(d.atStartOfDay(VN_ZONE));
+                prev.add(d.minusDays(7).atStartOfDay(VN_ZONE));
+            }
+        } else {
+            LocalDate first = today.withDayOfMonth(1);
+            LocalDate prevFirst = first.minusMonths(1);
+            for (int i = 0; i < today.getDayOfMonth(); i++) {
+                cur.add(first.plusDays(i).atStartOfDay(VN_ZONE));
+                LocalDate p = prevFirst.plusDays(i);
+                prev.add(p.getMonth() == prevFirst.getMonth() ? p.atStartOfDay(VN_ZONE) : null);
+            }
+        }
+
+        int n = cur.size();
+        BigDecimal[] revenue = new BigDecimal[n];
+        BigDecimal[] prevRevenue = new BigDecimal[n];
+        long[] bookings = new long[n];
+        long[] prevBookings = new long[n];
+        long[] checkIns = new long[n];
+        long[] prevCheckIns = new long[n];
+        java.util.Arrays.fill(revenue, BigDecimal.ZERO);
+        java.util.Arrays.fill(prevRevenue, BigDecimal.ZERO);
+
+        // Một khoảng truy vấn bao cả kỳ trước lẫn kỳ này (kỳ trước luôn bắt đầu sớm hơn).
+        Instant from = prev.get(0).toInstant();
+        Instant to = cur.get(n - 1).plus(step).toInstant();
+
+        query("select b.paidAt, b.totalAmount from Booking b where b.status in ?1 and b.tour.createdBy.id = ?2 "
+                + "and b.paidAt >= ?3 and b.paidAt < ?4", Object[].class, PAID_BOOKING, userId, from, to)
+                .getResultList().forEach(r -> {
+                    Instant at = (Instant) r[0];
+                    BigDecimal amount = r[1] == null ? BigDecimal.ZERO : (BigDecimal) r[1];
+                    int i = bucketOf(cur, at, step);
+                    if (i >= 0) { revenue[i] = revenue[i].add(amount); bookings[i]++; }
+                    int j = bucketOf(prev, at, step);
+                    if (j >= 0) { prevRevenue[j] = prevRevenue[j].add(amount); prevBookings[j]++; }
+                });
+
+        query("select c.checkedInAt from UserCheckInPoint c where c.isValid = true "
+                + "and c.experience.destination.createdBy.id = ?1 and c.checkedInAt >= ?2 and c.checkedInAt < ?3",
+                Instant.class, userId, from, to)
+                .getResultList().forEach(at -> {
+                    int i = bucketOf(cur, at, step);
+                    if (i >= 0) checkIns[i]++;
+                    int j = bucketOf(prev, at, step);
+                    if (j >= 0) prevCheckIns[j]++;
+                });
+
+        List<ProviderDashboardResponse.SeriesPoint> points = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            boolean hasPrev = prev.get(i) != null;
+            points.add(new ProviderDashboardResponse.SeriesPoint(
+                    cur.get(i).toInstant(), hasPrev ? prev.get(i).toInstant() : null,
+                    revenue[i], bookings[i], checkIns[i],
+                    hasPrev ? prevRevenue[i] : null, hasPrev ? prevBookings[i] : null, hasPrev ? prevCheckIns[i] : null));
+        }
+        return points;
+    }
+
+    /** Vị trí mốc chứa thời điểm `at` (mốc = [start, start + step)); -1 nếu không thuộc mốc nào. */
+    private static int bucketOf(List<ZonedDateTime> starts, Instant at, Duration step) {
+        if (at == null) return -1;
+        for (int i = 0; i < starts.size(); i++) {
+            ZonedDateTime s = starts.get(i);
+            if (s == null) continue;
+            Instant begin = s.toInstant();
+            if (!at.isBefore(begin) && at.isBefore(begin.plus(step))) return i;
+        }
+        return -1;
     }
 
     // ───────────────────────── MODERATOR ─────────────────────────

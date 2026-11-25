@@ -9,6 +9,8 @@ import '../common/ink.dart';
 import '../common/photo.dart';
 import '../chat/ai_guide_chat_screen.dart';
 import '../culture/cultural_stories.dart';
+import '../culture/then_now_slider.dart' show ThenNowSlider;
+import '../../l10n/locale_controller.dart';
 
 /// Đánh dấu du khách đã đọc phần văn hoá của một trạm (lưu trên máy, chỉ để hiện nhãn "Mới").
 class CultureReadStore {
@@ -43,7 +45,6 @@ class StopCultureScreen extends StatefulWidget {
   final int destinationId;
   final int order;
   final String name;
-  final String? coverImage;
   final bool wizard;
   final bool hasExperience;
 
@@ -53,7 +54,6 @@ class StopCultureScreen extends StatefulWidget {
     required this.destinationId,
     required this.order,
     required this.name,
-    required this.coverImage,
     required this.wizard,
     required this.hasExperience,
   });
@@ -73,10 +73,10 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
   @override
   void initState() {
     super.initState();
-    CultureReadStore.markRead(widget.journeyId, widget.destinationId);
     if (widget.wizard) {
       _load();
     } else {
+      CultureReadStore.markRead(widget.journeyId, widget.destinationId);
       _loading = false;
     }
   }
@@ -91,15 +91,18 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
         journeyId: widget.journeyId,
         destinationId: widget.destinationId,
       );
-      if (mounted) setState(() => _culture = culture);
+      if (!mounted) return;
+      setState(() => _culture = culture);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
+      CultureReadStore.markRead(widget.journeyId, widget.destinationId);
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  String? get _hero => _culture?.imageUrl ?? widget.coverImage;
+  /// Ảnh đầu trang: chỉ ảnh của nội dung văn hoá; không có ⇒ để trống (KHÔNG mượn ảnh trạm / tour).
+  String? get _hero => _culture?.imageUrl ?? _culture?.culturalImages.firstOrNull;
 
   @override
   Widget build(BuildContext context) {
@@ -113,7 +116,7 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
         scrolledUnderElevation: 0.5,
         titleSpacing: 0,
         title: Text(
-          'TRẠM ${widget.order.toString().padLeft(2, '0')}  ·  NỘI DUNG VĂN HÓA',
+          appL10n.scStopHeader(widget.order.toString().padLeft(2, '0')),
           style: AppType.eyebrow(),
         ),
         actions: [
@@ -126,9 +129,9 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
                 destinationName: widget.name,
               ),
               icon: const Icon(Icons.auto_awesome_rounded, size: 17, color: AppCultureColors.heritageJade),
-              label: const Text(
-                'Hỏi AI',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppCultureColors.heritageJade),
+              label: Text(
+                context.l10n.aiAskButton,
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppCultureColors.heritageJade),
               ),
             ),
           ),
@@ -156,13 +159,13 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (video != null)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(bottom: 10),
                     child: Row(
                       children: [
                         Icon(Icons.movie_outlined, size: 16, color: AppInk.muted),
                         SizedBox(width: 6),
-                        Text('Video thuyết minh', style: TextStyle(fontSize: 12.5, color: AppInk.muted)),
+                        Text(appL10n.scVideo, style: TextStyle(fontSize: 12.5, color: AppInk.muted)),
                       ],
                     ),
                   ),
@@ -205,7 +208,7 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
             const SizedBox(height: 12),
             Text(_error!, textAlign: TextAlign.center, style: const TextStyle(height: 1.5, color: AppInk.muted)),
             const SizedBox(height: 16),
-            OutlinedButton(onPressed: _load, child: const Text('Thử lại')),
+            OutlinedButton(onPressed: _load, child: Text(appL10n.commonRetry)),
           ],
         ),
       );
@@ -230,7 +233,7 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
             const SizedBox(height: 22),
           ],
           if (paragraphs.isNotEmpty) ...[
-            const _SectionTitle(label: 'Câu chuyện'),
+            _SectionTitle(label: appL10n.jsStory),
             for (var i = 0; i < paragraphs.length; i++)
               Padding(
                 padding: const EdgeInsets.only(bottom: 14),
@@ -239,12 +242,28 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
           ],
           if (c.culturalImages.isNotEmpty) ...[
             const SizedBox(height: 22),
-            _SectionTitle(label: 'Hình ảnh', trailing: '${c.culturalImages.length} ảnh'),
+            _SectionTitle(label: appL10n.scImages, trailing: appL10n.scImageCount(c.culturalImages.length)),
             _gallery(c.culturalImages),
+          ],
+          if (c.thenNow.isNotEmpty) ...[
+            const SizedBox(height: 28),
+            _SectionTitle(label: appL10n.scThenNowTitle),
+            for (final pair in c.thenNow) ...[
+              ThenNowSlider(pair: pair, aspectRatio: 4 / 3),
+              if (pair.caption != null) ...[
+                const SizedBox(height: 8),
+                Text(pair.caption!, style: AppType.reading(size: 15)),
+              ],
+              if (pair.credit != null) ...[
+                const SizedBox(height: 4),
+                Text(appL10n.scThenNowCredit(pair.credit!), style: const TextStyle(fontSize: 12, color: AppInk.muted)),
+              ],
+              const SizedBox(height: 18),
+            ],
           ],
           if (c.artifacts.isNotEmpty) ...[
             const SizedBox(height: 28),
-            _SectionTitle(label: 'Hiện vật', trailing: '${c.artifacts.length} hiện vật'),
+            _SectionTitle(label: appL10n.tdArtifacts, trailing: appL10n.scArtifactCount(c.artifacts.length)),
             Container(
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
@@ -261,10 +280,10 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
             ),
           ],
           if (c.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Text(
-                'Đối tác chưa bổ sung nội dung văn hóa cho trạm này.',
+                appL10n.scNoContent,
                 style: TextStyle(color: AppInk.muted),
               ),
             ),
@@ -289,7 +308,7 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
       ),
       itemBuilder: (_, i) => Semantics(
         button: true,
-        label: 'Xem hình ảnh ${i + 1}',
+        label: appL10n.scViewImage(i + 1),
         child: GestureDetector(
           onTap: () => _viewImage(images, i),
           child: Photo(url: images[i], width: 140, borderRadius: BorderRadius.circular(10)),
@@ -309,7 +328,7 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
 
   /// Hiện vật: một hàng gọn kiểu danh mục bảo tàng (ảnh vuông nhỏ + nhãn), chạm để xem chi tiết.
   Widget _artifact(TourArtifact a, int index, {required bool divider}) {
-    final label = 'HIỆN VẬT SỐ ${index.toString().padLeft(2, '0')}';
+    final label = appL10n.scArtifactNumber(index.toString().padLeft(2, '0'));
     return InkWell(
       onTap: () => _showArtifact(a, label),
       child: Container(
@@ -349,11 +368,11 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
                   ],
                   if (a.videoUrl != null) ...[
                     const SizedBox(height: 4),
-                    const Row(
+                    Row(
                       children: [
                         Icon(Icons.play_circle_outline_rounded, size: 15, color: AppInk.accent),
                         SizedBox(width: 4),
-                        Text('Có video', style: TextStyle(fontSize: 12, color: AppInk.accent)),
+                        Text(appL10n.scHasVideo, style: TextStyle(fontSize: 12, color: AppInk.accent)),
                       ],
                     ),
                   ],
@@ -428,7 +447,7 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
               textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
             ),
             icon: const Icon(Icons.explore_outlined),
-            label: const Text('Sang phần Trải nghiệm'),
+            label: Text(appL10n.scToExperience),
           )
         else
           OutlinedButton(
@@ -439,7 +458,7 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
               minimumSize: const Size.fromHeight(52),
               shape: const StadiumBorder(),
             ),
-            child: const Text('Quay lại lộ trình'),
+            child: Text(appL10n.scBackToRoute),
           ),
       ],
     );

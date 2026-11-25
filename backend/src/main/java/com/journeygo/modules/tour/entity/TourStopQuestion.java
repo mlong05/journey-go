@@ -53,6 +53,23 @@ public class TourStopQuestion {
     @Column(name = "reference_answer", columnDefinition = "TEXT")
     private String referenceAnswer;
 
+    /** Giải thích ngắn hiện cho du khách sau khi nộp câu đố (không bắt buộc). */
+    @Column(name = "explanation", columnDefinition = "TEXT")
+    private String explanation;
+
+    /** Câu NUMBER: khoảng thanh trượt [numberMin, numberMax], đáp án đúng và sai số cho phép. */
+    @Column(name = "number_min")
+    private Integer numberMin;
+
+    @Column(name = "number_max")
+    private Integer numberMax;
+
+    @Column(name = "number_correct")
+    private Integer numberCorrect;
+
+    @Column(name = "number_tolerance")
+    private Integer numberTolerance;
+
     public boolean isTextQuestion() {
         return questionType == QuestionType.TEXT;
     }

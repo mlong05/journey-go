@@ -35,6 +35,7 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../l10n/locale_controller.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/booking_service.dart';
@@ -172,7 +173,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       setState(() {
         _syncing = false;
         _polling = false;
-        _statusMessage = 'Thanh toán thành công!';
+        _statusMessage = context.l10n.paySuccessShort;
       });
       // Đọc lại giao dịch để có đầy đủ thông tin hiển thị.
       final paymentId = _payment?.id ?? _init?.paymentId ?? event.paymentId;
@@ -197,7 +198,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       _statusMessage = '';
       _error = event.message.isNotEmpty
           ? event.message
-          : 'Thanh toán không thành công. Bạn có thể thử lại.';
+          : context.l10n.payFailedRetry;
     });
   }
 
@@ -246,10 +247,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
     } catch (_) {
       if (!mounted) return;
       if (widget.booking != null) {
-        setState(() => _error = 'Không thể tải thông tin thanh toán.');
+        setState(() => _error = context.l10n.payLoadFailed);
       } else {
         setState(() {
-          _error = 'Không thể tải thông tin thanh toán.';
+          _error = context.l10n.payLoadFailed;
           _loading = false;
         });
       }
@@ -279,7 +280,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       setState(() => _error = e.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _error = 'Không thể tải phương thức thanh toán.');
+      setState(() => _error = context.l10n.payMethodsLoadFailed);
     }
   }
 
@@ -337,7 +338,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     if (result.isSuccess) {
       setState(() {
         _payment = result.payment;
-        _statusMessage = 'Thanh toán thành công!';
+        _statusMessage = context.l10n.paySuccessShort;
       });
       _showSuccessDialog();
       return;
@@ -352,7 +353,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         setState(() {
           _booking = fresh;
           _payment = result.payment;
-          _statusMessage = 'Thanh toán thành công!';
+          _statusMessage = context.l10n.paySuccessShort;
         });
         _showSuccessDialog();
         return;
@@ -363,8 +364,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         _statusMessage = '';
         _error = result.message.isNotEmpty
             ? result.message
-            : 'Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán '
-                'bởi một giao dịch khác.';
+            : context.l10n.paySuperseded;
       });
       return;
     }
@@ -396,8 +396,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
   void _onDeadlineExceeded() {
     if (_polling) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Đã hết thời hạn thanh toán 10 phút. Vui lòng đặt lại tour.'),
+      SnackBar(
+        content: Text(context.l10n.payDeadlineExceeded),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -430,7 +430,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     setState(() {
       _initializing = true;
       _error = '';
-      _statusMessage = 'Đang khởi tạo giao dịch...';
+      _statusMessage = context.l10n.payInitializingTxn;
     });
 
     try {
@@ -475,7 +475,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       setState(() {
         _initializing = false;
         _statusMessage = '';
-        _error = 'Không thể khởi tạo thanh toán. Vui lòng thử lại.';
+        _error = context.l10n.payInitFailed;
       });
     }
   }
@@ -489,7 +489,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     // Phương thức QR: hiển thị mã QR trong app, KHÔNG tự mở trình duyệt.
     // (Sandbox chưa hỗ trợ quét QR — khách dùng app thật sẽ quét mã này.)
     if (_isQrSelected) {
-      setState(() => _statusMessage = 'Quét mã QR để hoàn tất thanh toán.');
+      setState(() => _statusMessage = context.l10n.payScanQrToFinish);
       _startPolling(init.paymentId, booking.paymentDeadline);
       return;
     }
@@ -499,7 +499,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       if (!mounted) return;
       setState(() {
         _statusMessage = '';
-        _error = 'Không thể mở trang thanh toán. Vui lòng kiểm tra trình duyệt.';
+        _error = context.l10n.payOpenBrowserFailed;
       });
       return;
     }
@@ -518,7 +518,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         setState(() {
           _initializing = false;
           _statusMessage = '';
-          _error = 'Chưa xác minh được kết quả giao dịch trước. Vui lòng thử lại sau.';
+          _error = context.l10n.payUnverifiedLater;
         });
         return;
       }
@@ -531,7 +531,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         setState(() {
           _initializing = false;
           _payment = result.payment;
-          _statusMessage = 'Thanh toán thành công!';
+          _statusMessage = context.l10n.paySuccessShort;
         });
         _showSuccessDialog();
         return;
@@ -559,8 +559,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       setState(() {
         _initializing = false;
         _statusMessage = '';
-        _error = 'Chưa xác minh được kết quả giao dịch trước. Nếu bạn chưa thanh toán, '
-            'bạn có thể thử lại ngay; nếu đã thanh toán, hãy kiểm tra lại sau ít phút.';
+        _error = context.l10n.payUnverifiedRetry;
       });
       _offerRetry(bookingId);
     } catch (_) {
@@ -568,7 +567,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       setState(() {
         _initializing = false;
         _statusMessage = '';
-        _error = 'Chưa xác minh được kết quả giao dịch trước. Vui lòng thử lại sau.';
+        _error = context.l10n.payUnverifiedLater;
       });
       _offerRetry(bookingId);
     }
@@ -583,21 +582,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final retry = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Thanh toán lại?'),
-        content: const Text(
-          'Hệ thống chưa xác minh được kết quả giao dịch trước.\n\n'
-          '• Nếu bạn CHƯA thanh toán: bạn có thể thử lại ngay với thời hạn còn lại.\n'
-          '• Nếu bạn ĐÃ thanh toán: vui lòng chọn "Kiểm tra lại" để hệ thống đồng bộ '
-          'kết quả, tránh thanh toán trùng.',
-        ),
+        title: Text(ctx.l10n.payRetryTitle),
+        content: Text(ctx.l10n.payRetryMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Kiểm tra lại'),
+            child: Text(ctx.l10n.payCheckAgain),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Thử lại'),
+            child: Text(ctx.l10n.commonRetry),
           ),
         ],
       ),
@@ -622,7 +616,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     if (_polling) return;
     setState(() {
       _polling = true;
-      _statusMessage = 'Đang chờ kết quả thanh toán...';
+      _statusMessage = context.l10n.payAwaitingResult;
     });
 
     try {
@@ -642,7 +636,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         if (!mounted) return;
         setState(() {
           _polling = false;
-          _statusMessage = 'Thanh toán thành công!';
+          _statusMessage = context.l10n.paySuccessShort;
         });
         _showSuccessDialog();
         return;
@@ -668,7 +662,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           setState(() {
             _booking = fresh;
             _polling = false;
-            _statusMessage = 'Thanh toán thành công!';
+            _statusMessage = context.l10n.paySuccessShort;
           });
           _showSuccessDialog();
           return;
@@ -679,8 +673,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           _statusMessage = '';
           _error = result.message?.isNotEmpty == true
               ? result.message!
-              : 'Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán '
-                  'bởi một giao dịch khác.';
+              : context.l10n.paySuperseded;
         });
         return;
       }
@@ -693,14 +686,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
         _statusMessage = '';
         _error = result.message?.isNotEmpty == true
             ? result.message!
-            : 'Thanh toán không thành công. Bạn có thể thử lại.';
+            : context.l10n.payFailedRetry;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _polling = false;
         _statusMessage = '';
-        _error = 'Không thể kiểm tra trạng thái thanh toán. Vui lòng thử lại.';
+        _error = context.l10n.payStatusCheckFailed;
       });
     }
   }
@@ -724,7 +717,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     if (_syncing) return;
     setState(() {
       _syncing = true;
-      _statusMessage = 'Đang kiểm tra kết quả thanh toán...';
+      _statusMessage = context.l10n.payCheckingResult;
     });
 
     try {
@@ -737,7 +730,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         setState(() {
           _payment = result.payment;
           _syncing = false;
-          _statusMessage = 'Thanh toán thành công!';
+          _statusMessage = context.l10n.paySuccessShort;
         });
         _showSuccessDialog();
         return;
@@ -760,7 +753,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               _booking = fresh;
               _payment = result.payment;
               _syncing = false;
-              _statusMessage = 'Thanh toán thành công!';
+              _statusMessage = context.l10n.paySuccessShort;
             });
             _showSuccessDialog();
             return;
@@ -772,8 +765,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             _statusMessage = '';
             _error = result.message.isNotEmpty
                 ? result.message
-                : 'Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán '
-                    'bởi một giao dịch khác.';
+                : context.l10n.paySuperseded;
           });
           return;
         }
@@ -791,7 +783,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       setState(() {
         _payment = result.payment;
         _syncing = false;
-        _statusMessage = _polling ? '' : 'Đang chờ kết quả thanh toán...';
+        _statusMessage = _polling ? '' : context.l10n.payAwaitingResult;
       });
     } catch (_) {
       if (!mounted) return;
@@ -857,9 +849,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
               size: 18, color: AppCultureColors.textDark),
           onPressed: () => Navigator.of(context).pop(false),
         ),
-        title: const Text(
-          'Thanh Toán',
-          style: TextStyle(
+        title: Text(
+          context.l10n.coTitle,
+          style: const TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w800,
             color: AppCultureColors.textDark,
@@ -895,7 +887,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ElevatedButton.icon(
               onPressed: _load,
               icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Thử lại'),
+              label: Text(context.l10n.commonRetry),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppCultureColors.heritageJade,
                 foregroundColor: Colors.white,
@@ -944,6 +936,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final methods = (_methods?.methods ?? const <PaymentMethodOption>[])
         .where((m) => !_hiddenMethodCodes.contains(m.code))
         .toList();
+    final l10n = context.l10n;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
@@ -978,7 +971,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       children: [
                         Text(
                           booking.bookingCode.isEmpty
-                              ? 'Đơn #${booking.id}'
+                              ? l10n.payBookingNumber(booking.id)
                               : booking.bookingCode,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -992,7 +985,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         const SizedBox(height: 6),
                         Text(
                           booking.tourTitle.isEmpty
-                              ? 'Tour trải nghiệm'
+                              ? l10n.payTourFallback
                               : booking.tourTitle,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -1050,7 +1043,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Ngày trải nghiệm',
+                          l10n.payExperienceDate,
                           style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 11.5),
                         ),
                         const SizedBox(height: 2),
@@ -1076,7 +1069,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          'Tổng thanh toán',
+                          l10n.tdTotalPayment,
                           style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 11.5),
                         ),
                         const SizedBox(height: 2),
@@ -1101,9 +1094,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
         // ── Phương thức thanh toán ──
         const SizedBox(height: 18),
-        const Text(
-          'Phương thức thanh toán',
-          style: TextStyle(
+        Text(
+          l10n.payMethodTitle,
+          style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w800,
             color: AppCultureColors.textDark,
@@ -1118,9 +1111,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
               color: AppCultureColors.surfaceSubtle,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Text(
-              'Không tải được phương thức thanh toán. Bạn vẫn có thể thử lại.',
-              style: TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
+            child: Text(
+              l10n.payMethodsUnavailable,
+              style: const TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
             ),
           )
         else
@@ -1215,9 +1208,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       minimumSize: const Size(0, 32),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    child: const Text(
-                      'Kiểm tra lại',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                    child: Text(
+                      l10n.payCheckAgain,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
                     ),
                   ),
               ],
@@ -1276,12 +1269,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 : const Icon(Icons.account_balance_wallet_rounded, size: 20),
             label: Text(
               _initializing
-                  ? 'Đang khởi tạo...'
+                  ? l10n.payInitializing
                   : _syncing
-                      ? 'Đang kiểm tra...'
+                      ? l10n.payChecking
                       : _polling
-                          ? 'Kiểm tra kết quả thanh toán'
-                          : 'Thanh toán ${booking.formattedTotal}',
+                          ? l10n.payCheckResult
+                          : l10n.coPayAmount(booking.formattedTotal),
               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
             ),
             style: ElevatedButton.styleFrom(
@@ -1297,10 +1290,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        const Text(
-          'Bạn có 10 phút để hoàn tất thanh toán. Trang VNPay sẽ mở bằng trình duyệt.',
+        Text(
+          l10n.payTimeLimitNote,
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 11.5, color: AppCultureColors.textLight),
+          style: const TextStyle(fontSize: 11.5, color: AppCultureColors.textLight),
         ),
       ],
     );
@@ -1316,19 +1309,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
       ),
       child: Column(
         children: [
-          const Text(
-            'Quét mã để thanh toán',
-            style: TextStyle(
+          Text(
+            context.l10n.payQrTitle,
+            style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w800,
               color: AppCultureColors.textDark,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Mở ứng dụng ngân hàng hoặc ví điện tử hỗ trợ VNPay-QR để quét mã này.',
+          Text(
+            context.l10n.payQrHint,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11.5, color: AppCultureColors.textMuted),
+            style: const TextStyle(fontSize: 11.5, color: AppCultureColors.textMuted),
           ),
           const SizedBox(height: 14),
           QrImageView(
@@ -1348,6 +1341,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
         ],
       ),
     );
+  }
+
+  /// Tên phương thức: backend trả tiếng Việt ⇒ ngôn ngữ khác dịch theo mã phương thức.
+  String _methodLabel(PaymentMethodOption method) {
+    final l10n = context.l10n;
+    if (l10n.localeName == 'vi') return method.label;
+    return switch (method.code) {
+      'DOMESTIC_CARD' => l10n.coMethodDomestic,
+      'INTERNATIONAL_CARD' => l10n.payMethodIntl,
+      'QR_APP_WALLET' => l10n.payMethodQr,
+      _ => method.label,
+    };
   }
 
   /// Icon đại diện cho từng phương thức thanh toán.
@@ -1435,7 +1440,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          method.label,
+                          _methodLabel(method),
                           style: const TextStyle(
                             fontSize: 13.5,
                             fontWeight: FontWeight.w800,
@@ -1446,8 +1451,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           const SizedBox(height: 2),
                           Text(
                             _selectedBankCode == null
-                                ? 'Chọn loại thẻ (Visa, Mastercard, JCB…)'
-                                : 'Loại thẻ: ${_intlBrandLabel(_selectedBankCode!)}',
+                                ? context.l10n.payChooseCardHint
+                                : context.l10n.payCardType(_intlBrandLabel(_selectedBankCode!)),
                             style: const TextStyle(
                               fontSize: 11.5,
                               color: AppCultureColors.textMuted,
@@ -1491,7 +1496,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       return Padding(
         padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
         child: Text(
-          'Không tải được danh sách loại thẻ. Bạn vẫn có thể thanh toán bằng thẻ quốc tế.',
+          context.l10n.payCardTypesUnavailable,
           style: const TextStyle(fontSize: 11.5, color: AppCultureColors.textMuted),
         ),
       );
@@ -1506,11 +1511,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(2, 6, 0, 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(2, 6, 0, 8),
             child: Text(
-              'Chọn loại thẻ',
-              style: TextStyle(
+              context.l10n.payChooseCard,
+              style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
                 color: AppCultureColors.textDark,

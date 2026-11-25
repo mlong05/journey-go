@@ -8,6 +8,7 @@
 library;
 
 import '../utils/formatters.dart';
+import '../../l10n/locale_controller.dart';
 
 class RefundModel {
   final int id;
@@ -232,23 +233,23 @@ class RefundModel {
   String get statusLabel {
     switch (status) {
       case 'PENDING_REVIEW':
-        return 'Chờ duyệt';
+        return appL10n.refundStatusPendingReview;
       case 'APPROVED':
-        return 'Đã duyệt';
+        return appL10n.refundStatusApproved;
       case 'VNPAY_PROCESSING':
-        return 'Chờ VNPay xác nhận hoàn tiền';
+        return appL10n.refundStatusVnpay;
       case 'REFUND_PROCESSING':
-        return 'Đang hoàn tiền';
+        return appL10n.refundStatusProcessing;
       case 'MANUAL_TRANSFER_PENDING':
-        return 'Chờ chuyển khoản thủ công';
+        return appL10n.refundStatusManual;
       case 'REFUNDED':
-        return 'Đã hoàn tiền';
+        return appL10n.refundToneRefunded;
       case 'REJECTED':
-        return 'Bị từ chối';
+        return appL10n.refundStatusRejected;
       case 'FAILED':
-        return 'Hoàn tiền lỗi';
+        return appL10n.refundStatusFailed;
       case 'CANCELLED':
-        return 'Đã hủy';
+        return appL10n.statusCancelled;
       default:
         return status;
     }

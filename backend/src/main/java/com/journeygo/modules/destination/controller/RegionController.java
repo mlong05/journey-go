@@ -4,11 +4,13 @@ import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.modules.destination.dto.RegionRequest;
 import com.journeygo.modules.destination.dto.RegionResponse;
 import com.journeygo.modules.destination.service.RegionService;
+import com.journeygo.modules.tour.service.TourTranslationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,23 +25,30 @@ import java.util.List;
 public class RegionController {
 
     private final RegionService regionService;
+    private final TourTranslationService tourTranslationService;
 
     @GetMapping
     @Operation(summary = "Lấy tất cả khu vực")
     public ResponseEntity<ApiResponse<List<RegionResponse>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách khu vực thành công", regionService.getAll()));
+        List<RegionResponse> list = tourTranslationService.localizeRegions(
+                regionService.getAll(), LocaleContextHolder.getLocale());
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách khu vực thành công", list));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Lấy chi tiết khu vực theo ID")
     public ResponseEntity<ApiResponse<RegionResponse>> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin khu vực thành công", regionService.getById(id)));
+        RegionResponse region = tourTranslationService.localizeRegion(
+                regionService.getById(id), LocaleContextHolder.getLocale());
+        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin khu vực thành công", region));
     }
 
     @GetMapping("/slug/{slug}")
     @Operation(summary = "Lấy chi tiết khu vực theo slug")
     public ResponseEntity<ApiResponse<RegionResponse>> getBySlug(@PathVariable String slug) {
-        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin khu vực thành công", regionService.getBySlug(slug)));
+        RegionResponse region = tourTranslationService.localizeRegion(
+                regionService.getBySlug(slug), LocaleContextHolder.getLocale());
+        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin khu vực thành công", region));
     }
 
     @PostMapping

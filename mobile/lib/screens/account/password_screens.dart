@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/auth_service.dart';
 import '../common/heritage_motion.dart';
+import '../../l10n/locale_controller.dart';
 
 // Khôi phục mật khẩu bằng mã OTP qua email, và đổi mật khẩu khi đang đăng nhập.
 
@@ -45,7 +46,7 @@ class _HeritageHeader extends StatelessWidget {
                 IconButton(
                   onPressed: () => Navigator.of(context).maybePop(),
                   icon: const Icon(Icons.arrow_back_rounded, color: AppCultureColors.textDark),
-                  tooltip: 'Quay lại',
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
                 ),
                 const SizedBox(height: 6),
                 Padding(
@@ -145,7 +146,7 @@ class _PasswordFieldState extends State<_PasswordField> {
         Icons.lock_outline_rounded,
         helper: widget.helper,
         suffix: IconButton(
-          tooltip: _hidden ? 'Hiện mật khẩu' : 'Ẩn mật khẩu',
+          tooltip: _hidden ? context.l10n.pwShow : context.l10n.pwHide,
           icon: Icon(_hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined),
           onPressed: () => setState(() => _hidden = !_hidden),
         ),
@@ -188,8 +189,8 @@ Widget _errorBox(String message) {
 }
 
 String? _validateNewPassword(String? v) {
-  if (v == null || v.isEmpty) return 'Vui lòng nhập mật khẩu mới';
-  if (v.length < 6) return 'Mật khẩu phải có ít nhất 6 ký tự';
+  if (v == null || v.isEmpty) return appL10n.pwErrNewRequired;
+  if (v.length < 6) return appL10n.pwErrNewShort;
   return null;
 }
 
@@ -264,8 +265,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _startCountdown();
       setState(() => _step = 1);
       if (resend) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Đã gửi lại mã OTP tới email của bạn.'),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(appL10n.pwOtpResent),
           behavior: SnackBarBehavior.floating,
         ));
       }
@@ -295,15 +296,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         builder: (ctx) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
           icon: const Icon(Icons.verified_rounded, color: AppCultureColors.heritageJade, size: 44),
-          title: const Text('Đặt lại mật khẩu thành công',
+          title: Text(ctx.l10n.pwResetSuccess,
               textAlign: TextAlign.center, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-          content: const Text('Hãy đăng nhập bằng mật khẩu mới.',
+          content: Text(ctx.l10n.pwResetSuccessHint,
               textAlign: TextAlign.center, style: TextStyle(color: AppCultureColors.textMuted)),
           actions: [
             FilledButton(
               onPressed: () => Navigator.pop(ctx),
               style: FilledButton.styleFrom(backgroundColor: AppCultureColors.heritageJade),
-              child: const Text('Đăng nhập'),
+              child: Text(ctx.l10n.authLogin),
             ),
           ],
         ),
@@ -320,9 +321,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         child: Column(
           children: [
-            const _HeritageHeader(
-              title: 'Khôi phục mật khẩu',
-              subtitle: 'Nhận mã OTP qua email để đặt lại mật khẩu',
+            _HeritageHeader(
+              title: context.l10n.pwForgotTitle,
+              subtitle: context.l10n.pwForgotSubtitle,
               icon: Icons.key_rounded,
             ),
             Padding(
@@ -332,7 +333,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _StepIndicator(step: _step, labels: const ['Email', 'Mã OTP', 'Mật khẩu mới']),
+                    _StepIndicator(step: _step, labels: ['Email', context.l10n.pwStepOtp, context.l10n.pwStepNewPassword]),
                     const SizedBox(height: 22),
                     if (_error != null) _errorBox(_error!),
                     AnimatedSwitcher(
@@ -362,7 +363,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Nhập email bạn đã dùng để đăng ký. Chúng tôi sẽ gửi mã gồm 6 chữ số.',
+            Text(context.l10n.pwEmailIntro,
                 style: TextStyle(fontSize: 13.5, height: 1.45, color: AppCultureColors.textMuted)),
             const SizedBox(height: 16),
             TextFormField(
@@ -372,14 +373,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               onFieldSubmitted: (_) => _sendCode(),
               validator: (v) {
                 final value = v?.trim() ?? '';
-                if (value.isEmpty) return 'Vui lòng nhập email';
-                if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value)) return 'Email không đúng định dạng';
+                if (value.isEmpty) return context.l10n.pwErrEmailRequired;
+                if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value)) return context.l10n.pwErrEmailInvalid;
                 return null;
               },
               decoration: _fieldDecoration('Email', Icons.alternate_email_rounded),
             ),
             const SizedBox(height: 22),
-            _primaryButton(label: 'Gửi mã OTP', busy: _busy, onPressed: _sendCode),
+            _primaryButton(label: context.l10n.pwSendOtp, busy: _busy, onPressed: _sendCode),
           ],
         );
       case 1:
@@ -388,12 +389,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           children: [
             Text.rich(
               TextSpan(children: [
-                const TextSpan(text: 'Mã đã được gửi tới '),
+                TextSpan(text: context.l10n.pwCodeSentPrefix),
                 TextSpan(
                   text: _email.text.trim(),
                   style: const TextStyle(fontWeight: FontWeight.w600, color: AppCultureColors.textDark),
                 ),
-                const TextSpan(text: '. Kiểm tra cả thư mục Spam nếu chưa thấy.'),
+                TextSpan(text: context.l10n.pwCodeSentSuffix),
               ]),
               style: const TextStyle(fontSize: 13.5, height: 1.45, color: AppCultureColors.textMuted),
             ),
@@ -408,12 +409,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               onChanged: (v) {
                 if (v.length == 6) _verifyCode();
               },
-              validator: (v) => (v ?? '').length != 6 ? 'Mã OTP gồm đúng 6 chữ số' : null,
+              validator: (v) => (v ?? '').length != 6 ? context.l10n.pwErrOtpLength : null,
               style: const TextStyle(fontSize: 26, letterSpacing: 12, fontWeight: FontWeight.w600),
-              decoration: _fieldDecoration('Mã OTP', Icons.pin_outlined).copyWith(counterText: ''),
+              decoration: _fieldDecoration(context.l10n.pwStepOtp, Icons.pin_outlined).copyWith(counterText: ''),
             ),
             const SizedBox(height: 22),
-            _primaryButton(label: 'Xác nhận mã', busy: _busy, onPressed: _verifyCode),
+            _primaryButton(label: context.l10n.pwVerifyCode, busy: _busy, onPressed: _verifyCode),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -425,11 +426,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             _step = 0;
                             _error = null;
                           }),
-                  child: const Text('Đổi email'),
+                  child: Text(context.l10n.pwChangeEmail),
                 ),
                 TextButton(
                   onPressed: _busy || _resendIn > 0 ? null : () => _sendCode(resend: true),
-                  child: Text(_resendIn > 0 ? 'Gửi lại sau ${_resendIn}s' : 'Gửi lại mã'),
+                  child: Text(_resendIn > 0 ? context.l10n.pwResendIn(_resendIn) : context.l10n.pwResend),
                 ),
               ],
             ),
@@ -439,24 +440,24 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Đặt mật khẩu mới cho tài khoản của bạn.',
+            Text(context.l10n.pwNewIntro,
                 style: TextStyle(fontSize: 13.5, height: 1.45, color: AppCultureColors.textMuted)),
             const SizedBox(height: 16),
             _PasswordField(
               controller: _password,
-              label: 'Mật khẩu mới',
-              helper: 'Ít nhất 6 ký tự',
+              label: context.l10n.pwStepNewPassword,
+              helper: context.l10n.pwMin6,
               validator: _validateNewPassword,
             ),
             const SizedBox(height: 14),
             _PasswordField(
               controller: _confirm,
-              label: 'Nhập lại mật khẩu mới',
+              label: context.l10n.pwConfirmNew,
               action: TextInputAction.done,
-              validator: (v) => v != _password.text ? 'Mật khẩu nhập lại không khớp' : null,
+              validator: (v) => v != _password.text ? context.l10n.pwErrMismatch : null,
             ),
             const SizedBox(height: 22),
-            _primaryButton(label: 'Đặt lại mật khẩu', busy: _busy, onPressed: _reset),
+            _primaryButton(label: context.l10n.pwResetButton, busy: _busy, onPressed: _reset),
           ],
         );
     }
@@ -564,8 +565,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         confirmPassword: _confirm.text,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Đổi mật khẩu thành công.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(context.l10n.pwChangeSuccess),
         behavior: SnackBarBehavior.floating,
       ));
       Navigator.of(context).pop(true);
@@ -584,9 +585,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         child: Column(
           children: [
-            const _HeritageHeader(
-              title: 'Đổi mật khẩu',
-              subtitle: 'Giữ an toàn cho hành trang di sản của bạn',
+            _HeritageHeader(
+              title: context.l10n.changePasswordTitle,
+              subtitle: context.l10n.pwChangeSubtitle,
               icon: Icons.shield_outlined,
             ),
             Padding(
@@ -598,30 +599,30 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     if (_error != null) _errorBox(_error!),
                     _PasswordField(
                       controller: _current,
-                      label: 'Mật khẩu hiện tại',
+                      label: context.l10n.pwCurrent,
                       helper: widget.signedInWithGoogle
-                          ? 'Bỏ trống nếu bạn đăng nhập bằng Google và chưa từng đặt mật khẩu'
+                          ? context.l10n.pwCurrentGoogleHint
                           : null,
                       validator: (v) => !widget.signedInWithGoogle && (v ?? '').isEmpty
-                          ? 'Vui lòng nhập mật khẩu hiện tại'
+                          ? context.l10n.pwErrCurrentRequired
                           : null,
                     ),
                     const SizedBox(height: 14),
                     _PasswordField(
                       controller: _password,
-                      label: 'Mật khẩu mới',
-                      helper: 'Ít nhất 6 ký tự, khác mật khẩu hiện tại',
+                      label: context.l10n.pwStepNewPassword,
+                      helper: context.l10n.pwNewHelper,
                       validator: _validateNewPassword,
                     ),
                     const SizedBox(height: 14),
                     _PasswordField(
                       controller: _confirm,
-                      label: 'Nhập lại mật khẩu mới',
+                      label: context.l10n.pwConfirmNew,
                       action: TextInputAction.done,
-                      validator: (v) => v != _password.text ? 'Mật khẩu nhập lại không khớp' : null,
+                      validator: (v) => v != _password.text ? context.l10n.pwErrMismatch : null,
                     ),
                     const SizedBox(height: 24),
-                    _primaryButton(label: 'Lưu mật khẩu mới', busy: _busy, onPressed: _submit),
+                    _primaryButton(label: context.l10n.pwSave, busy: _busy, onPressed: _submit),
                   ],
                 ),
               ),

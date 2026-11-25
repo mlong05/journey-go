@@ -11,6 +11,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { formatDateVN } from "@/lib/money";
+import { INTL_LOCALE } from "@/i18n/core";
 
 /**
  * Biểu tượng + màu theo nhóm thông báo (backend: NotificationType.Category).
@@ -32,11 +33,27 @@ const FALLBACK = { icon: Bell, tone: "bg-slate-100 text-slate-600 ring-slate-200
 
 export const metaOf = (category) => CATEGORY_META[category] || FALLBACK;
 
-/** "Vừa xong", "5 phút trước", "Hôm qua", "03/11"... */
-export function timeAgo(value) {
+/** Nhãn nhóm thông báo theo ngôn ngữ ([t] từ useT() — khu du khách). */
+export const categoryLabel = (t, category) =>
+  t(CATEGORY_META[category] ? `notifCategory.${category}` : "notifCategory.FALLBACK");
+
+/**
+ * "Vừa xong", "5 phút trước", "Hôm qua", "03/11"...
+ * Truyền [t] + [locale] (useI18n) để hiện theo ngôn ngữ đã chọn; không truyền ⇒ tiếng Việt (trang quản trị).
+ */
+export function timeAgo(value, t, locale = "vi") {
   if (!value) return "";
   const date = new Date(value);
   const diff = Math.max(0, (Date.now() - date.getTime()) / 1000);
+  if (t) {
+    if (diff < 60) return t("time.justNow");
+    if (diff < 3600) return t("time.minutesAgo", { count: Math.floor(diff / 60) });
+    if (diff < 86400) return t("time.hoursAgo", { count: Math.floor(diff / 3600) });
+    if (diff < 172800) return t("time.yesterday");
+    if (diff < 604800) return t("time.daysAgo", { count: Math.floor(diff / 86400) });
+    if (locale !== "vi") return new Intl.DateTimeFormat(INTL_LOCALE[locale] || locale, { year: "numeric", month: "short", day: "numeric" }).format(date);
+    return formatDateVN(value);
+  }
   if (diff < 60) return "Vừa xong";
   if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
   if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;

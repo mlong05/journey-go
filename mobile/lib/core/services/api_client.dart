@@ -5,7 +5,9 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'server_finder.dart';
+import 'session_expiry.dart';
 import 'token_storage.dart';
+import '../../l10n/locale_controller.dart';
 
 const _imageSubtypesByExtension = {
   'jpg': 'jpeg',
@@ -101,7 +103,7 @@ class ApiClient {
           final res = await http
               .post(
                 Uri.parse('$baseUrl/auth/refresh'),
-                headers: {'Content-Type': 'application/json'},
+                headers: {'Content-Type': 'application/json', 'Accept-Language': acceptLanguage},
                 body: jsonEncode({'refreshToken': refreshToken}),
               )
               .timeout(const Duration(seconds: 15));
@@ -148,13 +150,13 @@ class ApiClient {
   }) async {
     final baseUrl = await TokenStorage.getBaseUrl();
     final uri = Uri.parse('$baseUrl$path');
-    final headers = <String, String>{'Accept': 'application/json'};
+    final headers = <String, String>{'Accept': 'application/json', 'Accept-Language': acceptLanguage};
 
     if (auth) {
       final token = await TokenStorage.getAccessToken();
       if (token == null || token.isEmpty) {
-        throw const ApiException(
-          'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+        throw ApiException(
+          SessionExpiry.message,
           statusCode: 401,
         );
       }
@@ -207,16 +209,15 @@ class ApiClient {
             formEncoded: formEncoded,
           );
         }
-        await TokenStorage.clear();
-        throw const ApiException(
-          'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
-          statusCode: 401,
-        );
+        // Refresh thất bại ⇒ xóa phiên + mở màn đăng nhập đè lên màn hiện tại;
+        // đăng nhập lại xong sẽ quay về đúng màn này (xem SessionExpiry).
+        unawaited(SessionExpiry.expire());
+        throw ApiException(SessionExpiry.message, statusCode: 401);
       }
 
       if (response.statusCode == 401) {
-        throw const ApiException(
-          'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+        throw ApiException(
+          SessionExpiry.message,
           statusCode: 401,
         );
       }
@@ -226,20 +227,20 @@ class ApiClient {
       throw ApiException(
         (serverMessage != null && serverMessage.isNotEmpty)
             ? serverMessage
-            : 'Không thể xử lý yêu cầu (mã ${response.statusCode}).',
+            : appL10n.apiRequestFailed('${response.statusCode}'),
         code: map['code']?.toString(),
         statusCode: response.statusCode,
       );
     } on TimeoutException {
       ServerFinder.markUnreachable();
-      throw const ApiException('Kết nối đến máy chủ quá hạn. Vui lòng thử lại.');
+      throw ApiException(appL10n.apiTimeout);
     } on SocketException {
       ServerFinder.markUnreachable();
-      throw const ApiException(
-        'Không thể kết nối đến máy chủ. Hãy kiểm tra mạng và địa chỉ API.',
+      throw ApiException(
+        appL10n.apiUnreachable,
       );
     } on FormatException {
-      throw const ApiException('Máy chủ trả về dữ liệu không hợp lệ.');
+      throw ApiException(appL10n.apiInvalidData);
     }
   }
 
@@ -248,12 +249,13 @@ class ApiClient {
     final baseUrl = await TokenStorage.getBaseUrl();
     final token = await TokenStorage.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw const ApiException('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', statusCode: 401);
+      throw ApiException(SessionExpiry.message, statusCode: 401);
     }
     try {
       final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/upload/image'))
         ..headers['Authorization'] = 'Bearer $token'
         ..headers['Accept'] = 'application/json'
+        ..headers['Accept-Language'] = acceptLanguage
         ..fields['folder'] = folder
         ..files.add(await http.MultipartFile.fromPath(
           'file',
@@ -268,19 +270,19 @@ class ApiClient {
         final data = decoded is Map ? decoded['data'] : null;
         final url = data is Map ? data['url']?.toString() : null;
         if (url != null && url.isNotEmpty) return url;
-        throw const ApiException('Máy chủ không trả về đường dẫn ảnh.');
+        throw ApiException(appL10n.apiNoImageUrl);
       }
       final message = decoded is Map ? decoded['message']?.toString() : null;
       throw ApiException(
-        (message != null && message.isNotEmpty) ? message : 'Không thể tải ảnh lên (mã ${response.statusCode}).',
+        (message != null && message.isNotEmpty) ? message : appL10n.apiImageUploadFailed('${response.statusCode}'),
         statusCode: response.statusCode,
       );
     } on TimeoutException {
-      throw const ApiException('Tải ảnh quá hạn. Vui lòng thử lại.');
+      throw ApiException(appL10n.apiImageTimeout);
     } on SocketException {
-      throw const ApiException('Không thể kết nối đến máy chủ. Hãy kiểm tra mạng và địa chỉ API.');
+      throw ApiException(appL10n.apiUnreachable);
     } on FormatException {
-      throw const ApiException('Máy chủ trả về dữ liệu không hợp lệ.');
+      throw ApiException(appL10n.apiInvalidData);
     }
   }
 
@@ -291,12 +293,13 @@ class ApiClient {
     final baseUrl = await TokenStorage.getBaseUrl();
     final token = await TokenStorage.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw const ApiException('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', statusCode: 401);
+      throw ApiException(SessionExpiry.message, statusCode: 401);
     }
     try {
       final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/upload/video'))
         ..headers['Authorization'] = 'Bearer $token'
         ..headers['Accept'] = 'application/json'
+        ..headers['Accept-Language'] = acceptLanguage
         ..fields['folder'] = folder
         ..files.add(await http.MultipartFile.fromPath(
           'file',
@@ -311,19 +314,19 @@ class ApiClient {
         final data = decoded is Map ? decoded['data'] : null;
         final url = data is Map ? data['url']?.toString() : null;
         if (url != null && url.isNotEmpty) return url;
-        throw const ApiException('Máy chủ không trả về đường dẫn video.');
+        throw ApiException(appL10n.apiNoVideoUrl);
       }
       final message = decoded is Map ? decoded['message']?.toString() : null;
       throw ApiException(
-        (message != null && message.isNotEmpty) ? message : 'Không thể tải video lên (mã ${response.statusCode}).',
+        (message != null && message.isNotEmpty) ? message : appL10n.apiVideoUploadFailed('${response.statusCode}'),
         statusCode: response.statusCode,
       );
     } on TimeoutException {
-      throw const ApiException('Tải video quá hạn. Vui lòng thử lại.');
+      throw ApiException(appL10n.apiVideoTimeout);
     } on SocketException {
-      throw const ApiException('Không thể kết nối đến máy chủ. Hãy kiểm tra mạng và địa chỉ API.');
+      throw ApiException(appL10n.apiUnreachable);
     } on FormatException {
-      throw const ApiException('Máy chủ trả về dữ liệu không hợp lệ.');
+      throw ApiException(appL10n.apiInvalidData);
     }
   }
 

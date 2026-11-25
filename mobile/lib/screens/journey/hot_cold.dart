@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
+import '../../l10n/locale_controller.dart';
 
 /// "Nóng – lạnh" khi đi tìm checkpoint: càng gần càng "nóng", vòng tròn đổi màu và điện thoại rung mạnh dần.
 enum Warmth { cold, cool, warm, hot, arrived }
@@ -20,7 +21,7 @@ extension WarmthStyle on Warmth {
         Warmth.cool => const Color(0xFF0284C7),
         Warmth.warm => const Color(0xFFEA580C),
         Warmth.hot => const Color(0xFFDC2626),
-        Warmth.arrived => const Color(0xFF047857),
+        Warmth.arrived => const Color(0xFF0B7F7E),
       };
 
   /// Màu chữ đạt tương phản trên nền nhạt.
@@ -29,7 +30,7 @@ extension WarmthStyle on Warmth {
         Warmth.cool => const Color(0xFF075985),
         Warmth.warm => const Color(0xFFC2410C),
         Warmth.hot => const Color(0xFFB91C1C),
-        Warmth.arrived => const Color(0xFF065F46),
+        Warmth.arrived => const Color(0xFF115E59),
       };
 
   Color get soft => color.withValues(alpha: 0.12);
@@ -43,11 +44,11 @@ extension WarmthStyle on Warmth {
       };
 
   String get label => switch (this) {
-        Warmth.cold => 'Lạnh · còn xa',
-        Warmth.cool => 'Mát · đang đến gần',
-        Warmth.warm => 'Ấm · gần lắm rồi',
-        Warmth.hot => 'Nóng! Ngay quanh đây',
-        Warmth.arrived => 'Đã tới checkpoint',
+        Warmth.cold => appL10n.hcCold,
+        Warmth.cool => appL10n.hcCool,
+        Warmth.warm => appL10n.hcWarm,
+        Warmth.hot => appL10n.hcHot,
+        Warmth.arrived => appL10n.hcArrived,
       };
 
   /// Rung khi vừa lên mức nóng hơn: càng gần càng mạnh.

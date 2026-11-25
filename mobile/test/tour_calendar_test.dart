@@ -8,6 +8,7 @@ import 'package:mobile/core/constants/app_theme.dart';
 import 'package:mobile/core/models/departure_model.dart';
 import 'package:mobile/core/models/tour_model.dart';
 import 'package:mobile/screens/tours/tour_calendar_screen.dart';
+import 'package:mobile/l10n/app_localizations.dart';
 
 Future<void> _loadNunito() async {
   final loader = FontLoader('Nunito');
@@ -49,6 +50,9 @@ Future<void> _pump(WidgetTester tester, {double textScale = 1}) async {
   final today = DateUtils.dateOnly(DateTime.now());
   await tester.pumpWidget(
     MaterialApp(
+      locale: const Locale('vi'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: AppTheme.light(),
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),

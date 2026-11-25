@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Compass, ArrowUpRight } from "lucide-react";
+import { useT } from "@/i18n";
 
 const TOUR_LINK_TOKEN_REGEX = /(\[[^\]]+\]\(\/tours\/\d+\)|\/tours\/\d+)/g;
 const MARKDOWN_LINK_REGEX = /^\[([^\]]+)\]\((\/tours\/(\d+))\)$/;
@@ -25,6 +26,8 @@ export default function AiMessageContent({
   isUser = false,
   onTourLinkClick = null,
 }) {
+  const t = useT();
+
   if (isUser) {
     return (
       <p className="whitespace-pre-wrap break-words text-[13.5px]">
@@ -69,7 +72,7 @@ export default function AiMessageContent({
               className="mx-0.5 inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs font-bold text-teal-800 transition hover:border-teal-400 hover:bg-teal-100 align-baseline"
             >
               <Compass size={11} className="shrink-0 text-teal-600" />
-              <span>Xem tour #{tourId}</span>
+              <span>{t("aiguide.message.viewTour", { id: tourId })}</span>
               <ArrowUpRight size={11} className="shrink-0 text-teal-600" />
             </Link>
           );

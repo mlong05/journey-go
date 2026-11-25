@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/constants/app_colors.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Quét mã QR tại trạm / điểm đến. Pop với chuỗi quét được (hoặc mã nhập tay), `null` nếu hủy.
 ///
@@ -10,13 +11,13 @@ import '../../core/constants/app_colors.dart';
 /// initState, dừng khi app inactive (kể cả lúc hộp xin quyền camera hiện lên), chạy lại khi resumed.
 /// Nếu để thư viện tự khởi động trong khi màn hình cấp controller riêng, camera có thể kẹt ở màn đen.
 class QrScanScreen extends StatefulWidget {
-  final String title;
-  final String hint;
+  final String? title;
+  final String? hint;
 
   const QrScanScreen({
     super.key,
-    this.title = 'Quét mã QR',
-    this.hint = 'Đưa mã QR tại điểm đến vào khung',
+    this.title,
+    this.hint,
   });
 
   @override
@@ -156,8 +157,8 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
               ),
               errorBuilder: (context, error) => _CameraProblem(
                 message: error.errorCode == MobileScannerErrorCode.permissionDenied
-                    ? 'Ứng dụng chưa được cấp quyền camera. Hãy cấp quyền trong Cài đặt, hoặc nhập mã thủ công bên dưới.'
-                    : 'Không mở được camera. Bạn có thể nhập mã thủ công bên dưới.',
+                    ? appL10n.qrNoPermission
+                    : appL10n.qrCameraFailed,
               ),
             ),
           ),
@@ -175,7 +176,7 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
                     icon: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
                   ),
                   Expanded(
-                    child: Text(widget.title,
+                    child: Text(widget.title ?? appL10n.qrTitle,
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                             color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
@@ -197,13 +198,13 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
                     color: Colors.white.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(999),
                   ),
-                  child: Text(widget.hint,
+                  child: Text(widget.hint ?? appL10n.qrHint,
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600, height: 1.35)),
                 ),
                 if (_slowStart && !_manualOpen) ...[
                   const SizedBox(height: 8),
-                  const Text('Camera mở chậm? Bạn có thể nhập mã in dưới QR.',
+                  Text(appL10n.qrSlowCamera,
                       textAlign: TextAlign.center,
                       style: TextStyle(color: AppCultureColors.onDarkMuted, fontSize: 12.5)),
                 ],
@@ -232,16 +233,16 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
                       width: 116,
                       height: 116,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF047857),
+                        color: const Color(0xFF0B7F7E),
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 5),
                         boxShadow: const [BoxShadow(color: Color(0x6634D399), blurRadius: 30, spreadRadius: 6)],
                       ),
-                      child: const Column(
+                      child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.check_rounded, color: Colors.white, size: 52),
-                          Text('ĐÃ QUÉT', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 1.4)),
+                          Text(appL10n.qrScanned, style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 1.4)),
                         ],
                       ),
                     ),
@@ -261,14 +262,14 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
       children: [
         _ScanAction(
           icon: _torch ? Icons.flash_on_rounded : Icons.flash_off_rounded,
-          label: _torch ? 'Tắt đèn' : 'Đèn flash',
+          label: _torch ? appL10n.qrTorchOff : appL10n.qrTorchOn,
           active: _torch,
           onTap: _toggleTorch,
         ),
         const SizedBox(width: 28),
         _ScanAction(
           icon: Icons.keyboard_rounded,
-          label: 'Nhập mã',
+          label: appL10n.qrEnterCode,
           active: _slowStart,
           onTap: () => setState(() => _manualOpen = true),
         ),
@@ -289,8 +290,8 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
         children: [
           Row(
             children: [
-              const Expanded(
-                child: Text('Nhập mã in dưới QR',
+              Expanded(
+                child: Text(appL10n.qrEnterPrintedCode,
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
               ),
               IconButton(
@@ -312,7 +313,7 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
             onSubmitted: (_) => _submitManual(),
             decoration: InputDecoration(
               hintText: 'VD: JGS-3F9A1C7E52B04D18',
-              helperText: 'Mã điểm đến bắt đầu bằng JGS-, mã hoạt động bắt đầu bằng JGE-',
+              helperText: appL10n.qrCodeHelper,
               filled: true,
               fillColor: AppCultureColors.surfaceSubtle,
               border: OutlineInputBorder(
@@ -329,7 +330,7 @@ class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver
               minimumSize: const Size.fromHeight(48),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
-            child: const Text('Xác nhận mã', style: TextStyle(fontWeight: FontWeight.w700)),
+            child: Text(appL10n.qrConfirmCode, style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -438,7 +439,7 @@ class _ScanOverlayPainter extends CustomPainter {
         Offset(window.left + 16, y),
         Offset(window.right - 16, y),
         Paint()
-          ..color = const Color(0xFF34D399)
+          ..color = const Color(0xFF2DD4BF)
           ..strokeWidth = 2.5
           ..strokeCap = StrokeCap.round,
       );
@@ -446,7 +447,7 @@ class _ScanOverlayPainter extends CustomPainter {
 
     // Bốn góc xanh ngọc sáng.
     final corner = Paint()
-      ..color = success ? Colors.white : const Color(0xFF34D399)
+      ..color = success ? Colors.white : const Color(0xFF2DD4BF)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 5
       ..strokeCap = StrokeCap.round;

@@ -2,169 +2,171 @@
 
 import React from "react";
 import Link from "next/link";
-import {
-  ArrowUpRight,
-  BadgeCheck,
-  ClipboardList,
-  Handshake,
-  MessageSquareWarning,
-  Scale,
-  ShieldAlert,
-  Wallet,
-} from "lucide-react";
-import { CardHeader } from "./KpiCard";
-import { CARD, PILL } from "@/app/admin/overview.tokens";
-import Hint from "./Hint";
-import { SEVERITY_HINTS } from "./glossary";
+import { ArrowUpRight, BadgeCheck, Clock3, Wallet } from "lucide-react";
+import { CARD } from "@/app/admin/overview.tokens";
+import { formatVNDNumber } from "@/lib/money";
 
-/** Mức độ ưu tiên — màu ngữ nghĩa theo đặc tả. */
-export const SEVERITY = {
+/** Màu + nhãn theo mức độ ưu tiên — luôn kèm chấm + nhãn, không chỉ dựa vào màu. */
+const SEVERITY = {
   URGENT: {
-    label: "Khẩn cấp",
     chip: "bg-rose-50 text-rose-700 border-rose-200/80",
     dot: "bg-rose-500",
-    icon: "bg-rose-50 text-rose-600",
+    label: "Khẩn cấp",
+    bar: "bg-rose-500",
   },
   SOON: {
-    label: "Xử lý sớm",
     chip: "bg-amber-50 text-amber-700 border-amber-200/80",
     dot: "bg-amber-500",
-    icon: "bg-amber-50 text-amber-600",
+    label: "Xử lý sớm",
+    bar: "bg-amber-500",
   },
   NORMAL: {
+    chip: "bg-slate-50 text-slate-700 border-slate-200/80",
+    dot: "bg-slate-400",
     label: "Bình thường",
-    chip: "bg-emerald-50 text-emerald-700 border-emerald-200/80",
-    dot: "bg-emerald-500",
-    icon: "bg-emerald-50 text-emerald-600",
+    bar: "bg-slate-400",
   },
 };
 
-/** Icon theo loại việc. */
-const ACTION_ICONS = {
-  DISPUTES: MessageSquareWarning,
-  REFUNDS: Wallet,
-  SETTLEMENTS: ClipboardList,
-  ADJUSTMENTS: Scale,
-  PARTNERS: Handshake,
-  PROFILE_UPDATES: BadgeCheck,
-  TOUR_REVIEWS: ShieldAlert,
-};
+const ORDER = { URGENT: 0, SOON: 1, NORMAL: 2 };
 
 /**
- * Action Center — danh sách việc Admin cần xử lý.
+ * Định dạng "đã chờ bao lâu" cho người đọc nhanh.
+ * < 1 giờ → "vừa xong"; < 24 giờ → "x giờ"; < 30 ngày → "y ngày".
+ */
+export function formatWaiting(hours) {
+  const h = Number(hours) || 0;
+  if (h < 1) return "vừa xong";
+  if (h < 24) return `${h} giờ`;
+  const days = Math.floor(h / 24);
+  if (days < 30) return `${days} ngày`;
+  return `${Math.floor(days / 30)} tháng`;
+}
+
+
+/**
+ * Action Center — "hướng tới hành động".
  *
- * 3 mức độ: Đỏ (khẩn cấp) · Cam (xử lý sớm) · Xanh (bình thường).
+ * Mỗi việc không chỉ có số lượng mà còn có:
+ *  • TUỔI CHỜ của việc cũ nhất (giờ) ⇒ biết việc nào bị bỏ quên.
+ *  • SỐ TIỀN ĐANG ĐỨNG (tiền hoàn / giá trị đợt tất toán) ⇒ biết việc nào gấp.
+ *
+ * Việc thuộc vai trò khác (href = null) hiển thị dạng "theo dõi", không có link chết.
  */
 export default function ActionCenter({ actions, isLoading }) {
   const list = actions || [];
-  const total = list.reduce((sum, a) => sum + (Number(a.count) || 0), 0);
+  if (isLoading && list.length === 0) return null;
 
-  // Nhóm theo mức độ, giữ thứ tự ưu tiên giảm dần.
-  const grouped = ["URGENT", "SOON", "NORMAL"]
-    .map((severity) => ({
-      severity,
-      items: list.filter((a) => a.severity === severity),
-    }))
-    .filter((group) => group.items.length > 0);
+  if (list.length === 0) {
+    return (
+      <section className={CARD.shell + " flex items-center gap-2.5 px-5 py-4"}>
+        <BadgeCheck size={17} className="shrink-0 text-emerald-500" />
+        <div>
+          <p className="text-[13px] font-bold text-slate-900">Không còn việc nào đang chờ xử lý</p>
+          <p className="text-[11.5px] text-slate-500 mt-0.5">
+            Toàn bộ hồ sơ đối tác, quyết toán, hoàn tiền và điều chỉnh tài chính đã được xử lý.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  const sorted = [...list].sort((a, b) => (ORDER[a.severity] ?? 3) - (ORDER[b.severity] ?? 3));
+  const urgent = sorted.filter((a) => a.severity === "URGENT");
+  const others = sorted.filter((a) => a.severity !== "URGENT");
+  const totalAtStake = sorted.reduce(
+    (sum, a) => sum + (Number(a.amountAtStake) || 0),
+    0,
+  );
 
   return (
-    <section className={CARD.shell + " flex flex-col h-full"}>
-      <CardHeader
-        icon={ShieldAlert}
-        tone="rose"
-        title="Công việc cần xử lý"
-        subtitle={total > 0 ? "Ưu tiên theo mức độ khẩn cấp" : "Không còn việc nào đang chờ"}
-      >
-        <span className={`${PILL.base} ${total > 0 ? PILL.rose : PILL.emerald}`}>
-          {total} đang chờ
-        </span>
-      </CardHeader>
-
-      {/* Chú thích 3 mức độ */}
-      <div className="px-5 py-2.5 border-b border-slate-100 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-        {["URGENT", "SOON", "NORMAL"].map((severity) => (
-          <Hint key={severity} text={SEVERITY_HINTS[severity]}>
-            <span
-              className={`${PILL.base} ${SEVERITY[severity].chip} px-1.5 py-0 text-[10px]`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${SEVERITY[severity].dot}`} />
-              {SEVERITY[severity].label}
-            </span>
-          </Hint>
-        ))}
-      </div>
-
-      <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2.5 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent] max-h-[520px]">
-        {isLoading && list.length === 0 ? (
-          <p className="py-10 text-center text-xs text-slate-400">Đang tải danh sách việc…</p>
-        ) : list.length === 0 ? (
-          <div className="py-10 text-center">
-            <div className="mx-auto w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center mb-3">
-              <BadgeCheck size={22} />
-            </div>
-            <p className="text-sm font-bold text-slate-700">Tất cả tác vụ đã được xử lý xong</p>
-            <p className="text-xs text-slate-400 mt-1">
-              Không còn yêu cầu duyệt hay hồ sơ nào tồn đọng.
-            </p>
-          </div>
-        ) : (
-          grouped.map((group) => (
-            <div key={group.severity} className="space-y-2">
-              {group.items.map((action) => {
-                const Icon = ACTION_ICONS[action.id] || ClipboardList;
-                const severity = SEVERITY[action.severity] || SEVERITY.NORMAL;
-                return (
-                  <div
-                    key={action.id}
-                    className="group flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-200/80 hover:border-slate-300 hover:shadow-sm transition-all"
-                  >
-                    <span
-                      className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center ${severity.icon}`}
-                    >
-                      <Icon size={17} strokeWidth={1.9} />
-                    </span>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <h3 className="text-[13px] font-bold text-slate-900 truncate">
-                          <Hint text={action.note}>{action.title}</Hint>
-                        </h3>
-                        <span className={`${PILL.base} ${severity.chip} shrink-0 px-1.5 py-0 text-[10px]`}>
-                          {action.count}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 truncate mt-0.5">{action.note}</p>
-                    </div>
-
-                    {action.href ? (
-                      <Link
-                        href={action.href}
-                        className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] font-bold text-slate-700 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 transition-colors"
-                      >
-                        {action.actionLabel || "Xem"}
-                        <ArrowUpRight size={12} />
-                      </Link>
-                    ) : (
-                      // Việc thuộc vai trò khác (Kiểm duyệt viên) ⇒ chỉ hiện nhãn, không link chết.
-                      <span
-                        title="Việc này thuộc phạm vi xử lý của vai trò Khách du lịch/Đối tác/Kiểm duyệt viên"
-                        className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-dashed border-slate-200 text-[11px] font-semibold text-slate-400 cursor-default"
-                      >
-                        {action.actionLabel || "Theo dõi"}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ))
+    <section className={CARD.shell + " overflow-hidden"}>
+      <header className={CARD.header}>
+        <div className="min-w-0">
+          <h2 className={CARD.title}>Cần bạn xử lý</h2>
+          <p className={CARD.subtitle}>
+            {sorted.length} nhóm việc đang chờ
+            {totalAtStake > 0 && (
+              <>
+                {" · "}
+                <span className="font-bold text-slate-700">
+                  {formatVNDNumber(totalAtStake)} đang chờ giải ngân
+                </span>
+              </>
+            )}
+          </p>
+        </div>
+        {urgent.length > 0 && (
+          <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/80">
+            {urgent.length} việc khẩn cấp
+          </span>
         )}
-      </div>
+      </header>
 
-      <div className={CARD.footer + " flex items-center justify-between"}>
-        <span className="font-semibold">Quyền: Quản trị viên</span>
-        <span className="text-slate-400">Cam kết SLA duyệt đối tác: &lt; 24h</span>
+      <div className="divide-y divide-slate-100">
+        {[...urgent, ...others].map((action) => {
+          const s = SEVERITY[action.severity] || SEVERITY.NORMAL;
+          const hasAmount = Number(action.amountAtStake) > 0;
+          const hasWait = Number(action.oldestWaitingHours) > 0;
+          const body = (
+            <>
+              <span className={`w-2 h-2 rounded-full shrink-0 ${s.dot}`} aria-label={s.label} />
+              <div className="min-w-0 flex-1">
+                <p className="text-[12.5px] font-bold text-slate-900 leading-tight truncate">
+                  {action.title}
+                  <span className="ml-1.5 text-slate-400 font-semibold tabular-nums">
+                    {action.count}
+                  </span>
+                </p>
+                <div className="flex items-center gap-2.5 mt-1 flex-wrap">
+                  <span className="text-[10.5px] font-semibold text-slate-500">{action.note}</span>
+                  {hasWait && (
+                    <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-slate-500">
+                      <Clock3 size={11} className="shrink-0" />
+                      Chờ {formatWaiting(action.oldestWaitingHours)}
+                    </span>
+                  )}
+                  {hasAmount && (
+                    <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-slate-600">
+                      <Wallet size={11} className="shrink-0" />
+                      {formatVNDNumber(action.amountAtStake)} đ
+                    </span>
+                  )}
+                </div>
+              </div>
+              {action.href ? (
+                <span
+                  className={`shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[10.5px] font-bold ${s.chip}`}
+                >
+                  {action.actionLabel}
+                  <ArrowUpRight size={11} />
+                </span>
+              ) : (
+                <span
+                  className="shrink-0 inline-flex items-center px-2 py-1 rounded-lg border border-dashed border-slate-200 text-[10.5px] font-bold text-slate-400"
+                  title="Thuộc vai trò khác — chỉ theo dõi"
+                >
+                  {action.actionLabel}
+                </span>
+              )}
+            </>
+          );
+          return action.href ? (
+            <Link
+              key={action.id}
+              href={action.href}
+              className="flex items-center gap-2.5 px-5 py-3 transition-colors hover:bg-slate-50/70"
+            >
+              {body}
+            </Link>
+          ) : (
+            <div key={action.id} className="flex items-center gap-2.5 px-5 py-3">
+              {body}
+            </div>
+          );
+        })}
       </div>
     </section>
   );
 }
+

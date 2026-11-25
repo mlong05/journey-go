@@ -15,6 +15,7 @@ import { ROUTES } from "@/constants/routes";
 import { touristService } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
 import { longDate, vnd } from "../utils";
+import { useI18n } from "@/i18n";
 
 const msLeft = (deadline) => Math.max(0, new Date(deadline).getTime() - Date.now());
 
@@ -107,24 +108,26 @@ export function usePendingBooking(tourId) {
 export function PendingBookingBar() {
   const pathname = usePathname() || "";
   const { pending, clear } = usePendingBooking();
+  const { t, locale } = useI18n();
   if (!pending) return null;
-  if (pathname.startsWith("/checkout/") || pathname === ROUTES.TRIP_DETAIL(pending.id)) return null;
+  // /trips đã có khối "Cần xử lý" với nút thanh toán / hủy ⇒ không nhắc trùng.
+  if (pathname.startsWith("/checkout/") || pathname === ROUTES.TRIPS || pathname === ROUTES.TRIP_DETAIL(pending.id)) return null;
   return (
     <div className="border-b border-amber-200 bg-amber-50">
       <Link href={ROUTES.TRIP_DETAIL(pending.id)}
-        className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2.5 text-sm sm:px-6 hover:bg-amber-100/60 transition-colors">
+        className="mx-auto flex max-w-page items-center gap-3 px-4 py-2.5 text-sm sm:px-6 lg:px-8 hover:bg-amber-100/60 transition-colors">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-amber-100 text-amber-700">
           <Timer size={16} />
         </span>
         <span className="min-w-0 flex-1">
           <span className="block font-bold text-amber-900">
-            Bạn có đơn chờ thanh toán · còn <PaymentCountdown deadline={pending.paymentDeadline} onExpire={clear} />
+            {t("pending.barTitle")}<PaymentCountdown deadline={pending.paymentDeadline} onExpire={clear} />{t("pending.barSuffix")}
           </span>
           <span className="block truncate text-xs text-amber-800/80">
-            {pending.tourTitle} · {longDate(pending.experienceDate)} · {vnd(pending.totalAmount)}
+            {pending.tourTitle} · {longDate(pending.experienceDate, locale)} · {vnd(pending.totalAmount)}
           </span>
         </span>
-        <span className="hidden shrink-0 font-bold text-teal-700 sm:inline">Tiếp tục thanh toán</span>
+        <span className="hidden shrink-0 font-bold text-teal-700 sm:inline">{t("pending.continuePayment")}</span>
         <ChevronRight size={18} className="shrink-0 text-teal-700" />
       </Link>
     </div>

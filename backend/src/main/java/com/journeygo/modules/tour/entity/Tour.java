@@ -166,7 +166,7 @@ public class Tour {
     @Builder.Default
     private List<String> highlights = new ArrayList<>();
 
-    /** Bước 1 — ít nhất 5 ảnh; ảnh bìa (coverImageUrl) phải nằm trong danh sách này. */
+    /** Bước 1 — đúng 5 ảnh tour; ảnh bìa (coverImageUrl) là ảnh riêng, không nằm trong danh sách này. */
     @ElementCollection
     @CollectionTable(name = "tour_images", joinColumns = @JoinColumn(name = "tour_id"))
     @OrderColumn(name = "position")
@@ -199,6 +199,19 @@ public class Tour {
     @OrderBy("departureDate ASC")
     @Builder.Default
     private List<TourDepartureDate> departureDates = new ArrayList<>();
+
+    // ── Lịch khởi hành — thông tin dùng chung cho mọi ngày khởi hành (dạng chữ tự do) ──
+    /** Giờ khởi hành, ví dụ "08:00 sáng". */
+    @Column(name = "departure_time", length = 100)
+    private String departureTime;
+
+    /** Địa điểm tập trung. */
+    @Column(name = "meeting_point", length = 500)
+    private String meetingPoint;
+
+    /** Giờ đón và điểm đón (không bắt buộc). */
+    @Column(name = "pickup_info", length = 1000)
+    private String pickupInfo;
 
     /** Bước 5 — đối tác cam kết quyền sử dụng hình ảnh, nội dung. */
     @Column(name = "content_rights_confirmed", nullable = false)

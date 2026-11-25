@@ -10,18 +10,23 @@ import TouristShell from "./TouristShell";
 import RequireTourist from "./RequireTourist";
 import { touristService } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
+import { useT, useI18n, INTL_LOCALE } from "@/i18n";
 
 /**
  * Các mục của khu tài khoản, chia nhóm. "Chuyến đi của tôi" (kèm hoàn tiền) là khu riêng ở /trips,
  * không nằm trong cột trái này.
  */
 export const ACCOUNT_GROUPS = [
-  { title: "Tài khoản", items: [
-    { href: ROUTES.ACCOUNT, label: "Thông tin cá nhân", Icon: UserRound, match: (p) => p === "/account" },
-    { href: ROUTES.ACCOUNT_ACHIEVEMENTS, label: "Thành tựu & Huy hiệu", Icon: Trophy, match: (p) => p.startsWith("/account/achievements"), badge: "achievements" },
-    { href: ROUTES.ACCOUNT_REWARDS, label: "Điểm thưởng & voucher", Icon: Gift, match: (p) => p.startsWith("/account/rewards") },
-    { href: ROUTES.ACCOUNT_POSTS, label: "Bài viết của tôi", Icon: MessageCircle, match: (p) => p.startsWith("/account/posts") },
+  { titleKey: "account.groupAccount", items: [
+    { href: ROUTES.ACCOUNT, labelKey: "account.profile", Icon: UserRound, match: (p) => p === "/account" },
+    { href: ROUTES.ACCOUNT_ACHIEVEMENTS, labelKey: "account.achievements", Icon: Trophy, match: (p) => p.startsWith("/account/achievements"), badge: "achievements" },
+    { href: ROUTES.ACCOUNT_REWARDS, labelKey: "nav.rewards", Icon: Gift, match: (p) => p.startsWith("/account/rewards") },
+    { href: ROUTES.ACCOUNT_POSTS, labelKey: "account.myPosts", Icon: MessageCircle, match: (p) => p.startsWith("/account/posts") },
   ] },
+  { titleKey: "account.groupContact", items: [
+    { href: ROUTES.ACCOUNT_AI_GUIDE, labelKey: "merge.nav.aiGuide", Icon: Sparkles, match: (p) => p.startsWith("/account/ai-guide") },
+    { href: ROUTES.ACCOUNT_MESSAGES, labelKey: "account.providerMessages", Icon: MessageCircle, match: (p) => p.startsWith("/account/messages"), badge: "unread" },
+    { href: ROUTES.ACCOUNT_INVITATIONS, labelKey: "account.invitations", Icon: Ticket, match: (p) => p.startsWith("/account/invitations") },
   { title: "Liên hệ & Dịch vụ", items: [
     { href: ROUTES.ACCOUNT_TOUR_REQUESTS, label: "Tour theo nhu cầu", Icon: Sparkles, match: (p) => p.startsWith("/account/requests") },
     ...(ROUTES.ACCOUNT_AI_GUIDE ? [{ href: ROUTES.ACCOUNT_AI_GUIDE, label: "Hướng dẫn viên AI", Icon: Sparkles, match: (p) => p.startsWith("/account/ai-guide") }] : []),
@@ -75,6 +80,7 @@ function useAccountSummary() {
 /** Thẻ người dùng ở đầu cột trái. */
 function UserCard({ summary }) {
   const { user } = useTouristSession();
+  const { t, locale } = useI18n();
   const me = summary?.me;
   const name = me?.fullName || user?.fullName || "";
   const avatar = me?.avatarUrl || user?.avatarUrl;
@@ -90,8 +96,8 @@ function UserCard({ summary }) {
         </div>
       </div>
       <Link href={ROUTES.ACCOUNT_REWARDS} className="mt-3 flex items-center justify-between rounded-xl bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800 transition hover:bg-orange-100">
-        <span><b className="tabular-nums">{(summary?.points ?? 0).toLocaleString("vi-VN")}</b> điểm</span>
-        <span><b className="tabular-nums">{summary?.vouchers ?? 0}</b> voucher</span>
+        <span><b className="tabular-nums">{(summary?.points ?? 0).toLocaleString(INTL_LOCALE[locale])}</b> {t("account.points")}</span>
+        <span><b className="tabular-nums">{summary?.vouchers ?? 0}</b> {t("account.vouchers")}</span>
       </Link>
     </div>
   );
@@ -99,16 +105,17 @@ function UserCard({ summary }) {
 
 function NavItem({ item, pathname, unread, unclaimedAchievements, onClick }) {
   const on = item.match(pathname);
+  const t = useT();
   return (
     <Link href={item.href} onClick={onClick} aria-current={on ? "page" : undefined}
       className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-colors ${on ? "bg-teal-50 font-bold text-teal-800" : "font-semibold text-slate-600 hover:bg-white hover:text-slate-900"}`}>
       <item.Icon size={16} className="shrink-0" />
-      <span className="flex-1 whitespace-nowrap">{item.label}</span>
+      <span className="flex-1 whitespace-nowrap">{t(item.labelKey)}</span>
       {item.badge === "unread" && unread > 0 && (
-        <span className="grid h-5 min-w-5 place-items-center rounded-full bg-orange-600 px-1 text-[11px] font-bold text-white" aria-label={`${unread} tin chưa đọc`}>{unread}</span>
+        <span className="grid h-5 min-w-5 place-items-center rounded-full bg-orange-600 px-1 text-[11px] font-bold text-white" aria-label={t("shell.unreadCount", { count: unread })}>{unread}</span>
       )}
       {item.badge === "achievements" && unclaimedAchievements > 0 && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-rose-600 px-1.5 py-0.5 text-[11px] font-bold text-white" aria-label={`${unclaimedAchievements} thành tựu chờ nhận thưởng`}>
+        <span className="inline-flex items-center gap-1 rounded-full bg-rose-600 px-1.5 py-0.5 text-[11px] font-bold text-white" aria-label={t("account.unclaimed", { count: unclaimedAchievements })}>
           <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
           {unclaimedAchievements}
         </span>
@@ -120,6 +127,7 @@ function NavItem({ item, pathname, unread, unclaimedAchievements, onClick }) {
 /** Điện thoại / máy tính bảng: một nút chọn mục thay cho cột trái. */
 function MobileSectionPicker({ pathname, unread, unclaimedAchievements }) {
   const [open, setOpen] = useState(false);
+  const t = useT();
   const ref = useRef(null);
   const current = ALL_ITEMS.find((n) => n.match(pathname)) || ALL_ITEMS[0];
   useEffect(() => {
@@ -135,7 +143,7 @@ function MobileSectionPicker({ pathname, unread, unclaimedAchievements }) {
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="menu"
         className="flex w-full items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-bold text-slate-800 cursor-pointer">
         <current.Icon size={17} className="shrink-0 text-teal-700" />
-        <span className="flex-1">{current.label}</span>
+        <span className="flex-1">{t(current.labelKey)}</span>
         {unread > 0 && current.badge !== "unread" && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-orange-600 px-1 text-[11px] font-bold text-white">{unread}</span>}
         {unclaimedAchievements > 0 && current.badge !== "achievements" && (
           <span className="inline-flex items-center gap-1 rounded-full bg-rose-600 px-1.5 py-0.5 text-[11px] font-bold text-white">
@@ -148,8 +156,8 @@ function MobileSectionPicker({ pathname, unread, unclaimedAchievements }) {
       {open && (
         <div role="menu" className="jg-pop absolute inset-x-0 top-[calc(100%+6px)] z-30 space-y-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
           {ACCOUNT_GROUPS.map((g) => (
-            <div key={g.title}>
-              <p className="px-3 pb-1 pt-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">{g.title}</p>
+            <div key={g.titleKey}>
+              <p className="px-3 pb-1 pt-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">{t(g.titleKey)}</p>
               {g.items.map((it) => (
                 <div key={it.href} className="relative">
                   <NavItem item={it} pathname={pathname} unread={unread} unclaimedAchievements={unclaimedAchievements} onClick={() => setOpen(false)} />
@@ -181,17 +189,19 @@ export default function AccountLayout({ title, actions, children, wide = false }
 
 function AccountBody({ pathname, title, actions, wide, children }) {
   const summary = useAccountSummary();
+  const t = useT();
   const unread = summary?.unread || 0;
   const unclaimedAchievements = summary?.unclaimedAchievements || 0;
   return (
-    <div className="mx-auto grid max-w-6xl grid-cols-1 gap-5 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-7">
+    <div className="mx-auto grid max-w-page grid-cols-1 gap-5 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-7 lg:px-8">
       <MobileSectionPicker pathname={pathname} unread={unread} unclaimedAchievements={unclaimedAchievements} />
       <aside className="hidden min-w-0 space-y-4 lg:sticky lg:top-24 lg:block lg:self-start">
-        <UserCard summary={summary} />
-        <nav aria-label="Tài khoản" className="space-y-3">
+        {/* Trang hồ sơ đã có "trang dữ liệu hộ chiếu" (tên, email, điểm) ⇒ không lặp thẻ người dùng. */}
+        {pathname !== ROUTES.ACCOUNT && <UserCard summary={summary} />}
+        <nav aria-label={t("shell.account")} className="space-y-3">
           {ACCOUNT_GROUPS.map((g) => (
-            <div key={g.title}>
-              <p className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">{g.title}</p>
+            <div key={g.titleKey}>
+              <p className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">{t(g.titleKey)}</p>
               <div className="space-y-0.5">
                 {g.items.map((it) => (
                   <NavItem

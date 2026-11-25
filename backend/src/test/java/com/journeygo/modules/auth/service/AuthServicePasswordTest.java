@@ -214,6 +214,6 @@ class AuthServicePasswordTest {
 
         // Act & Assert
         AppException ex = assertThrows(AppException.class, () -> authService.changePassword(1L, request));
-        assertEquals(ErrorCode.INVALID_CREDENTIALS, ex.getErrorCode());
+        assertEquals(ErrorCode.WRONG_CURRENT_PASSWORD, ex.getErrorCode());
     }
 }

@@ -1,36 +1,47 @@
 /** Tiện ích hiển thị dùng chung cho các trang du khách. */
 
+import { INTL_LOCALE } from "@/i18n/core";
+
 export const vnd = (n) => `${Number(n || 0).toLocaleString("vi-VN")}đ`;
 
-/** Thời lượng tour: trong ngày theo giờ/phút, nhiều ngày theo ngày/đêm. */
-export function durationLabel(t) {
-  if (t?.tourFormat === "MULTI_DAY" || (!t?.durationMinutes && t?.durationDays > 1)) {
-    const d = t.durationDays || 1;
-    const n = t.durationNights ?? Math.max(0, d - 1);
-    return `${d} ngày ${n} đêm`;
+/**
+ * Thời lượng tour: trong ngày theo giờ/phút, nhiều ngày theo ngày/đêm.
+ * [t] là hàm dịch từ useT() (bắt buộc truyền để chữ đổi theo ngôn ngữ).
+ */
+export function durationLabel(t, tour) {
+  if (tour?.tourFormat === "MULTI_DAY" || (!tour?.durationMinutes && tour?.durationDays > 1)) {
+    const d = tour.durationDays || 1;
+    const n = tour.durationNights ?? Math.max(0, d - 1);
+    return t("duration.daysNights", { days: d, nights: n });
   }
-  const m = Number(t?.durationMinutes || 0);
-  if (!m) return "Trong ngày";
+  const m = Number(tour?.durationMinutes || 0);
+  if (!m) return t("duration.dayTrip");
   const h = Math.floor(m / 60);
   const r = m % 60;
-  return h ? `${h} giờ${r ? ` ${r} phút` : ""}` : `${r} phút`;
+  if (!h) return t("duration.minutes", { count: r });
+  return r ? t("duration.hoursMinutes", { hours: h, minutes: r }) : t("duration.hours", { count: h });
 }
 
 const DOW = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 const DOW_LONG = ["Chủ nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
 const pad = (n) => String(n).padStart(2, "0");
 const toDate = (iso) => (iso instanceof Date ? iso : new Date(String(iso).length <= 10 ? `${iso}T00:00:00` : iso));
+const fmt = (locale, opts, d) => new Intl.DateTimeFormat(INTL_LOCALE[locale] || locale, opts).format(d);
 
-/** "T7, 21/11" */
-export const shortDate = (iso) => {
+/** "T7, 21/11" · "Sat, Nov 21" · "11/21(土)" — truyền [locale] từ useI18n(). */
+export const shortDate = (iso, locale = "vi") => {
   if (!iso) return "";
   const d = toDate(iso);
+  if (locale === "en") return fmt("en", { weekday: "short", month: "short", day: "numeric" }, d);
+  if (locale === "ja") return `${d.getMonth() + 1}/${d.getDate()}(${fmt("ja", { weekday: "short" }, d)})`;
   return `${DOW[d.getDay()]}, ${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
 };
-/** "Thứ Bảy, 21/11/2026" */
-export const longDate = (iso) => {
+/** "Thứ Bảy, 21/11/2026" · "Saturday, Nov 21, 2026" · "2026年11月21日(土)". */
+export const longDate = (iso, locale = "vi") => {
   if (!iso) return "";
   const d = toDate(iso);
+  if (locale === "en") return fmt("en", { weekday: "long", year: "numeric", month: "short", day: "numeric" }, d);
+  if (locale === "ja") return `${fmt("ja", { year: "numeric", month: "long", day: "numeric" }, d)}(${fmt("ja", { weekday: "short" }, d)})`;
   return `${DOW_LONG[d.getDay()]}, ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 };
 /** "14:30 21/11/2026" */

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, AlertTriangle, Flag } from "lucide-react";
+import { useT } from "@/i18n";
 
 /**
  * Hộp thoại báo cáo vi phạm — dùng chung cho bài viết và bình luận.
@@ -10,12 +11,12 @@ import { Loader2, AlertTriangle, Flag } from "lucide-react";
  * + `description` (tối đa 500 ký tự, tuỳ chọn).
  */
 export const REPORT_REASONS = [
-  { value: "SPAM", label: "Spam hoặc quảng cáo" },
-  { value: "INAPPROPRIATE_CONTENT", label: "Nội dung không phù hợp" },
-  { value: "HATE_SPEECH", label: "Ngôn từ thù ghét" },
-  { value: "FALSE_INFORMATION", label: "Thông tin sai sự thật" },
-  { value: "COPYRIGHT_VIOLATION", label: "Vi phạm bản quyền" },
-  { value: "OTHER", label: "Lý do khác" },
+  { value: "SPAM", labelKey: "community.reportReason.SPAM" },
+  { value: "INAPPROPRIATE_CONTENT", labelKey: "community.reportReason.INAPPROPRIATE_CONTENT" },
+  { value: "HATE_SPEECH", labelKey: "community.reportReason.HATE_SPEECH" },
+  { value: "FALSE_INFORMATION", labelKey: "community.reportReason.FALSE_INFORMATION" },
+  { value: "COPYRIGHT_VIOLATION", labelKey: "community.reportReason.COPYRIGHT_VIOLATION" },
+  { value: "OTHER", labelKey: "community.reportReason.OTHER" },
 ];
 
 const DESCRIPTION_MAX = 500;
@@ -28,6 +29,7 @@ const DESCRIPTION_MAX = 500;
  * @param {Function} props.onSubmit nhận `{ reason, description }` và trả về Promise
  */
 export default function ReportDialog({ open, subject, onClose, onSubmit }) {
+  const t = useT();
   const [reason, setReason] = useState("SPAM");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
@@ -37,7 +39,7 @@ export default function ReportDialog({ open, subject, onClose, onSubmit }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!reason) { setError("Vui lòng chọn lý do báo cáo."); return; }
+    if (!reason) { setError(t("community.reportErrorNoReason")); return; }
     setBusy(true); setError("");
     try {
       await onSubmit({ reason, description: description.trim() || null });
@@ -45,7 +47,7 @@ export default function ReportDialog({ open, subject, onClose, onSubmit }) {
       setDescription("");
       onClose?.();
     } catch (err) {
-      setError(err?.message || "Không gửi được báo cáo.");
+      setError(err?.message || t("community.reportErrorSubmit"));
     } finally {
       setBusy(false);
     }
@@ -59,7 +61,7 @@ export default function ReportDialog({ open, subject, onClose, onSubmit }) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Báo cáo vi phạm"
+        aria-label={t("community.reportTitle")}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl"
       >
@@ -68,10 +70,10 @@ export default function ReportDialog({ open, subject, onClose, onSubmit }) {
             <Flag size={20} />
           </span>
           <div className="min-w-0">
-            <h3 className="text-base font-semibold tracking-tight text-slate-900">Báo cáo vi phạm</h3>
+            <h3 className="text-base font-semibold tracking-tight text-slate-900">{t("community.reportTitle")}</h3>
             {subject && <p className="mt-1 truncate text-xs font-medium text-slate-700">{subject}</p>}
             <p className="mt-1 text-xs leading-relaxed text-slate-500">
-              Báo cáo sẽ được gửi tới đội ngũ kiểm duyệt viên.
+              {t("community.reportSubtitle")}
             </p>
           </div>
         </div>
@@ -80,7 +82,7 @@ export default function ReportDialog({ open, subject, onClose, onSubmit }) {
           <div className="space-y-3.5 px-6 pb-4">
             <div>
               <label htmlFor="report-reason" className="mb-1 block text-xs font-medium text-slate-700">
-                Lý do báo cáo <span className="text-rose-500">*</span>
+                {t("community.reportReasonLabel")} <span className="text-rose-500">*</span>
               </label>
               <select
                 id="report-reason"
@@ -90,14 +92,14 @@ export default function ReportDialog({ open, subject, onClose, onSubmit }) {
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
               >
                 {REPORT_REASONS.map((r) => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
+                  <option key={r.value} value={r.value}>{t(r.labelKey)}</option>
                 ))}
               </select>
             </div>
 
             <div>
               <label htmlFor="report-desc" className="mb-1 block text-xs font-medium text-slate-700">
-                Mô tả thêm <span className="font-normal text-slate-400">(không bắt buộc)</span>
+                {t("community.reportDescLabel")} <span className="font-normal text-slate-400">{t("community.optional")}</span>
               </label>
               <textarea
                 id="report-desc"
@@ -105,7 +107,7 @@ export default function ReportDialog({ open, subject, onClose, onSubmit }) {
                 maxLength={DESCRIPTION_MAX}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Mô tả cụ thể nội dung vi phạm…"
+                placeholder={t("community.reportDescPlaceholder")}
                 disabled={busy}
                 className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm leading-relaxed text-slate-800 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 focus:bg-white"
               />
@@ -126,7 +128,7 @@ export default function ReportDialog({ open, subject, onClose, onSubmit }) {
               disabled={busy}
               className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-50"
             >
-              Huỷ bỏ
+              {t("community.cancel")}
             </button>
             <button
               type="submit"
@@ -134,7 +136,7 @@ export default function ReportDialog({ open, subject, onClose, onSubmit }) {
               className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-rose-600 px-5 py-2.5 text-xs font-medium text-white transition-colors hover:bg-rose-700 disabled:opacity-50"
             >
               {busy ? <Loader2 size={14} className="animate-spin" /> : <Flag size={14} />}
-              {busy ? "Đang gửi..." : "Gửi báo cáo"}
+              {busy ? t("community.sending") : t("community.sendReport")}
             </button>
           </div>
         </form>

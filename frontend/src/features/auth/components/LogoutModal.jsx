@@ -4,6 +4,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Check } from "lucide-react";
+import { useT } from "@/i18n";
 
 /**
  * Hộp thông báo đăng xuất: chỉ dấu tích + một dòng "Đăng xuất thành công"
@@ -11,6 +12,7 @@ import { Loader2, Check } from "lucide-react";
  * Dùng chung cho trang du khách và khu quản trị / kiểm duyệt / đối tác.
  */
 export function LogoutModal({ isOpen, status = "success" }) {
+  const t = useT();
   if (!isOpen || typeof document === "undefined") return null;
 
   const isLoading = status === "loading";
@@ -80,7 +82,7 @@ export function LogoutModal({ isOpen, status = "success" }) {
 
           {/* Chỉ một dòng thông báo */}
           <h3 role="status" className="relative z-10 text-xl font-extrabold text-slate-900 tracking-tight leading-tight">
-            {isLoading ? "Đang đăng xuất…" : "Đăng xuất thành công"}
+            {isLoading ? t("misc.logout.loading") : t("misc.logout.success")}
           </h3>
 
           {/* Thanh tiến trình trong lúc chuyển trang */}

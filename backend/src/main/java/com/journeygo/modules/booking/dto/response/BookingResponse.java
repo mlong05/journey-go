@@ -21,7 +21,12 @@ public record BookingResponse(
         @Schema(description = "Tên người đặt") String touristName,
         @Schema(description = "ID tour") Long tourId,
         @Schema(description = "Tên tour") String tourTitle,
+        @Schema(description = "Giờ khởi hành của tour (chữ tự do)") String departureTime,
+        @Schema(description = "Địa điểm tập trung") String meetingPoint,
+        @Schema(description = "Giờ đón và điểm đón") String pickupInfo,
         @Schema(description = "Ngày trải nghiệm") LocalDate experienceDate,
+        @Schema(description = "Ngày cuối còn được bắt đầu hành trình (ngày khởi hành + số ngày tour − 1)")
+        LocalDate experienceEndDate,
         @Schema(description = "Tổng tiền đã chốt (VND)") BigDecimal totalAmount,
         @Schema(description = "Mã voucher đã áp dụng") String appliedVoucherCode,
         @Schema(description = "Số tiền giảm giá voucher (VND)") BigDecimal discountAmount,
@@ -82,7 +87,11 @@ public record BookingResponse(
                 .touristName(b.getTourist() != null ? b.getTourist().getFullName() : null)
                 .tourId(b.getTour() != null ? b.getTour().getTourId() : null)
                 .tourTitle(b.getTour() != null ? b.getTour().getTitle() : null)
+                .departureTime(b.getTour() != null ? b.getTour().getDepartureTime() : null)
+                .meetingPoint(b.getTour() != null ? b.getTour().getMeetingPoint() : null)
+                .pickupInfo(b.getTour() != null ? b.getTour().getPickupInfo() : null)
                 .experienceDate(b.getExperienceDate())
+                .experienceEndDate(b.experienceEndDate())
                 .totalAmount(b.getTotalAmount())
                 .appliedVoucherCode(b.getAppliedVoucherCode())
                 .discountAmount(b.getDiscountAmount())

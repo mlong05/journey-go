@@ -1,0 +1,15 @@
+{
+  "merge.nav.aiGuide": "AI Tour Guide",
+  "merge.chat.loadingHistory": "Loading history…",
+  "merge.chat.loadOlder": "Load older messages",
+  "merge.chat.endOfHistory": "You have reached the beginning of the conversation",
+  "merge.chat.loadingOlder": "Loading older messages…",
+  "merge.chat.customerFallback": "Customer",
+  "merge.refund.tierEarly": "7 days or more before departure",
+  "merge.refund.tierMid": "3 to 6 days (72 hours – 6 days)",
+  "merge.refund.tierLate": "Less than 72 hours (3 days)",
+  "merge.refund.rateLabel": "{rate} refund",
+  "merge.refund.guideRatesDesc": "Cancel 7+ days in advance: 80% refund. Cancel 3–6 days (72 hours – 6 days) in advance: 50% refund. Under 72 hours (3 days): no refund. Platform or tour provider fault: 100% refund after admin verification.",
+  "merge.trips.rebookThisTour": "Book this tour again",
+  "merge.trips.unitTrip": "trips"
+}

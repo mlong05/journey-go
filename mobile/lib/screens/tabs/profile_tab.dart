@@ -19,6 +19,7 @@ import '../../core/services/refund_service.dart';
 import '../../core/services/notification_service.dart';
 import '../../core/services/realtime_service.dart';
 import '../../core/services/token_storage.dart';
+import '../../l10n/locale_controller.dart';
 import '../../tourist_auth_screen.dart' show TouristAuthScreen;
 import '../account/password_screens.dart';
 import '../common/bright.dart';
@@ -42,14 +43,18 @@ class ProfileTab extends StatefulWidget {
 
   final ValueListenable<int>? selectedTab;
 
-  const ProfileTab({super.key, required this.currentUser, this.onUserUpdated, this.selectedTab});
+  const ProfileTab({
+    super.key,
+    required this.currentUser,
+    this.onUserUpdated,
+    this.selectedTab,
+  });
 
   @override
   State<ProfileTab> createState() => _ProfileTabState();
 }
 
 class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
-
   @override
   ValueListenable<int>? get selectedTab => widget.selectedTab;
 
@@ -155,9 +160,9 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
 
   /// Mở "Hỗ trợ từ nhà tour" — lịch sử chat với các nhà tour khác nhau.
   void _openProviderChats() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ProviderChatListScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const ProviderChatListScreen()));
   }
 
   /// Mở "Đơn đặt tour của tôi" — gồm vé, đơn chờ thanh toán, giao dịch và chat
@@ -196,52 +201,63 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
   Future<void> _callHotline() async {
     final opened = await launchUrl(Uri(scheme: 'tel', path: _hotlineNumber));
     if (!opened && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Không mở được trình gọi điện trên thiết bị này.'),
-        behavior: SnackBarBehavior.floating,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.hotlineCannotOpen),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
   void _openChangePassword() {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => ChangePasswordScreen(
-        signedInWithGoogle: (_user.authProvider ?? '').toUpperCase() == 'GOOGLE',
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChangePasswordScreen(
+          signedInWithGoogle:
+              (_user.authProvider ?? '').toUpperCase() == 'GOOGLE',
+        ),
       ),
-    ));
+    );
   }
 
   void _openNotificationDialog() => showNotificationSheet(context);
 
   void _handleLogout() async {
+    final l10n = context.l10n;
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.logout_rounded, color: AppCultureColors.error),
-            SizedBox(width: 10),
-            Text(
-              'Xác nhận đăng xuất',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: AppCultureColors.textDark,
+            const Icon(Icons.logout_rounded, color: AppCultureColors.error),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                l10n.logoutConfirmTitle,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: AppCultureColors.textDark,
+                ),
               ),
             ),
           ],
         ),
-        content: const Text(
-          'Phiên làm việc hiện tại sẽ được hủy an toàn trên máy chủ và toàn bộ token trên thiết bị sẽ được xóa.',
-          style: TextStyle(fontSize: 13, color: AppCultureColors.textMuted),
+        content: Text(
+          l10n.logoutConfirmMessage,
+          style: const TextStyle(
+            fontSize: 13,
+            color: AppCultureColors.textMuted,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text(
-              'Hủy bỏ',
-              style: TextStyle(color: AppCultureColors.textMuted),
+            child: Text(
+              l10n.commonCancel,
+              style: const TextStyle(color: AppCultureColors.textMuted),
             ),
           ),
           ElevatedButton(
@@ -254,9 +270,9 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text(
-              'Đăng xuất ngay',
-              style: TextStyle(fontWeight: FontWeight.w600),
+            child: Text(
+              l10n.logoutConfirmButton,
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -307,10 +323,7 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                     const SizedBox(height: 26),
                     Reveal(order: 1, child: _buildHeritageSection()),
                     const SizedBox(height: 26),
-                    Reveal(
-                      order: 2,
-                      child: _buildServicesSection(),
-                    ),
+                    Reveal(order: 2, child: _buildServicesSection()),
                     const SizedBox(height: 26),
                     Reveal(order: 3, child: _buildGeneralSettingsSection()),
                   ],
@@ -326,8 +339,9 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
   /// ảnh đại diện thật, hạng thành viên kèm thanh tiến độ lên hạng.
   Widget _buildProfileHeroCard() {
     // Hạng xét theo tổng điểm đã kiếm để đổi voucher không làm tụt hạng
+    final l10n = context.l10n;
     final earned = _points.lifetimeEarned;
-    final rank = rankTierFor(earned);
+    final rank = _rankLabel(rankTierFor(earned));
     final next = nextRankFor(earned);
     final joinedAt = DateTime.tryParse(_user.createdAt ?? '')?.toLocal();
 
@@ -341,22 +355,33 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Hồ sơ du khách',
+                  l10n.profileHeader,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppCultureColors.textMuted),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppCultureColors.textMuted,
+                  ),
                 ),
               ),
               _lightIconButton(
                 icon: Icons.notifications_none_rounded,
-                iconWidget: const NotificationBellIcon(size: 19, color: AppCultureColors.textDark),
-                tooltip: 'Thông báo',
+                iconWidget: const NotificationBellIcon(
+                  size: 19,
+                  color: AppCultureColors.textDark,
+                ),
+                tooltip: l10n.profileNotifications,
                 onTap: _openNotificationDialog,
               ),
               const SizedBox(width: 8),
-              _lightIconButton(icon: Icons.edit_outlined, tooltip: 'Sửa hồ sơ', onTap: _openEditProfileModal),
+              _lightIconButton(
+                icon: Icons.edit_outlined,
+                tooltip: l10n.profileEdit,
+                onTap: _openEditProfileModal,
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -367,15 +392,25 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: [AppCultureColors.goldBright, AppCultureColors.jade400],
+                    colors: [
+                      AppCultureColors.goldBright,
+                      AppCultureColors.jade400,
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                 ),
                 child: Container(
                   padding: const EdgeInsets.all(2),
-                  decoration: const BoxDecoration(shape: BoxShape.circle, color: AppCultureColors.surface),
-                  child: ForumAvatar(name: _user.fullName, url: _user.avatarUrl, size: 62),
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppCultureColors.surface,
+                  ),
+                  child: ForumAvatar(
+                    name: _user.fullName,
+                    url: _user.avatarUrl,
+                    size: 62,
+                  ),
                 ),
               ),
               const SizedBox(width: 14),
@@ -399,9 +434,17 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                       spacing: 6,
                       runSpacing: 6,
                       children: [
-                        _toneChip(Icons.workspace_premium_rounded, rank, AppTone.brass),
+                        _toneChip(
+                          Icons.workspace_premium_rounded,
+                          rank,
+                          AppTone.brass,
+                        ),
                         if (joinedAt != null)
-                          _toneChip(Icons.calendar_today_rounded, 'Từ ${formatDate(joinedAt)}', AppTone.jade),
+                          _toneChip(
+                            Icons.calendar_today_rounded,
+                            l10n.profileMemberSince(formatDate(joinedAt)),
+                            AppTone.jade,
+                          ),
                       ],
                     ),
                   ],
@@ -416,14 +459,25 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
               Expanded(
                 child: Text(
                   next == null
-                      ? 'Bạn đã đạt hạng cao nhất'
-                      : 'Còn ${formatThousands(next.remaining)} điểm lên ${next.name}',
+                      ? l10n.profileTopRank
+                      : l10n.profilePointsToNextRank(
+                          formatThousands(next.remaining),
+                          _rankLabel(next.name),
+                        ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppCultureColors.textMuted),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppCultureColors.textMuted,
+                  ),
                 ),
               ),
-              const Icon(Icons.auto_awesome_rounded, size: 15, color: AppCultureColors.gold),
+              const Icon(
+                Icons.auto_awesome_rounded,
+                size: 15,
+                color: AppCultureColors.gold,
+              ),
             ],
           ),
           const SizedBox(height: 7),
@@ -437,7 +491,9 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                 value: v,
                 minHeight: 7,
                 backgroundColor: AppTone.brass.soft.withValues(alpha: 0.6),
-                valueColor: const AlwaysStoppedAnimation(AppCultureColors.brass500),
+                valueColor: const AlwaysStoppedAnimation(
+                  AppCultureColors.brass500,
+                ),
               ),
             ),
           ),
@@ -449,7 +505,7 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                   icon: Icons.star_rounded,
                   tone: AppTone.brass,
                   value: _points.currentBalance,
-                  label: 'Điểm khả dụng',
+                  label: l10n.profileStatPoints,
                   compact: true,
                 ),
               ),
@@ -459,7 +515,7 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                   icon: Icons.military_tech_rounded,
                   tone: AppTone.coral,
                   value: _badges.length,
-                  label: 'Huy hiệu',
+                  label: l10n.profileStatBadges,
                   compact: true,
                 ),
               ),
@@ -469,7 +525,7 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                   icon: Icons.place_rounded,
                   tone: AppTone.jade,
                   value: _timeline.length,
-                  label: 'Điểm đã đến',
+                  label: l10n.profileStatPlaces,
                   compact: true,
                 ),
               ),
@@ -478,6 +534,18 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
         ],
       ),
     );
+  }
+
+  /// Tên hạng trong `journey_model.dart` là tiếng Việt cố định ⇒ đổi sang ngôn ngữ đang chọn.
+  String _rankLabel(String vietnameseName) {
+    final l10n = context.l10n;
+    return switch (vietnameseName) {
+      'Bạch Kim' => l10n.rankPlatinum,
+      'Hạng Vàng' => l10n.rankGold,
+      'Hạng Bạc' => l10n.rankSilver,
+      'Hạng Đồng' => l10n.rankBronze,
+      _ => vietnameseName,
+    };
   }
 
   Widget _lightIconButton({
@@ -490,13 +558,17 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
       message: tooltip,
       child: Material(
         color: AppCultureColors.surface,
-        shape: const CircleBorder(side: BorderSide(color: AppCultureColors.borderLight)),
+        shape: const CircleBorder(
+          side: BorderSide(color: AppCultureColors.borderLight),
+        ),
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(8),
-            child: iconWidget ?? Icon(icon, size: 19, color: AppCultureColors.textDark),
+            child:
+                iconWidget ??
+                Icon(icon, size: 19, color: AppCultureColors.textDark),
           ),
         ),
       ),
@@ -516,7 +588,14 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
         children: [
           Icon(icon, size: 13, color: tone.strong),
           const SizedBox(width: 4),
-          Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: tone.strong)),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: tone.strong,
+            ),
+          ),
         ],
       ),
     );
@@ -528,10 +607,11 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
   Widget _buildHeritageSection() {
     final lastGain = _recentPoints.where((t) => t.isEarning).firstOrNull;
     final unclaimed = _achievementSummary.unclaimedCount;
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Hành trình di sản', 'Dấu ấn văn hoá bạn đã ghi lại'),
+        _sectionTitle(l10n.heritageTitle, l10n.heritageSubtitle),
         const SizedBox(height: 12),
         Pressable(
           onTap: _openAchievements,
@@ -564,23 +644,37 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    const IconTile(icon: Icons.emoji_events_rounded, tone: AppTone.brass, size: 46),
+                    const IconTile(
+                      icon: Icons.emoji_events_rounded,
+                      tone: AppTone.brass,
+                      size: 46,
+                    ),
                     if (unclaimed > 0)
                       Positioned(
                         right: -4,
                         top: -4,
                         child: Container(
                           constraints: const BoxConstraints(minWidth: 20),
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: AppCultureColors.coral,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppCultureColors.surface, width: 1.5),
+                            border: Border.all(
+                              color: AppCultureColors.surface,
+                              width: 1.5,
+                            ),
                           ),
                           child: Text(
                             '$unclaimed',
                             textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
@@ -591,35 +685,59 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Thành tựu & Nhận thưởng',
+                      Text(
+                        l10n.achievementsTitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 15, height: 1.25, fontWeight: FontWeight.w700, color: AppCultureColors.textDark),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          height: 1.25,
+                          fontWeight: FontWeight.w700,
+                          color: AppCultureColors.textDark,
+                        ),
                       ),
                       const SizedBox(height: 3),
                       Text.rich(
                         TextSpan(
                           children: [
-                            TextSpan(text: '${_achievementSummary.totalAchieved} đã đạt'),
+                            TextSpan(
+                              text: l10n.achievementsAchieved(
+                                _achievementSummary.totalAchieved,
+                              ),
+                            ),
                             if (_achievementSummary.totalPointsEarned > 0)
-                              TextSpan(text: ' · +${formatThousands(_achievementSummary.totalPointsEarned)} JP'),
+                              TextSpan(
+                                text:
+                                    ' · +${formatThousands(_achievementSummary.totalPointsEarned)} JP',
+                              ),
                             if (unclaimed > 0)
                               TextSpan(
-                                text: ' · $unclaimed chờ nhận',
-                                style: const TextStyle(color: AppCultureColors.coralDark, fontWeight: FontWeight.w700),
+                                text:
+                                    ' · ${l10n.achievementsUnclaimed(unclaimed)}',
+                                style: const TextStyle(
+                                  color: AppCultureColors.coralDark,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                           ],
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppCultureColors.brass800),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppCultureColors.brass800,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.chevron_right_rounded, color: AppCultureColors.textMuted, size: 22),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppCultureColors.textMuted,
+                  size: 22,
+                ),
               ],
             ),
           ),
@@ -632,8 +750,8 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                 icon: Icons.auto_stories_rounded,
                 color: AppCultureColors.heritageJade,
                 background: AppCultureColors.jadeLight,
-                title: 'Nhật ký hành trình',
-                value: '${_timeline.length} điểm đã đến',
+                title: l10n.journeyLogTitle,
+                value: l10n.journeyPlacesVisited(_timeline.length),
                 onTap: _showJourneySheet,
               ),
             ),
@@ -643,10 +761,12 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                 icon: Icons.stars_rounded,
                 color: AppCultureColors.amberDark,
                 background: AppCultureColors.rewardBg,
-                title: 'Lịch sử tích điểm',
+                title: l10n.pointsHistoryTitle,
                 value: lastGain == null
-                    ? 'Chưa có giao dịch'
-                    : 'Gần nhất +${formatThousands(lastGain.amount.abs())}',
+                    ? l10n.pointsNoTransactions
+                    : l10n.pointsLatestGain(
+                        formatThousands(lastGain.amount.abs()),
+                      ),
                 onTap: _showPointsSheet,
               ),
             ),
@@ -660,8 +780,8 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                 icon: Icons.military_tech_rounded,
                 color: AppCultureColors.oceanBlue,
                 background: AppCultureColors.oceanLight,
-                title: 'Huy hiệu di sản',
-                value: '${_badges.length} đã mở khoá',
+                title: l10n.badgesTitle,
+                value: l10n.badgesUnlocked(_badges.length),
                 preview: _badges.isEmpty
                     ? null
                     : Row(
@@ -673,7 +793,10 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                                 width: 26,
                                 height: 26,
                                 child: FittedBox(
-                                  child: BadgeIcon(iconUrl: b.imageUrl, earned: true),
+                                  child: BadgeIcon(
+                                    iconUrl: b.imageUrl,
+                                    earned: true,
+                                  ),
                                 ),
                               ),
                             ),
@@ -688,8 +811,10 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                 icon: Icons.confirmation_number_outlined,
                 color: AppCultureColors.lacquer500,
                 background: AppCultureColors.lacquer50,
-                title: 'Voucher',
-                value: '${formatThousands(_points.currentBalance)} điểm khả dụng',
+                title: l10n.voucherTitle,
+                value: l10n.voucherAvailablePoints(
+                  formatThousands(_points.currentBalance),
+                ),
                 onTap: _openWallet,
               ),
             ),
@@ -715,7 +840,10 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
           const SizedBox(height: 2),
           Text(
             subtitle,
-            style: const TextStyle(fontSize: 12.5, color: AppCultureColors.textMuted),
+            style: const TextStyle(
+              fontSize: 12.5,
+              color: AppCultureColors.textMuted,
+            ),
           ),
         ],
       ],
@@ -725,9 +853,10 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
   // ─────────────────────── Bảng trượt chi tiết ───────────────────────
 
   void _showPointsSheet() {
+    final l10n = context.l10n;
     _showDetailSheet(
-      title: 'Lịch sử tích điểm',
-      subtitle: 'Các giao dịch điểm gần đây',
+      title: l10n.pointsHistoryTitle,
+      subtitle: l10n.pointsHistorySubtitle,
       icon: Icons.stars_rounded,
       color: AppCultureColors.amberDark,
       children: (ctx) => [
@@ -740,21 +869,21 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
           ),
           child: Row(
             children: [
-              _pointSummaryCell('Đã tích lũy', _points.lifetimeEarned),
-              _pointSummaryCell('Đã tiêu', _points.lifetimeSpent),
-              _pointSummaryCell('Khả dụng', _points.currentBalance),
+              _pointSummaryCell(l10n.pointsEarned, _points.lifetimeEarned),
+              _pointSummaryCell(l10n.pointsSpent, _points.lifetimeSpent),
+              _pointSummaryCell(l10n.pointsAvailable, _points.currentBalance),
             ],
           ),
         ),
         const SizedBox(height: 14),
         if (_recentPoints.isEmpty)
-          _sheetEmpty(
-            Icons.stars_outlined,
-            'Chưa có giao dịch điểm. Check-in điểm đến và hoàn thành nhiệm vụ để bắt đầu tích điểm.',
-          )
+          _sheetEmpty(Icons.stars_outlined, l10n.pointsEmpty)
         else
           for (final (i, tx) in _recentPoints.indexed)
-            Reveal(order: i, child: PointTransactionTile(tx: tx)),
+            Reveal(
+              order: i,
+              child: PointTransactionTile(tx: tx),
+            ),
         const SizedBox(height: 6),
         SizedBox(
           height: 48,
@@ -765,12 +894,14 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
             },
             style: FilledButton.styleFrom(
               backgroundColor: AppCultureColors.heritageJade,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
             icon: const Icon(Icons.account_balance_wallet_outlined, size: 19),
-            label: const Text(
-              'Xem ví & đổi voucher',
-              style: TextStyle(fontWeight: FontWeight.w600),
+            label: Text(
+              l10n.pointsOpenWallet,
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
         ),
@@ -779,23 +910,22 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
   }
 
   void _showJourneySheet() {
+    final l10n = context.l10n;
     _showDetailSheet(
-      title: 'Nhật ký hành trình',
-      subtitle: '${_timeline.length} điểm di sản đã check-in',
+      title: l10n.journeyLogTitle,
+      subtitle: l10n.journeyLogSubtitle(_timeline.length),
       icon: Icons.auto_stories_rounded,
       color: AppCultureColors.heritageJade,
       children: (_) => _timeline.isEmpty
-          ? [
-              _sheetEmpty(
-                Icons.explore_outlined,
-                'Chưa có điểm nào. Check-in tại điểm đến trong hành trình để ghi lại dấu ấn đầu tiên.',
-              ),
-            ]
+          ? [_sheetEmpty(Icons.explore_outlined, l10n.journeyEmpty)]
           : [
               for (final (i, item) in _timeline.indexed)
                 Reveal(
                   order: i < 6 ? i : 0,
-                  child: _buildTimelineItem(item, isLast: i == _timeline.length - 1),
+                  child: _buildTimelineItem(
+                    item,
+                    isLast: i == _timeline.length - 1,
+                  ),
                 ),
             ],
     );
@@ -859,7 +989,7 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                     onPressed: () => Navigator.of(ctx).pop(),
                     icon: const Icon(Icons.close_rounded),
                     color: AppCultureColors.textMuted,
-                    tooltip: 'Đóng',
+                    tooltip: ctx.l10n.commonClose,
                   ),
                 ],
               ),
@@ -941,7 +1071,9 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                 Expanded(
                   child: Container(
                     width: 2,
-                    color: AppCultureColors.heritageJade.withValues(alpha: 0.35),
+                    color: AppCultureColors.heritageJade.withValues(
+                      alpha: 0.35,
+                    ),
                   ),
                 ),
             ],
@@ -988,9 +1120,10 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          [item.location, item.checkinDate]
-                              .where((s) => s.isNotEmpty)
-                              .join(' · '),
+                          [
+                            item.location,
+                            item.checkinDate,
+                          ].where((s) => s.isNotEmpty).join(' · '),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -1023,10 +1156,11 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
 
   Widget _buildServicesSection() {
     final refundsInProgress = _refunds.where((r) => r.isInProgress).length;
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Vé & hỗ trợ'),
+        _sectionTitle(l10n.servicesTitle),
         const SizedBox(height: 12),
         _groupCard([
           _buildSettingTile(
@@ -1046,8 +1180,8 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
             icon: Icons.receipt_long_rounded,
             iconColor: AppCultureColors.oceanBlue,
             iconBg: AppCultureColors.oceanLight,
-            title: 'Đơn đặt tour của tôi',
-            subtitle: 'Theo dõi đơn, thanh toán & mã QR trải nghiệm',
+            title: l10n.myBookingsTitle,
+            subtitle: l10n.myBookingsSubtitle,
             onTap: _openBookings,
           ),
           _tileDivider(),
@@ -1055,8 +1189,8 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
             icon: Icons.forum_rounded,
             iconColor: AppCultureColors.oceanDark,
             iconBg: AppCultureColors.oceanLight,
-            title: 'Hỗ trợ từ nhà tour',
-            subtitle: 'Lịch sử chat với các nhà tour (nhắn trước khi đặt vé)',
+            title: l10n.providerSupportTitle,
+            subtitle: l10n.providerSupportSubtitle,
             onTap: _openProviderChats,
           ),
           _tileDivider(),
@@ -1064,11 +1198,11 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
             icon: Icons.support_agent_rounded,
             iconColor: AppCultureColors.lacquer500,
             iconBg: AppCultureColors.lacquer50,
-            title: 'Hỗ trợ & khiếu nại',
-            subtitle: 'Hoàn tiền và xử lý sự cố vé',
+            title: l10n.supportTitle,
+            subtitle: l10n.supportSubtitle,
             trailing: refundsInProgress > 0
                 ? _badgeTrailing(
-                    '$refundsInProgress đang xử lý',
+                    l10n.refundsInProgress(refundsInProgress),
                     AppCultureColors.rewardBg,
                     AppCultureColors.rewardText,
                   )
@@ -1080,7 +1214,12 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
     );
   }
 
-  Widget _badgeTrailing(String text, Color bg, Color fg, {bool chevron = true}) {
+  Widget _badgeTrailing(
+    String text,
+    Color bg,
+    Color fg, {
+    bool chevron = true,
+  }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1092,7 +1231,11 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
           ),
           child: Text(
             text,
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: fg,
+            ),
           ),
         ),
         if (chevron) ...[
@@ -1109,19 +1252,108 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
 
   // ─────────────────────── Cài đặt ───────────────────────
 
+  /// Bảng chọn ngôn ngữ; chọn xong app đổi ngay (MaterialApp nghe [LocaleController]).
+  void _showLanguageSheet() {
+    final controller = LocaleController.instance;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppCultureColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (ctx) {
+        final l10n = ctx.l10n;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppCultureColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _sectionTitle(l10n.languageSheetTitle, l10n.languageSheetNote),
+                const SizedBox(height: 14),
+                _groupCard([
+                  for (final (i, lang)
+                      in LocaleController.languages.indexed) ...[
+                    if (i > 0) _tileDivider(),
+                    _languageOption(
+                      lang,
+                      selected: lang.locale == controller.value,
+                      onTap: () {
+                        Navigator.of(ctx).pop();
+                        controller.setLocale(lang.locale);
+                      },
+                    ),
+                  ],
+                ]),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _languageOption(
+    AppLanguage lang, {
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                lang.nativeName,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected
+                      ? AppCultureColors.heritageJade
+                      : AppCultureColors.textDark,
+                ),
+              ),
+            ),
+            if (selected)
+              const Icon(
+                Icons.check_circle_rounded,
+                color: AppCultureColors.heritageJade,
+                size: 22,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildGeneralSettingsSection() {
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Cài đặt'),
+        _sectionTitle(l10n.settingsTitle),
         const SizedBox(height: 12),
         _groupCard([
           _buildSettingTile(
             icon: Icons.person_outline_rounded,
             iconColor: AppCultureColors.oceanBlue,
             iconBg: AppCultureColors.oceanLight,
-            title: 'Thông tin cá nhân',
-            subtitle: 'Họ tên, email, số điện thoại',
+            title: l10n.personalInfoTitle,
+            subtitle: l10n.personalInfoSubtitle,
             onTap: _openEditProfileModal,
           ),
           _tileDivider(),
@@ -1129,29 +1361,36 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
             icon: Icons.lock_reset_rounded,
             iconColor: AppCultureColors.jadeDark,
             iconBg: AppCultureColors.jadeLight,
-            title: 'Đổi mật khẩu',
-            subtitle: 'Bảo vệ tài khoản của bạn',
+            title: l10n.changePasswordTitle,
+            subtitle: l10n.changePasswordSubtitle,
             onTap: _openChangePassword,
           ),
           _tileDivider(),
-          // Ứng dụng mới có tiếng Việt: chỉ ghi rõ, không cho bấm
           _buildSettingTile(
             icon: Icons.language_rounded,
             iconColor: AppCultureColors.amberDark,
             iconBg: AppCultureColors.rewardBg,
-            title: 'Ngôn ngữ',
-            subtitle: 'Ứng dụng hiển thị bằng tiếng Việt',
-            trailing: _badgeTrailing('Tiếng Việt', AppCultureColors.rewardBg, AppCultureColors.rewardText, chevron: false),
-            onTap: null,
+            title: l10n.languageTitle,
+            subtitle: l10n.languageSubtitle,
+            trailing: _badgeTrailing(
+              LocaleController.instance.current.nativeName,
+              AppCultureColors.rewardBg,
+              AppCultureColors.rewardText,
+            ),
+            onTap: _showLanguageSheet,
           ),
           _tileDivider(),
           _buildSettingTile(
             icon: Icons.phone_in_talk_outlined,
             iconColor: AppCultureColors.oceanDark,
             iconBg: AppCultureColors.oceanLight,
-            title: 'Tổng đài $_hotlineLabel',
-            subtitle: 'Bấm để gọi hỗ trợ du khách',
-            trailing: const Icon(Icons.call_rounded, color: AppCultureColors.oceanBlue, size: 20),
+            title: l10n.hotlineTitle(_hotlineLabel),
+            subtitle: l10n.hotlineSubtitle,
+            trailing: const Icon(
+              Icons.call_rounded,
+              color: AppCultureColors.oceanBlue,
+              size: 20,
+            ),
             onTap: _callHotline,
           ),
         ]),
@@ -1161,8 +1400,8 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
             icon: Icons.logout_rounded,
             iconColor: AppCultureColors.error,
             iconBg: AppCultureColors.lacquer100,
-            title: 'Đăng xuất',
-            subtitle: 'Thoát tài khoản khỏi thiết bị',
+            title: l10n.logoutTitle,
+            subtitle: l10n.logoutSubtitle,
             titleColor: AppCultureColors.error,
             onTap: _handleLogout,
           ),
@@ -1307,7 +1546,11 @@ class _HeritageTile extends StatelessWidget {
                 ),
                 const Spacer(),
                 if (preview != null) Flexible(child: preview!),
-                Icon(Icons.arrow_outward_rounded, size: 16, color: color.withValues(alpha: 0.7)),
+                Icon(
+                  Icons.arrow_outward_rounded,
+                  size: 16,
+                  color: color.withValues(alpha: 0.7),
+                ),
               ],
             ),
             const Spacer(),
@@ -1326,7 +1569,11 @@ class _HeritageTile extends StatelessWidget {
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12.5, color: color, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 12.5,
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),

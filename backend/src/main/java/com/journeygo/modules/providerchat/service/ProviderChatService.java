@@ -63,6 +63,14 @@ public class ProviderChatService {
     private final BookingPassengerRepository passengerRepository;
     private final com.journeygo.modules.realtime.service.RealtimeHub realtimeHub;
     private final com.journeygo.modules.notification.service.NotificationPublisher notifications;
+    /** Ai đang mở kết nối thông báo thời gian thực (web nhà tour đang mở) ⇒ trạng thái "Đang trực tuyến". */
+    private final com.journeygo.modules.notification.service.SseHub sseHub;
+
+    /** Bộ nhớ đệm thời gian trả lời theo nhà tour (tính lại tối đa mỗi 10 phút — tránh quét tin nhắn liên tục). */
+    private final java.util.Map<Long, CachedReplyTime> replyTimeCache = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.time.Duration REPLY_CACHE_TTL = java.time.Duration.ofMinutes(10);
+
+    private record CachedReplyTime(Integer minutes, Instant at) {}
 
     /**
      * Số tin nhắn tối đa cho 1 trang khi phân trang kiểu "cuộn lên để load thêm".
@@ -557,7 +565,44 @@ public class ProviderChatService {
                 .count();
 
         return ProviderConversationResponse.fromEntity(
-                c, touristName, providerName, tourTitle, bookingCode, lastMessage, unread);
+                c, touristName, providerName, tourTitle, bookingCode, lastMessage, unread,
+                sseHub.isOnline(c.getProviderId()), replyMinutesOf(c.getProviderId()));
+    }
+
+    /**
+     * Nhà tour "thường trả lời trong bao lâu": TRUNG VỊ khoảng cách từ tin du khách (đầu tiên chưa được đáp)
+     * tới tin trả lời kế tiếp của nhà tour, lấy tối đa 30 lần trả lời gần nhất trong 60 ngày.
+     * Cần ít nhất 3 lần trả lời mới đưa ra con số (ít hơn ⇒ null, app không hiện — tránh số liệu thiếu tin cậy).
+     */
+    private Integer replyMinutesOf(Long providerId) {
+        if (providerId == null) return null;
+        CachedReplyTime cached = replyTimeCache.get(providerId);
+        if (cached != null && cached.at().plus(REPLY_CACHE_TTL).isAfter(Instant.now())) return cached.minutes();
+
+        Instant since = Instant.now().minus(java.time.Duration.ofDays(60));
+        List<Long> gaps = new java.util.ArrayList<>();
+        for (ProviderConversation conv : conversationRepository.findByProviderIdOrderByLastMessageAtDescCreatedAtDesc(providerId)) {
+            if (conv.getLastMessageAt() != null && conv.getLastMessageAt().isBefore(since)) break;
+            Instant waitingSince = null;
+            for (ProviderMessage m : messageRepository.findByConversation_IdOrderByCreatedAtAsc(conv.getId())) {
+                if (m.getCreatedAt() == null || m.getCreatedAt().isBefore(since)) continue;
+                boolean fromProvider = providerId.equals(m.getSenderId());
+                if (!fromProvider) {
+                    if (waitingSince == null) waitingSince = m.getCreatedAt();
+                } else if (waitingSince != null) {
+                    gaps.add(java.time.Duration.between(waitingSince, m.getCreatedAt()).toMinutes());
+                    waitingSince = null;
+                }
+            }
+            if (gaps.size() >= 30) break;
+        }
+        Integer minutes = null;
+        if (gaps.size() >= 3) {
+            java.util.Collections.sort(gaps);
+            minutes = (int) Math.max(1, gaps.get(gaps.size() / 2));
+        }
+        replyTimeCache.put(providerId, new CachedReplyTime(minutes, Instant.now()));
+        return minutes;
     }
 
     /** Danh sách cuộc trò chuyện của du khách, sắp xếp theo tin nhắn mới nhất. */

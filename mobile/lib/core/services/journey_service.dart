@@ -1,6 +1,7 @@
 import '../models/tour_detail_model.dart' show StopCulture;
 import '../models/tour_journey_model.dart';
 import 'api_client.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Gọi API chuyến đi thực tế: /journeys.
 class JourneyService {
@@ -42,7 +43,7 @@ class JourneyService {
       body: {'verificationMethod': 'GPS', 'latitude': latitude, 'longitude': longitude},
     );
     if (data is! Map<String, dynamic>) {
-      throw const ApiException('Máy chủ trả về kết quả check-in không hợp lệ.');
+      throw ApiException(appL10n.jsvcCheckInInvalid);
     }
     return CheckInResult.fromJson(data);
   }
@@ -59,7 +60,7 @@ class JourneyService {
       body: {'verificationMethod': 'QR', 'qrValue': qrValue},
     );
     if (data is! Map<String, dynamic>) {
-      throw const ApiException('Máy chủ trả về kết quả check-in không hợp lệ.');
+      throw ApiException(appL10n.jsvcCheckInInvalid);
     }
     return CheckInResult.fromJson(data);
   }
@@ -74,7 +75,7 @@ class JourneyService {
   Future<StopCheckpoints> getCheckpoints({required int journeyId, required int destinationId}) async {
     final data = await ApiClient.request('GET', '/journeys/$journeyId/destinations/$destinationId/checkpoints');
     if (data is! Map<String, dynamic>) {
-      throw const ApiException('Máy chủ trả về bản đồ checkpoint không hợp lệ.');
+      throw ApiException(appL10n.jsvcCheckpointInvalid);
     }
     return StopCheckpoints.fromJson(data);
   }
@@ -83,7 +84,7 @@ class JourneyService {
   Future<StopCulture> getCulture({required int journeyId, required int destinationId}) async {
     final data = await ApiClient.request('GET', '/journeys/$journeyId/destinations/$destinationId/culture');
     if (data is! Map<String, dynamic>) {
-      throw const ApiException('Máy chủ trả về nội dung văn hóa không hợp lệ.');
+      throw ApiException(appL10n.jsvcCultureInvalid);
     }
     return StopCulture.fromJson(data);
   }
@@ -104,7 +105,7 @@ class JourneyService {
             : '';
     final data = await ApiClient.request('GET', '/journeys/$journeyId/tasks/$taskId/questions$query');
     if (data is! Map<String, dynamic>) {
-      throw const ApiException('Máy chủ trả về nội dung nhiệm vụ không hợp lệ.');
+      throw ApiException(appL10n.jsvcTaskInvalid);
     }
     return TaskContent.fromJson(data);
   }
@@ -113,7 +114,7 @@ class JourneyService {
   Future<PuzzleClue> getClue({required int journeyId, required int taskId}) async {
     final data = await ApiClient.request('GET', '/journeys/$journeyId/tasks/$taskId/puzzle-clue');
     if (data is! Map<String, dynamic>) {
-      throw const ApiException('Không lấy được manh mối.');
+      throw ApiException(appL10n.jsvcClueFailed);
     }
     return PuzzleClue.fromJson(data);
   }
@@ -134,14 +135,39 @@ class JourneyService {
       'qrValue': ?qrValue,
     });
     if (data is! Map<String, dynamic>) {
-      throw const ApiException('Máy chủ trả về kết quả nộp bài không hợp lệ.');
+      throw ApiException(appL10n.jsvcSubmitInvalid);
+    }
+    return TaskSubmitResult.fromJson(data);
+  }
+
+  /// Câu đố chấm theo từng câu: trả lời MỘT câu, nhận ngay đúng/sai + đáp án + giải thích (review).
+  Future<TaskSubmitResult> answerQuestion({
+    required int journeyId,
+    required int taskId,
+    required AnswerDraft answer,
+    double? latitude,
+    double? longitude,
+    String? qrValue,
+  }) async {
+    final data = await ApiClient.request(
+      'POST',
+      '/journeys/$journeyId/tasks/$taskId/questions/${answer.questionId}/answer',
+      body: {
+        'answers': [answer.toJson()],
+        'latitude': ?latitude,
+        'longitude': ?longitude,
+        'qrValue': ?qrValue,
+      },
+    );
+    if (data is! Map<String, dynamic>) {
+      throw ApiException(appL10n.jsvcSubmitInvalid);
     }
     return TaskSubmitResult.fromJson(data);
   }
 
   TourJourney _journey(dynamic data) {
     if (data is! Map<String, dynamic>) {
-      throw const ApiException('Máy chủ trả về dữ liệu hành trình không hợp lệ.');
+      throw ApiException(appL10n.jsvcJourneyInvalid);
     }
     return TourJourney.fromJson(data);
   }

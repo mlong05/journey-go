@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:intl/intl.dart' show DateFormat;
 import '../../core/constants/app_colors.dart';
+import '../../l10n/locale_controller.dart';
 import '../../core/services/tour_availability_service.dart';
 
 /// Lịch chọn ngày trải nghiệm dạng tháng — dùng chung cho mobile.
@@ -133,8 +135,16 @@ class _ExperienceDateCalendarState extends State<ExperienceDateCalendar> {
     };
     final rows = _buildGrid(_viewMonth);
     final parts = _viewMonth.split('-');
-    final monthLabel =
-        'Tháng ${int.parse(parts[1])}/${parts[0]}';
+    final l10n = context.l10n;
+    final lang = l10n.localeName;
+    final monthLabel = lang == 'vi'
+        ? 'Tháng ${int.parse(parts[1])}/${parts[0]}'
+        : DateFormat.yMMMM(lang).format(DateTime(int.parse(parts[0]), int.parse(parts[1])));
+    // Tên cột thứ (Thứ Hai trước): tiếng Việt giữ "T2…CN"; ngôn ngữ khác lấy từ MaterialLocalizations (bắt đầu từ Chủ nhật).
+    final narrow = MaterialLocalizations.of(context).narrowWeekdays;
+    final weekdayLabels = lang == 'vi'
+        ? const ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
+        : [for (var i = 1; i <= 7; i++) narrow[i % 7]];
 
     final monthHasAvailable = widget.dates
         .any((d) => d.available && d.date.startsWith(_viewMonth));
@@ -162,7 +172,7 @@ class _ExperienceDateCalendarState extends State<ExperienceDateCalendar> {
                     ),
                   ),
                   Text(
-                    monthHasAvailable ? 'Còn lịch' : 'Không có lịch',
+                    monthHasAvailable ? l10n.calHasDates : l10n.calNoDates,
                     style: const TextStyle(
                       fontSize: 11,
                       color: AppCultureColors.textMuted,
@@ -184,7 +194,7 @@ class _ExperienceDateCalendarState extends State<ExperienceDateCalendar> {
         // (không dùng `const` vì `const` collection không hỗ trợ `for` element)
         Row(
           children: [
-            for (final label in const ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'])
+            for (final label in weekdayLabels)
               Expanded(
                 child: Center(
                   child: Text(
@@ -234,20 +244,20 @@ class _ExperienceDateCalendarState extends State<ExperienceDateCalendar> {
         // ── Chú thích màu ──
         if (!widget.loading) ...[
           const SizedBox(height: 8),
-          const Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
             children: [
-              _LegendDot(color: AppCultureColors.jade400, label: 'Còn chỗ'),
-              SizedBox(width: 12),
-              _LegendDot(color: AppCultureColors.brass500, label: 'Sắp hết'),
-              SizedBox(width: 12),
-              _LegendDot(color: AppCultureColors.ink200, label: 'Hết chỗ'),
+              _LegendDot(color: AppCultureColors.jade400, label: l10n.calAvailable),
+              _LegendDot(color: AppCultureColors.brass500, label: l10n.calAlmostFull),
+              _LegendDot(color: AppCultureColors.ink200, label: l10n.calFull),
             ],
           ),          const SizedBox(height: 6),
           Center(
             child: TextButton.icon(
               onPressed: () => setState(() => _viewMonth = _initialMonth()),
               icon: const Icon(Icons.today_rounded, size: 15),
-              label: const Text('Về tháng này'),
+              label: Text(l10n.calThisMonth),
               style: TextButton.styleFrom(
                 foregroundColor: AppCultureColors.oceanBlue,
                 textStyle: const TextStyle(

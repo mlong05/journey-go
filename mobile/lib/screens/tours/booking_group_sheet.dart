@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/constants/app_colors.dart';
-import '../../core/models/gamification_model.dart' show formatThousands;
 import '../../core/models/tour_detail_model.dart';
+import '../../core/models/tour_model.dart' show formatVndPrice;
+import '../../l10n/locale_controller.dart';
 import '../../core/services/booking_service.dart';
 
 /// Loại khách mà tour đang bán — nhãn + khoảng tuổi.
@@ -26,8 +27,7 @@ class GuestTypeOption {
     required this.countsTowardSlot,
   });
 
-  String get formattedPrice =>
-      alwaysFree || price <= 0 ? 'Miễn phí' : '${formatThousands(price)} đ';
+  String get formattedPrice => alwaysFree ? appL10n.tourPriceFree : formatVndPrice(price);
 }
 
 /// Một hành khách trong nhóm (thông tin do khách nhập).
@@ -116,11 +116,14 @@ class _BookingGroupSheet extends StatefulWidget {
 
 class _BookingGroupSheetState extends State<_BookingGroupSheet> {
   /// Loại khách tour đang bán (fallback: một loại "Người lớn" theo giá hiển thị).
+  ///
+  /// ⚠️ Được đọc lần đầu trong `initState` ⇒ KHÔNG dùng `context.l10n` ở đây (Flutter cấm
+  /// đọc InheritedWidget trước khi initState xong) — dùng `appL10n` (ngôn ngữ đang chọn).
   late final List<GuestTypeOption> _types = widget.detail.prices.isNotEmpty
       ? widget.detail.prices
           .map((p) => GuestTypeOption(
                 key: p.guestType,
-                label: p.label.isEmpty ? p.guestType : p.label,
+                label: p.localizedLabel(appL10n).isEmpty ? p.guestType : p.localizedLabel(appL10n),
                 ageRange: p.ageRange,
                 price: p.price,
                 alwaysFree: p.alwaysFree,
@@ -131,7 +134,7 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
       : [
           GuestTypeOption(
             key: 'ADULT',
-            label: 'Người lớn',
+            label: appL10n.guestAdult,
             ageRange: '',
             price: widget.detail.price,
             alwaysFree: false,
@@ -340,6 +343,7 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
     // Khi bàn phím mở thì phần inset hệ thống ở đáy đã bị bàn phím che ⇒ không
     // cần chừa thêm (tránh thừa khoảng trống).
     final bottomInset = keyboard > 0 ? keyboard : media.padding.bottom;
+    final l10n = context.l10n;
 
     return AnimatedPadding(
       duration: const Duration(milliseconds: 160),
@@ -359,9 +363,9 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Đặt tour',
-                    style: TextStyle(
+                  Text(
+                    l10n.bgTitle,
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
                       color: AppCultureColors.textDark,
@@ -389,17 +393,17 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
                     // ── Số chỗ còn ──
                     Row(
                       children: [
-                        const Expanded(
-                          child: Text('Số chỗ còn',
-                              style: TextStyle(
+                        Expanded(
+                          child: Text(l10n.bgRemainingSlots,
+                              style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
                                   color: AppCultureColors.textDark)),
                         ),
                         Text(
                           widget.remainingSlots == null
-                              ? 'Chưa chọn ngày'
-                              : 'Còn ${widget.remainingSlots} chỗ',
+                              ? l10n.bgNoDate
+                              : l10n.bgSlotsLeft(widget.remainingSlots!),
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -418,8 +422,10 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
                     if (_totalGuests > 0) ...[
                       const SizedBox(height: 8),
                       Text(
-                        'Đã chọn $_usedSlots chỗ'
-                        '${_totalGuests > _usedSlots ? ' · ${_totalGuests - _usedSlots} người không tính slot' : ''}',
+                        [
+                          l10n.bgSlotsSelected(_usedSlots),
+                          if (_totalGuests > _usedSlots) l10n.bgGuestsNotCounted(_totalGuests - _usedSlots),
+                        ].join(' · '),
                         style: const TextStyle(
                             fontSize: 11.5, color: AppCultureColors.textMuted),
                       ),
@@ -451,14 +457,12 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('Tổng · $_totalGuests khách',
+                            Text(l10n.bgTotalGuests(_totalGuests),
                                 style: const TextStyle(
                                     fontSize: 12,
                                     color: AppCultureColors.textMuted)),
                             Text(
-                              _total <= 0
-                                  ? 'Miễn phí'
-                                  : '${formatThousands(_total)} đ',
+                              formatVndPrice(_total),
                               style: const TextStyle(
                                   fontSize: 19,
                                   fontWeight: FontWeight.w800,
@@ -475,16 +479,16 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16)),
                         ),
-                        child: const Text('Xác nhận đặt',
-                            style: TextStyle(fontWeight: FontWeight.w700)),
+                        child: Text(l10n.bgConfirm,
+                            style: const TextStyle(fontWeight: FontWeight.w700)),
                       ),
                     ],
                   ),
                   if (_hasMissingPassenger) ...[
                     const SizedBox(height: 6),
-                    const Text(
-                      'Mở từng mục "Hành khách" và điền đủ thông tin để tiếp tục.',
-                      style: TextStyle(
+                    Text(
+                      l10n.bgMissingPassenger,
+                      style: const TextStyle(
                           fontSize: 11.5, color: AppCultureColors.amberDark),
                     ),
                   ],
@@ -522,7 +526,7 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
                   [
                     if (type.ageRange.isNotEmpty) type.ageRange,
                     type.formattedPrice,
-                    if (!type.countsTowardSlot) 'không tính chỗ',
+                    if (!type.countsTowardSlot) context.l10n.bgNoSlot,
                   ].join(' · '),
                   style: const TextStyle(
                       fontSize: 12, color: AppCultureColors.textMuted),
@@ -613,7 +617,7 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
             children: [
               Flexible(
                 child: Text(
-                  'Hành khách $number',
+                  context.l10n.bgPassengerN(number),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -625,16 +629,16 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
               ),
               if (isOwner) ...[
                 const SizedBox(width: 8),
-                const _Tag(text: 'Người đặt tour'),
+                _Tag(text: context.l10n.bgOwnerTag),
               ],
             ],
           ),
           subtitle: Text(
             complete
-                ? 'Đã điền đủ thông tin'
+                ? context.l10n.bgPassengerComplete
                 : isAdult
-                    ? 'Bấm để nhập họ tên, ngày sinh, giới tính, email'
-                    : 'Bấm để nhập họ tên, ngày sinh, giới tính',
+                    ? context.l10n.bgPassengerHintAdult
+                    : context.l10n.bgPassengerHint,
             style: TextStyle(
               fontSize: 11.5,
               color: complete ? AppCultureColors.jadeDark : AppCultureColors.textMuted,
@@ -652,6 +656,7 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
     final isAdult = type.key == 'ADULT';
     final inferred = _inferGuestType(passenger.birthDate);
     final mismatch = inferred != null && inferred != type.key;
+    final l10n = context.l10n;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
@@ -680,10 +685,10 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
                 ),
               ),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Thông tin hành khách',
-                  style: TextStyle(
+                  l10n.bgPassengerInfo,
+                  style: const TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w800,
                     color: AppCultureColors.textDark,
@@ -701,7 +706,7 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
             scrollPadding: const EdgeInsets.only(bottom: 120, left: 20, right: 20),
             style: const TextStyle(fontSize: 14, color: AppCultureColors.textDark),
             decoration: _inputDecoration(
-              label: 'Họ và tên *',
+              label: l10n.bgFullName,
               icon: Icons.person_outline_rounded,
             ),
           ),
@@ -722,7 +727,7 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
                   scrollPadding: const EdgeInsets.only(bottom: 120, left: 20, right: 20),
                   style: const TextStyle(fontSize: 14, color: AppCultureColors.textDark),
                   decoration: _inputDecoration(
-                    label: 'Ngày sinh *',
+                    label: l10n.bgBirthDate,
                     icon: Icons.cake_outlined,
                     hint: 'dd/mm/yyyy',
                   ),
@@ -736,15 +741,15 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
                   isExpanded: true,
                   style: const TextStyle(fontSize: 14, color: AppCultureColors.textDark),
                   decoration: _inputDecoration(
-                    label: 'Giới tính *',
+                    label: l10n.bgGender,
                     icon: Icons.wc_outlined,
                   ),
                   icon: const Icon(Icons.expand_more_rounded, size: 20),
                   borderRadius: BorderRadius.circular(12),
-                  items: const [
-                    DropdownMenuItem(value: 'MALE', child: Text('Nam')),
-                    DropdownMenuItem(value: 'FEMALE', child: Text('Nữ')),
-                    DropdownMenuItem(value: 'OTHER', child: Text('Khác')),
+                  items: [
+                    DropdownMenuItem(value: 'MALE', child: Text(l10n.genderMale)),
+                    DropdownMenuItem(value: 'FEMALE', child: Text(l10n.genderFemale)),
+                    DropdownMenuItem(value: 'OTHER', child: Text(l10n.genderOther)),
                   ],
                   onChanged: (v) => setState(() => passenger.gender = v ?? ''),
                 ),
@@ -764,11 +769,11 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
                 icon: Icons.alternate_email_rounded,
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.only(top: 6, left: 2),
+            Padding(
+              padding: const EdgeInsets.only(top: 6, left: 2),
               child: Text(
-                'Người lớn cần email để nhận vé, liên kết tài khoản và nhận lời mời tham gia tour.',
-                style: TextStyle(fontSize: 11, color: AppCultureColors.textMuted, height: 1.35),
+                l10n.bgEmailHint,
+                style: const TextStyle(fontSize: 11, color: AppCultureColors.textMuted, height: 1.35),
               ),
             ),
           ],
@@ -791,7 +796,7 @@ class _BookingGroupSheetState extends State<_BookingGroupSheet> {
                     const SizedBox(width: 7),
                     Expanded(
                       child: Text(
-                        'Tuổi tại ngày trải nghiệm thuộc loại "${_labelOf(inferred)}" — hãy kiểm tra lại nhóm khách.',
+                        l10n.bgAgeMismatch(_labelOf(inferred)),
                         style: const TextStyle(
                             fontSize: 11, color: AppCultureColors.amberDark, height: 1.35),
                       ),

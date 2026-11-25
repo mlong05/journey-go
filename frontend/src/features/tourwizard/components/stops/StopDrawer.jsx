@@ -18,11 +18,13 @@ let keySeq = 0;
 export const newKey = () => `k${Date.now().toString(36)}${(keySeq++).toString(36)}`;
 
 export const emptyArtifact = () => ({ _key: newKey(), name: "", imageUrl: "", shortDescription: "" });
+export const emptyThenNow = () => ({ _key: newKey(), thenImageUrl: "", nowImageUrl: "", thenLabel: "", caption: "", credit: "" });
+const THEN_NOW_MAX = 3;
 
 /** Ba bước thiết lập điểm đến, làm lần lượt: Thông tin → Nội dung văn hóa → Trải nghiệm. */
 const TABS = [
   { key: "info", label: "Thông tin", Icon: Info, fields: ["name", "location", "checkInRadiusMeters", "shortDescription", "guestNote", "imageUrl"] },
-  { key: "culture", label: "Nội dung văn hóa", Icon: BookOpen, fields: ["videoUrl", "videoSource", "culturalContent", "culturalImages", "artifacts"] },
+  { key: "culture", label: "Nội dung văn hóa", Icon: BookOpen, fields: ["videoUrl", "videoSource", "culturalContent", "culturalImages", "artifacts", "thenNow"] },
   { key: "experience", label: "Trải nghiệm", Icon: Gamepad2, fields: ["quiz", "experiences"] },
 ];
 
@@ -44,7 +46,7 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
   const [dirty, setDirty] = useState(false);
   const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | saved | error
   const [stepNotice, setStepNotice] = useState("");
-  // Còn form câu hỏi / trải nghiệm đang soạn (chưa bấm "Lưu câu hỏi" / "Lưu trải nghiệm").
+  // Còn form câu đố / trải nghiệm đang soạn (chưa bấm "Lưu câu đố" / "Lưu trải nghiệm").
   const [activityFormOpen, setActivityFormOpen] = useState(false);
   const [pickLocation, setPickLocation] = useState(false);
   // Các ô đã sửa từ lần lưu gần nhất: ẩn lỗi cũ của máy chủ cho tới khi lưu và kiểm tra lại.
@@ -72,7 +74,7 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
   const saveAndGo = async (target = null) => {
     if (readOnly || saveStatus === "saving") return;
     if (activityFormOpen) {
-      setStepNotice("Bạn còn câu hỏi / trải nghiệm đang soạn — bấm \"Lưu\" hoặc \"Hủy\" trong form đó trước.");
+      setStepNotice("Bạn còn câu đố / trải nghiệm đang soạn — bấm \"Lưu\" hoặc \"Hủy\" trong form đó trước.");
       return;
     }
     setSaveStatus("saving");
@@ -99,6 +101,11 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
 
   const goToTab = (i) => {
     if (i === tabIndex) return;
+    // Rời tab Trải nghiệm khi form câu đố / trải nghiệm còn mở thì bản đang soạn sẽ mất ⇒ bắt Lưu hoặc Hủy trước.
+    if (activityFormOpen && !readOnly) {
+      setStepNotice("Bạn còn câu đố / trải nghiệm đang soạn — bấm \"Lưu\" hoặc \"Hủy\" trong form đó trước.");
+      return;
+    }
     if (readOnly || i < tabIndex) {
       setStepNotice("");
       showTab(i);
@@ -121,6 +128,11 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
 
   const tabHasError = (key) => TABS.find((t) => t.key === key).fields.some((f) => stopErr(f));
 
+  const setThenNow = (i, patch) =>
+    set(
+      { thenNow: (stop.thenNow || []).map((t, j) => (j === i ? { ...t, ...patch } : t)) },
+      Object.keys(patch).map((k) => `thenNow[${i}].${k}`),
+    );
   const setArtifact = (i, patch) =>
     set(
       { artifacts: stop.artifacts.map((a, j) => (j === i ? { ...a, ...patch } : a)) },
@@ -268,13 +280,18 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
                 </div>
               ))}
             </div>
+
+            <ThenNowEditor items={stop.thenNow || []} readOnly={readOnly} stopErr={stopErr}
+              onAdd={() => set({ thenNow: [...(stop.thenNow || []), emptyThenNow()] })}
+              onRemove={(i) => set({ thenNow: stop.thenNow.filter((_, j) => j !== i) }, [`thenNow[${i}]`])}
+              onChange={setThenNow} />
           </>
         )}
 
         {tab === "experience" && (
           <>
             <p className="text-[11px] text-slate-500">
-              Thứ tự trên app: <b>Câu hỏi (quiz)</b> → <b>Trải nghiệm thực tế</b>. Quiz chỉ là câu <b>trắc nghiệm</b>. Trải nghiệm thực tế: đến <b>checkpoint</b> → <b>đếm ngược</b> → quét <b>mã QR</b> tại điểm → trả lời câu hỏi <b>tự luận</b> (khách nhập chữ). Bấm <b>Thêm</b> để soạn từng mục. Điểm thưởng do Admin cấu hình, hiển thị để tham khảo.
+              Thứ tự trên app: <b>Câu đố văn hóa</b> → <b>Trải nghiệm thực tế</b>. Câu đố có 4 dạng: <b>chọn đáp án</b>, <b>chọn ảnh</b>, <b>xếp thứ tự</b>, <b>đoán số</b>. Trải nghiệm thực tế: đến <b>checkpoint</b> → <b>đếm ngược</b> → quét <b>mã QR</b> tại điểm → trả lời câu hỏi <b>tự luận</b> (khách nhập chữ). Bấm <b>Thêm</b> để soạn từng mục. Điểm thưởng do Admin cấu hình, hiển thị để tham khảo.
             </p>
             <StopActivitiesEditor stop={stop} readOnly={readOnly} stopErr={stopErr}
               quizPoints={rewardPoints?.quizPerQuestion} experiencePoints={rewardPoints?.perExperience}
@@ -338,5 +355,69 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
       />
     )}
     </>
+  );
+}
+
+/** Ảnh xưa và nay: tối đa 3 cặp (ảnh tư liệu + ảnh hiện tại cùng góc), bắt buộc ghi nguồn ảnh tư liệu. */
+function ThenNowEditor({ items, readOnly, stopErr, onAdd, onRemove, onChange }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-bold text-slate-800">Ảnh xưa và nay ({items.length}/{THEN_NOW_MAX})</h4>
+        {!readOnly && items.length < THEN_NOW_MAX && (
+          <button type="button" onClick={onAdd}
+            className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline cursor-pointer">
+            <Plus size={14} /> Thêm cặp ảnh
+          </button>
+        )}
+      </div>
+      <p className="text-[11px] text-slate-500">
+        Khách kéo thanh trượt để so sánh ảnh tư liệu với cảnh hiện tại. Chụp ảnh hiện tại <b>cùng góc</b> với ảnh tư liệu.
+        Ảnh tư liệu thường có bản quyền — hãy ghi rõ nguồn và chỉ dùng ảnh được phép.
+      </p>
+      {items.length === 0 && <p className="text-[11px] text-slate-400">Chưa có cặp ảnh nào (không bắt buộc).</p>}
+      {items.map((t, i) => {
+        const err = (f) => stopErr(f ? `thenNow[${i}].${f}` : `thenNow[${i}]`);
+        return (
+          <div key={t._key} className="p-3 rounded-xl border border-slate-200 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-slate-600">Cặp ảnh {i + 1}</span>
+              {!readOnly && (
+                <button type="button" title="Xóa cặp ảnh" onClick={() => onRemove(i)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer">
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <span className="text-[11px] font-bold text-slate-700">Ảnh tư liệu (xưa)</span>
+                <SingleImage value={t.thenImageUrl} disabled={readOnly} label="Tải ảnh tư liệu" aspect="aspect-[4/3]"
+                  onChange={(thenImageUrl) => onChange(i, { thenImageUrl })} />
+              </div>
+              <div className="space-y-1">
+                <span className="text-[11px] font-bold text-slate-700">Ảnh hiện tại (nay)</span>
+                <SingleImage value={t.nowImageUrl} disabled={readOnly} label="Tải ảnh hiện tại" aspect="aspect-[4/3]"
+                  onChange={(nowImageUrl) => onChange(i, { nowImageUrl })} />
+              </div>
+            </div>
+            {err() && <p className="text-[11px] font-bold text-rose-600">{err()}</p>}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <TextInput value={t.thenLabel} limit={50} disabled={readOnly} placeholder="Thời điểm ảnh xưa, vd. 1975"
+                error={err("thenLabel")} onChange={(e) => onChange(i, { thenLabel: e.target.value })} />
+              <div className="sm:col-span-2">
+                <TextInput value={t.credit} limit={300} disabled={readOnly} placeholder="Nguồn ảnh tư liệu, vd. TTXVN / Bảo tàng…"
+                  error={err("credit")} onChange={(e) => onChange(i, { credit: e.target.value })} />
+              </div>
+            </div>
+            {(err("thenLabel") || err("credit")) && (
+              <p className="text-[11px] font-bold text-rose-600">{err("thenLabel") || err("credit")}</p>
+            )}
+            <TextArea rows={2} value={t.caption} limit={500} disabled={readOnly} placeholder="Chú thích ngắn: điều gì đã thay đổi?"
+              onChange={(e) => onChange(i, { caption: e.target.value })} />
+          </div>
+        );
+      })}
+    </div>
   );
 }

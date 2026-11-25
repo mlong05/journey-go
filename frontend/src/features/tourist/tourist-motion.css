@@ -76,6 +76,29 @@
   animation: jg-fade-in 360ms var(--jg-ease-out) both;
 }
 
+/* Thẻ tour xuất hiện lần lượt (đặt --i = thứ tự; tối đa ~8 thẻ có độ trễ để không chờ lâu) */
+@keyframes jg-card-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.jg-card-in {
+  animation: jg-card-in 520ms var(--jg-ease-out) both;
+  animation-delay: calc(min(var(--i, 0), 8) * 70ms);
+}
+
+/* Hiệu ứng nhấn: lún nhẹ khi bấm, nảy lại khi thả */
+.jg-press {
+  transition: transform 160ms var(--jg-ease-out), box-shadow 200ms var(--jg-ease-out), background-color 200ms, color 200ms, border-color 200ms;
+  -webkit-tap-highlight-color: transparent;
+}
+.jg-press:active:not(:disabled) { transform: scale(0.95); }
+/* Nút chính (cam): thêm vòng sáng lan ra khi bấm */
+@keyframes jg-ring {
+  from { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.45); }
+  to { box-shadow: 0 0 0 12px rgba(234, 88, 12, 0); }
+}
+.jg-press-ring:active:not(:disabled) { animation: jg-ring 450ms var(--jg-ease-out); }
+
 /* Menu xổ xuống */
 @keyframes jg-pop {
   from { opacity: 0; transform: translateY(-4px) scale(0.98); }
@@ -156,7 +179,8 @@ html[data-nav="back"]::view-transition-new(jg-page) {
 
 /* ── Giảm chuyển động ───────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .jg-rise, .jg-drop, .jg-fade-in, .jg-pop, .jg-sheet, .jg-shimmer { animation: none !important; }
+  .jg-rise, .jg-drop, .jg-fade-in, .jg-pop, .jg-sheet, .jg-shimmer, .jg-card-in, .jg-press-ring { animation: none !important; }
+  .jg-press:active { transform: none !important; }
   .jg-drop { transform: rotate(var(--rot, 0deg)) !important; }
   .jg-tilt { transform: none !important; transition: none !important; }
   [data-reveal], [data-reveal] .jg-item { transition: none !important; opacity: 1 !important; transform: none !important; }

@@ -776,6 +776,15 @@ public class BookingService {
      */
     @Transactional(readOnly = true)
     public Booking assertJourneyAllowed(Long bookingId, Long userId) {
+        return assertJourneyAllowed(bookingId, userId, true);
+    }
+
+    /**
+     * @param enforceEndDate true khi tạo hành trình MỚI ⇒ chặn nếu đã qua ngày cuối của tour;
+     *                       false khi mở lại hành trình đã bắt đầu (vẫn kiểm tra quyền / trạng thái đơn).
+     */
+    @Transactional(readOnly = true)
+    public Booking assertJourneyAllowed(Long bookingId, Long userId, boolean enforceEndDate) {
         Booking booking = findOrThrow(bookingId);
 
         boolean isOwner = booking.getTourist() != null && userId.equals(booking.getTourist().getId());
@@ -803,6 +812,15 @@ public class BookingService {
                             + booking.getExperienceDate() + ") — còn "
                             + java.time.temporal.ChronoUnit.DAYS.between(today, booking.getExperienceDate())
                             + " ngày nữa");
+        }
+        // Chỉ được BẮT ĐẦU trong thời gian tour diễn ra (ngày khởi hành → ngày cuối của tour).
+        // Hành trình đã bắt đầu trong hạn vẫn mở lại được (enforceEndDate = false).
+        LocalDate endDate = booking.experienceEndDate();
+        if (enforceEndDate && endDate != null && today.isAfter(endDate)) {
+            throw new AppException(ErrorCode.BOOKING_EXPERIENCE_EXPIRED,
+                    "Đã quá ngày trải nghiệm (" + booking.getExperienceDate()
+                            + (endDate.equals(booking.getExperienceDate()) ? "" : " – " + endDate)
+                            + ") — không thể bắt đầu hành trình");
         }
 
         return booking;

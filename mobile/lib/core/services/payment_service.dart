@@ -19,6 +19,7 @@ library;
 
 import '../models/payment_model.dart';
 import 'api_client.dart';
+import '../../l10n/locale_controller.dart';
 
 class PaymentService {
   static final PaymentService _instance = PaymentService._internal();
@@ -67,7 +68,7 @@ class PaymentService {
       '$_endpoint/bookings/$bookingId/init$query',
     );
     if (data is! Map<String, dynamic>) {
-      throw const ApiException('Máy chủ trả về dữ liệu thanh toán không hợp lệ.');
+      throw ApiException(appL10n.payInvalidData);
     }
     return PaymentInitModel.fromJson(data);
   }

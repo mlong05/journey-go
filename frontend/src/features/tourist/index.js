@@ -1,5 +1,4 @@
 export { default as HomePage } from "./components/HomePage";
-export { default as ToursBrowser } from "./components/ToursBrowser";
 export { default as TourDetailScreen } from "./components/TourDetailScreen";
 export { default as CheckoutScreen } from "./components/CheckoutScreen";
 export { default as PaymentResultScreen } from "./components/PaymentResultScreen";

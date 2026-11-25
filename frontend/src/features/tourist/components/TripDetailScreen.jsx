@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, CalendarDays, Loader2, AlertTriangle, Timer, CreditCard, Smartphone, Ban,
-  UserPlus, UserCog, Send, X, RotateCcw, UserRoundPlus, MapPin,
+  UserPlus, UserCog, Send, X, RotateCcw, UserRoundPlus, MapPin, Clock, Bus,
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -16,8 +16,7 @@ import BookingChatPanel from "./TripChatPanel";
 import { touristService } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
 import { BOOKING_STATUS, dateTime, longDate, vnd } from "../utils";
-
-const GENDER = { MALE: "Nam", FEMALE: "Nữ", OTHER: "Khác" };
+import { useI18n, translate, getLocale } from "@/i18n";
 
 /** Đếm ngược tới hạn thanh toán; gọi onExpire một lần khi hết giờ. */
 function Countdown({ deadline, onExpire }) {
@@ -36,6 +35,7 @@ function Countdown({ deadline, onExpire }) {
 }
 
 function TripDetail({ bookingId }) {
+  const { t, locale } = useI18n();
   const [booking, setBooking] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
@@ -51,7 +51,7 @@ function TripDetail({ bookingId }) {
 
   const load = useCallback(() => touristService.booking(bookingId)
     .then((b) => { setBooking(b); setLoadedAt(Date.now()); })
-    .catch((err) => setError(err?.message || "Không tìm thấy đơn.")), [bookingId]);
+    .catch((err) => setError(err?.message || translate(getLocale(), "trips.errNotFound"))), [bookingId]);
   const onExpire = useCallback(() => { setTimeUp(true); load(); }, [load]);
   useEffect(() => { load(); }, [load]);
 
@@ -78,24 +78,32 @@ function TripDetail({ bookingId }) {
     setBusy("pay"); setActionError("");
     try {
       const payment = await touristService.initPayment(booking.id);
-      if (!payment?.paymentUrl) throw new Error("Không nhận được đường dẫn thanh toán từ VNPay.");
+      if (!payment?.paymentUrl) throw new Error(t("trips.errNoPaymentUrl"));
       window.location.href = payment.paymentUrl;
-    } catch (err) { setActionError(err?.message || "Không khởi tạo được thanh toán."); setBusy(""); }
+    } catch (err) { setActionError(err?.message || t("trips.errInitPayment")); setBusy(""); }
   };
   const cancel = async () => {
-    const ok = await confirm({ tone: "danger", icon: "reject", title: "Hủy đơn này?", confirmLabel: "Hủy đơn",
-      description: "Chỗ đang giữ sẽ được trả lại. Đơn chưa thanh toán nên không phát sinh phí.", subject: booking.tourTitle });
+    const ok = await confirm({
+      tone: "danger",
+      icon: "reject",
+      title: t("trips.cancelDialogTitle"),
+      confirmLabel: t("trips.cancelBooking"),
+      cancelLabel: t("trips.cancelDialogCancel"),
+      description: t("trips.cancelDialogDesc"),
+      subject: booking.tourTitle,
+    });
     if (!ok) return;
     setBusy("cancel"); setActionError("");
-    try { setBooking(await touristService.cancelBooking(booking.id, "Khách hủy trên web")); }
-    catch (err) { setActionError(err?.message || "Không hủy được đơn."); }
+    try { setBooking(await touristService.cancelBooking(booking.id, t("trips.cancelReasonWeb"))); }
+    catch (err) { setActionError(err?.message || t("trips.errCancelShort")); }
     finally { setBusy(""); }
   };
 
   if (error) return <p role="alert" className="mx-auto max-w-md px-4 py-20 text-center font-bold text-rose-600">{error}</p>;
-  if (!booking) return <p className="flex justify-center gap-2 py-24 text-sm text-slate-500"><Loader2 size={18} className="animate-spin" />Đang tải…</p>;
+  if (!booking) return <p className="flex justify-center gap-2 py-24 text-sm text-slate-500"><Loader2 size={18} className="animate-spin" />{t("common.loading")}</p>;
 
   const st = BOOKING_STATUS[booking.status] || BOOKING_STATUS.CANCELLED;
+  const statusLabel = t(BOOKING_STATUS[booking.status] ? `bookingStatus.${booking.status}` : "bookingStatus.CANCELLED");
   const pending = booking.status === "PENDING_PAYMENT" && !timeUp && new Date(booking.paymentDeadline).getTime() > loadedAt;
   const passengers = (booking.passengers || []).filter((p) => p.status !== "REVOKED" && p.status !== "REPLACED");
   // Người đặt tour (chủ đơn) vs hành khách được mời — quyền khác nhau.
@@ -109,30 +117,49 @@ function TripDetail({ bookingId }) {
   return (
     <div className="min-w-0">
       {confirmDialog}
-      <Breadcrumbs fallback={ROUTES.TRIPS} items={[{ label: "Trang chủ", href: ROUTES.HOME }, { label: "Chuyến đi của tôi", href: ROUTES.TRIPS }, { label: `Đơn ${booking.bookingCode}` }]} />
+      <Breadcrumbs fallback={ROUTES.TRIPS} items={[{ label: t("trips.home"), href: ROUTES.HOME }, { label: t("nav.myTrips"), href: ROUTES.TRIPS }, { label: t("trips.bookingBread", { code: booking.bookingCode }) }]} />
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className={`rounded-md border px-2 py-0.5 text-xs font-bold ${st.cls}`}>{st.label}</span>
-        <span className="text-sm text-slate-500">Mã đơn <b className="font-mono text-slate-800">{booking.bookingCode}</b></span>
+        <span className={`rounded-md border px-2 py-0.5 text-xs font-bold ${st.cls}`}>{statusLabel}</span>
+        <span className="text-sm text-slate-500">{t("trips.bookingCodeLabel")} <b className="font-mono text-slate-800">{booking.bookingCode}</b></span>
         {!isOwner && (
           <span className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-bold text-violet-700">
-            <UserRoundPlus size={11} />Bạn được mời tham gia
+            <UserRoundPlus size={11} />{t("trips.invitedToJoin")}
           </span>
         )}
       </div>
       <h1 className="mt-2 text-[26px] font-extrabold leading-tight tracking-tight text-slate-900 text-balance">
         <Link href={ROUTES.TOUR_DETAIL(booking.tourId)} className="hover:text-teal-800">{booking.tourTitle}</Link>
       </h1>
-      <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-600"><CalendarDays size={15} />{longDate(booking.experienceDate)}</p>
+      <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-600"><CalendarDays size={15} />{longDate(booking.experienceDate, locale)}</p>
+
+      {/* Giờ khởi hành + nơi tập trung + giờ đón — thứ khách cần nhất trước ngày đi. */}
+      {(pending || booking.status === "CONFIRMED") && !refunded && (booking.departureTime || booking.meetingPoint || booking.pickupInfo) && (
+        <section className="mt-5 rounded-3xl border border-slate-200 bg-white p-5">
+          <h2 className="mb-3 font-extrabold text-slate-900">{t("trips.departureInfo")}</h2>
+          <dl className="grid gap-4 text-sm sm:grid-cols-3">
+            {[[Clock, t("schedule.departureTime"), booking.departureTime], [MapPin, t("schedule.meetingPoint"), booking.meetingPoint], [Bus, t("schedule.pickup"), booking.pickupInfo]]
+              .filter(([, , v]) => v).map(([Icon, k, v]) => (
+                <div key={k} className="flex min-w-0 items-start gap-2.5">
+                  <Icon size={17} className="mt-0.5 shrink-0 text-teal-700" />
+                  <div className="min-w-0">
+                    <dt className="font-bold text-slate-900">{k}</dt>
+                    <dd className="mt-0.5 whitespace-pre-line text-slate-700">{v}</dd>
+                  </div>
+                </div>
+              ))}
+          </dl>
+        </section>
+      )}
 
       {pending && (
         <div className="mt-5 rounded-3xl border border-amber-200 bg-amber-50 p-5">
-          <p className="flex items-center gap-2 text-sm font-bold text-amber-800"><Timer size={16} />Chỗ đang được giữ, còn <Countdown deadline={booking.paymentDeadline} onExpire={onExpire} /> để thanh toán</p>
+          <p className="flex items-center gap-2 text-sm font-bold text-amber-800"><Timer size={16} />{t("trips.detailHoldBefore")}<Countdown deadline={booking.paymentDeadline} onExpire={onExpire} />{t("trips.detailHoldAfter")}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" onClick={pay} disabled={Boolean(busy)} className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-orange-700 disabled:translate-y-0 disabled:opacity-50 transition duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] motion-reduce:transition-none cursor-pointer">
-              {busy === "pay" ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}Thanh toán {vnd(booking.totalAmount)}
+              {busy === "pay" ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}{t("trips.payAmount", { amount: vnd(booking.totalAmount) })}
             </button>
             <button type="button" onClick={cancel} disabled={Boolean(busy)} className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50 cursor-pointer">
-              {busy === "cancel" ? <Loader2 size={16} className="animate-spin" /> : <Ban size={16} />}Hủy đơn
+              {busy === "cancel" ? <Loader2 size={16} className="animate-spin" /> : <Ban size={16} />}{t("trips.cancelBooking")}
             </button>
           </div>
         </div>
@@ -147,7 +174,7 @@ function TripDetail({ bookingId }) {
         <>
           <div className="mt-5 flex items-start gap-3 rounded-3xl border border-teal-200 bg-teal-50 p-5 text-sm text-teal-900">
             <Smartphone size={20} className="mt-0.5 shrink-0" />
-            <p>{booking.daysUntilExperience > 0 ? `Còn ${booking.daysUntilExperience} ngày nữa là đến ngày đi tour. ` : ""}Ngày đi tour, mở app JourneyGo bằng cùng tài khoản, đến điểm hẹn để check-in và mở câu chuyện của từng điểm dừng.</p>
+            <p>{booking.daysUntilExperience > 0 ? t("trips.daysUntilPrefix", { count: booking.daysUntilExperience }) : ""}{t("trips.tourDayReminder")}</p>
           </div>
           {/* Xem lại toàn bộ thông tin tour như lúc người dùng xem trước khi mua. */}
           {booking.tourId != null && (
@@ -157,7 +184,7 @@ function TripDetail({ bookingId }) {
                 className="inline-flex items-center gap-2 rounded-xl border border-teal-600 bg-white px-4 py-2.5 text-sm font-extrabold text-teal-700 transition hover:bg-teal-50"
               >
                 <MapPin size={16} />
-                Xem chi tiết tour
+                {t("trips.viewTourDetail")}
               </Link>
             </div>
           )}
@@ -170,8 +197,7 @@ function TripDetail({ bookingId }) {
           <p className="flex items-start gap-3">
             <RotateCcw size={18} className="mt-0.5 shrink-0" />
             <span>
-              Yêu cầu hoàn tiền của đơn này đã được xử lý xong. Bạn không còn đi tour
-              vào ngày {longDate(booking.experienceDate)} — xem chi tiết ở mục Hoàn tiền bên dưới.
+              {t("trips.refundedNotice", { date: longDate(booking.experienceDate, locale) })}
             </span>
           </p>
         </div>
@@ -180,14 +206,14 @@ function TripDetail({ bookingId }) {
       <div className="mt-5 grid grid-cols-1 items-start gap-5 md:grid-cols-[minmax(0,1fr)_300px]">
         <PassengerGroupPanel booking={booking} isOwner={isOwner} />
         <section className="rounded-3xl border border-slate-200 bg-white p-5 text-sm">
-          <h2 className="mb-3 font-extrabold text-slate-900">Thanh toán</h2>
+          <h2 className="mb-3 font-extrabold text-slate-900">{t("trips.paymentSection")}</h2>
           <dl className="space-y-2.5">
             <div className="flex justify-between">
-              <dt className="text-slate-500">Tiền ban đầu</dt>
+              <dt className="text-slate-500">{t("trips.originalAmount")}</dt>
               <dd className="tabular-nums font-medium text-slate-800">{vnd(originalTotal)}</dd>
             </div>
             <div className="flex justify-between items-center">
-              <dt className="text-slate-500">Voucher áp dụng</dt>
+              <dt className="text-slate-500">{t("trips.appliedVoucher")}</dt>
               <dd className="tabular-nums">
                 {booking.appliedVoucherCode ? (
                   <span
@@ -197,27 +223,30 @@ function TripDetail({ bookingId }) {
                     {booking.appliedVoucherCode}
                   </span>
                 ) : (
-                  <span className="text-slate-400">Không có</span>
+                  <span className="text-slate-400">{t("trips.none")}</span>
                 )}
               </dd>
             </div>
             <div className="flex justify-between border-t border-slate-100 pt-2">
-              <dt className="font-bold text-slate-800">Số tiền cần thanh toán</dt>
+              <dt className="font-bold text-slate-800">{t("trips.amountToPay")}</dt>
               <dd className="font-extrabold tabular-nums text-slate-900">{vnd(booking.totalAmount)}</dd>
             </div>
+            {/* Chỉ giữ mốc thời gian có ích theo trạng thái (giống mobile):
+                • Đã thanh toán: Thanh toán lúc (+ Hoàn thành)
+                • Chờ thanh toán / hủy / hết hạn: Đặt lúc (hạn thanh toán đã có ở băng đếm ngược phía trên) */}
             <div className="flex justify-between border-t border-dashed border-slate-200 pt-2 text-xs">
-              <dt className="text-slate-500">Đặt lúc</dt>
-              <dd className="text-slate-700">{dateTime(booking.createdAt)}</dd>
+              <dt className="text-slate-500">{booking.paidAt ? t("trips.paidAt") : t("trips.bookedAt")}</dt>
+              <dd className="text-slate-700">{dateTime(booking.paidAt || booking.createdAt)}</dd>
             </div>
-            {booking.paidAt && (
+            {booking.completedAt && (
               <div className="flex justify-between text-xs">
-                <dt className="text-slate-500">Thanh toán lúc</dt>
-                <dd className="text-slate-700">{dateTime(booking.paidAt)}</dd>
+                <dt className="text-slate-500">{t("trips.completedAt")}</dt>
+                <dd className="text-slate-700">{dateTime(booking.completedAt)}</dd>
               </div>
             )}
             {booking.cancellationReason && (
               <div className="text-xs">
-                <dt className="text-slate-500">Lý do hủy</dt>
+                <dt className="text-slate-500">{t("trips.cancellationReason")}</dt>
                 <dd className="mt-0.5 text-slate-700">{booking.cancellationReason}</dd>
               </div>
             )}
@@ -246,29 +275,29 @@ function TripDetail({ bookingId }) {
       */}
       {isOwner && (booking.status === "CANCELLED" || booking.status === "EXPIRED") && (
         <div className="mt-5 rounded-3xl border border-teal-200 bg-teal-50 p-5">
-          <p className="text-sm font-bold text-teal-900">Bạn muốn đi lại chuyến này?</p>
+          <p className="text-sm font-bold text-teal-900">{t("trips.rebookTitle")}</p>
           <p className="mt-1 text-sm text-teal-800/80">
-            Mở lại trang tour để chọn ngày khác và đặt vé mới.
+            {t("trips.rebookDesc")}
           </p>
           <Link
             href={ROUTES.TOUR_DETAIL(booking.tourId)}
             className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-teal-800"
           >
-            <RotateCcw size={16} />Đặt lại tour
+            <RotateCcw size={16} />{t("trips.rebookTour")}
           </Link>
         </div>
       )}
       {isOwner && booking.status === "COMPLETED" && (
         <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-5">
-          <p className="text-sm font-bold text-slate-900">Bạn đã đi tour này rồi</p>
+          <p className="text-sm font-bold text-slate-900">{t("trips.completedTitle")}</p>
           <p className="mt-1 text-sm text-slate-600">
-            Mỗi tour chỉ được đặt một lần. Bạn có thể xem lại thông tin tour hoặc khám phá các tour khác.
+            {t("trips.completedDesc")}
           </p>
           <Link
             href={ROUTES.TOUR_DETAIL(booking.tourId)}
             className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100"
           >
-            <MapPin size={16} />Xem chi tiết tour
+            <MapPin size={16} />{t("trips.viewTourDetail")}
           </Link>
         </div>
       )}

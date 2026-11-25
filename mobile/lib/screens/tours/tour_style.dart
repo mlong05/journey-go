@@ -2,6 +2,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../l10n/locale_controller.dart';
 import '../../core/models/gamification_model.dart' show formatThousands;
 
 /// Màu và biểu tượng nhận diện theo loại hình tour (dùng khi tour chưa có ảnh bìa).
@@ -105,10 +106,11 @@ class TourRewardStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final items = <(IconData, String, Color)>[
-      if (taskCount > 0) (Icons.flag_rounded, '$taskCount nhiệm vụ', AppCultureColors.heritageJade),
-      if (points > 0) (Icons.stars_rounded, 'tối đa ${formatThousands(points)} điểm', AppCultureColors.gold),
-      if (badgeCount > 0) (Icons.military_tech_rounded, '$badgeCount huy hiệu', AppCultureColors.lacquer),
+      if (taskCount > 0) (Icons.flag_rounded, l10n.tourTaskCount(taskCount), AppCultureColors.heritageJade),
+      if (points > 0) (Icons.stars_rounded, l10n.rewardMaxPoints(formatThousands(points)), AppCultureColors.gold),
+      if (badgeCount > 0) (Icons.military_tech_rounded, l10n.tourBadgeCount(badgeCount), AppCultureColors.lacquer),
     ];
     if (items.isEmpty) return const SizedBox.shrink();
 

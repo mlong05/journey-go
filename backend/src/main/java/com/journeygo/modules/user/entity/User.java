@@ -47,6 +47,14 @@ public class User {
     @Column(name = "avatar_url", columnDefinition = "TEXT")
     private String avatarUrl;
 
+    /** Ảnh bìa trang hồ sơ du khách; null = dùng ảnh mặc định. */
+    @Column(name = "cover_image_url", columnDefinition = "TEXT")
+    private String coverImageUrl;
+
+    @Column(name = "preferred_language", nullable = false, length = 5)
+    @Builder.Default
+    private String preferredLanguage = "vi";
+
     @Column(nullable = false)
     @Builder.Default
     private boolean active = true;

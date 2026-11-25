@@ -6,6 +6,11 @@ import { authService } from "../services/authService";
 import { ROUTES } from "@/constants/routes";
 import { STORAGE_KEYS } from "@/constants";
 import { translateAuthError } from "@/services/errorMessage";
+import { resolvePostLoginPath } from "@/services/authRedirect";
+import { getLocale, translate } from "@/i18n";
+import { applyAccountLocale } from "@/i18n/sync";
+
+const tr = (key, params) => translate(getLocale(), key, params);
 
 export function useAuth() {
   const router = useRouter();
@@ -24,21 +29,21 @@ export function useAuth() {
 
       const roleStr = String(user?.role || "").toUpperCase();
       let targetPath = ROUTES.HOME;
-      let roleTitle = "Người dùng";
-      let roleScope = "Khám phá di sản";
+      let roleTitle = tr("misc.role.user");
+      let roleScope = tr("misc.role.tourist.scope");
 
       if (roleStr === "ADMIN") {
         targetPath = ROUTES.ADMIN || "/admin";
-        roleTitle = "Quản trị viên";
-        roleScope = "Quản trị hệ thống & vận hành";
+        roleTitle = tr("misc.role.admin.title");
+        roleScope = tr("misc.role.admin.scope");
       } else if (roleStr === "CONTENT_MODERATOR") {
         targetPath = ROUTES.MODERATOR || "/moderator";
-        roleTitle = "Kiểm duyệt viên";
-        roleScope = "Thẩm định hồ sơ & nội dung";
+        roleTitle = tr("misc.role.moderator.title");
+        roleScope = tr("misc.role.moderator.scope");
       } else if (roleStr === "CONTENT_PROVIDER") {
         targetPath = ROUTES.PROVIDER || "/provider";
-        roleTitle = "Đối tác cung cấp nội dung";
-        roleScope = "Nội dung, tour, doanh thu & tất toán";
+        roleTitle = tr("misc.role.provider.title");
+        roleScope = tr("misc.role.provider.scopeFull");
       }
 
       if (typeof window !== "undefined") {
@@ -54,6 +59,7 @@ export function useAuth() {
             roleTitle,
             roleScope,
             active: user?.active,
+            preferredLanguage: user?.preferredLanguage || "vi",
           },
           token: accessToken,
           accessToken,
@@ -67,13 +73,16 @@ export function useAuth() {
         if (accessToken) localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
         if (refreshToken) localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
         if (user) localStorage.setItem(STORAGE_KEYS.USER_INFO, JSON.stringify(user));
+        if (roleStr === "TOURIST" || roleStr === "USER") {
+          applyAccountLocale(user?.preferredLanguage || "vi");
+        }
         window.dispatchEvent(new Event("storage"));
       }
 
-      router.push(targetPath);
+      router.push(resolvePostLoginPath(roleStr));
       return payload;
     } catch (err) {
-      setError(err.message || "Đăng nhập thất bại");
+      setError(err.message || tr("misc.auth.loginFailed"));
       throw err;
     } finally {
       setLoading(false);
@@ -92,21 +101,21 @@ export function useAuth() {
 
       const roleStr = String(user?.role || desiredRole || "TOURIST").toUpperCase();
       let targetPath = ROUTES.HOME || "/";
-      let roleTitle = "Người dùng";
-      let roleScope = "Khám phá di sản";
+      let roleTitle = tr("misc.role.user");
+      let roleScope = tr("misc.role.tourist.scope");
 
       if (roleStr === "ADMIN") {
         targetPath = ROUTES.ADMIN || "/admin";
-        roleTitle = "Quản trị viên";
-        roleScope = "Quản trị hệ thống & vận hành";
+        roleTitle = tr("misc.role.admin.title");
+        roleScope = tr("misc.role.admin.scope");
       } else if (roleStr === "CONTENT_MODERATOR") {
         targetPath = ROUTES.MODERATOR || "/moderator";
-        roleTitle = "Kiểm duyệt viên";
-        roleScope = "Thẩm định hồ sơ & nội dung";
+        roleTitle = tr("misc.role.moderator.title");
+        roleScope = tr("misc.role.moderator.scope");
       } else if (roleStr === "CONTENT_PROVIDER") {
         targetPath = ROUTES.PROVIDER || "/provider";
-        roleTitle = "Đối tác cung cấp nội dung";
-        roleScope = "Nội dung, tour, doanh thu & tất toán";
+        roleTitle = tr("misc.role.provider.title");
+        roleScope = tr("misc.role.provider.scopeFull");
       }
 
       if (typeof window !== "undefined") {
@@ -124,6 +133,7 @@ export function useAuth() {
             active: user?.active,
             avatarUrl: user?.avatarUrl,
             authProvider: user?.authProvider || "GOOGLE",
+            preferredLanguage: user?.preferredLanguage || "vi",
           },
           token: accessToken,
           accessToken,
@@ -146,15 +156,18 @@ export function useAuth() {
           localStorage.setItem(STORAGE_KEYS.USER_INFO, JSON.stringify(user));
           localStorage.setItem("jg_user_info", JSON.stringify(user));
         }
+        if (roleStr === "TOURIST" || roleStr === "USER") {
+          applyAccountLocale(user?.preferredLanguage || "vi");
+        }
         window.dispatchEvent(new Event("storage"));
       }
 
       if (options?.redirect !== false) {
-        router.push(targetPath);
+        router.push(resolvePostLoginPath(roleStr));
       }
       return { success: true, user, payload, targetPath, roleTitle };
     } catch (err) {
-      const msg = translateAuthError(err, "Đăng nhập Google thất bại");
+      const msg = translateAuthError(err, tr("misc.auth.googleLoginFailed"));
       setError(msg);
       return { success: false, error: msg };
     } finally {
@@ -169,7 +182,7 @@ export function useAuth() {
       const response = await authService.register(userData);
       return response?.data || response;
     } catch (err) {
-      setError(err.message || "Đăng ký thất bại");
+      setError(err.message || tr("misc.auth.registerFailed"));
       throw err;
     } finally {
       setLoading(false);
@@ -228,7 +241,7 @@ export function useAuth() {
 
       return payload;
     } catch (err) {
-      setError(err?.message || "Làm mới phiên làm việc thất bại");
+      setError(err?.message || tr("misc.auth.refreshFailed"));
       throw err;
     }
   };

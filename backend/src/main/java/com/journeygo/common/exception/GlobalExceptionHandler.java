@@ -1,6 +1,7 @@
 package com.journeygo.common.exception;
 
 import com.journeygo.common.dto.ApiResponse;
+import com.journeygo.common.i18n.Messages;
 import com.journeygo.modules.experience.exception.BusinessException;
 import com.journeygo.modules.experience.exception.ResourceNotFoundException;
 import lombok.extern.slf4j.Slf4j;
@@ -39,7 +40,7 @@ public class GlobalExceptionHandler {
             org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(ApiResponse.builder()
                 .code(HttpStatus.PAYLOAD_TOO_LARGE.value())
-                .message("Tệp quá lớn: ảnh tối đa 10MB, video tối đa 100MB")
+                .message(Messages.get("common.fileTooLarge"))
                 .build());
     }
 
@@ -61,9 +62,24 @@ public class GlobalExceptionHandler {
         ErrorCode errorCode = ex.getErrorCode();
         ApiResponse<Object> response = ApiResponse.builder()
                 .code(errorCode.getHttpStatus().value())
-                .message(ex.getMessage() != null ? ex.getMessage() : errorCode.getMessage())
+                .message(appMessage(ex))
                 .build();
         return ResponseEntity.status(errorCode.getHttpStatus()).body(response);
+    }
+
+    /**
+     * Câu thông báo của AppException theo ngôn ngữ request:
+     *  • Tiếng Việt: giữ câu tự viết (chi tiết hơn) nếu có, không thì câu của mã lỗi.
+     *  • en / ja: câu tự viết hầu hết là tiếng Việt ⇒ dùng câu đã dịch của mã lỗi.
+     */
+    private static String appMessage(AppException ex) {
+        if (ex.hasCustomMessage() && Messages.isVietnamese(Messages.currentLocale())) return ex.getMessage();
+        return ex.getErrorCode().getLocalizedMessage();
+    }
+
+    /** Lỗi nghiệp vụ chỉ có câu tiếng Việt: ngôn ngữ khác thì dùng câu chung đã dịch theo mã HTTP. */
+    private static String vietnameseOr(String vietnamese, String fallbackKey) {
+        return Messages.isVietnamese(Messages.currentLocale()) && vietnamese != null ? vietnamese : Messages.get(fallbackKey);
     }
 
     // ── Experience module exceptions ──────────────────────────────────────────────
@@ -72,7 +88,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Object>> handleResourceNotFound(ResourceNotFoundException ex) {
         ApiResponse<Object> response = ApiResponse.builder()
                 .code(HttpStatus.NOT_FOUND.value())
-                .message(ex.getMessage())
+                .message(vietnameseOr(ex.getMessage(), "common.notFound"))
                 .build();
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
@@ -99,7 +115,11 @@ public class GlobalExceptionHandler {
 
         ApiResponse<Object> response = ApiResponse.builder()
                 .code(status.value())
-                .message(ex.getMessage())
+                .message(vietnameseOr(ex.getMessage(), switch (status) {
+                    case UNAUTHORIZED -> "common.sessionExpired";
+                    case FORBIDDEN -> "common.accessDenied";
+                    default -> "common.badRequest";
+                }))
                 .build();
         return ResponseEntity.status(status).body(response);
     }
@@ -144,6 +164,9 @@ public class GlobalExceptionHandler {
         }
 
         log.warn("DataIntegrityViolation: code={} cause={}", code, rootMessage);
+        if (!Messages.isVietnamese(Messages.currentLocale())) {
+            message = Messages.get("INTEGRITY-002".equals(code) ? "common.integrityViolation" : "common.duplicateData");
+        }
 
         ApiResponse<Object> response = ApiResponse.builder()
                 .code(HttpStatus.BAD_REQUEST.value())
@@ -161,7 +184,7 @@ public class GlobalExceptionHandler {
 
         ApiResponse<Map<String, String>> response = ApiResponse.<Map<String, String>>builder()
                 .code(HttpStatus.BAD_REQUEST.value())
-                .message("Dữ liệu đầu vào không hợp lệ")
+                .message(Messages.get("common.validationError"))
                 .data(errors)
                 .build();
         return ResponseEntity.badRequest().body(response);
@@ -171,7 +194,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Object>> handleBadCredentialsException(BadCredentialsException ex) {
         ApiResponse<Object> response = ApiResponse.builder()
                 .code(HttpStatus.UNAUTHORIZED.value())
-                .message("Email hoặc mật khẩu không chính xác")
+                .message(Messages.get("common.badCredentials"))
                 .build();
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
     }
@@ -180,7 +203,9 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Object>> handleAuthenticationException(AuthenticationException ex) {
         ApiResponse<Object> response = ApiResponse.builder()
                 .code(HttpStatus.UNAUTHORIZED.value())
-                .message("Xác thực thất bại: " + ex.getMessage())
+                .message(Messages.isVietnamese(Messages.currentLocale())
+                        ? "Xác thực thất bại: " + ex.getMessage()
+                        : Messages.get("common.authFailed"))
                 .build();
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
     }
@@ -189,7 +214,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Object>> handleAccessDeniedException(AccessDeniedException ex) {
         ApiResponse<Object> response = ApiResponse.builder()
                 .code(HttpStatus.FORBIDDEN.value())
-                .message("Bạn không có quyền truy cập chức năng này")
+                .message(Messages.get("common.accessDenied"))
                 .build();
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
@@ -207,7 +232,7 @@ public class GlobalExceptionHandler {
                 : "Trường sort không hợp lệ";
         ApiResponse<Object> response = ApiResponse.builder()
                 .code(HttpStatus.BAD_REQUEST.value())
-                .message("Tham số sort không hợp lệ: " + msg)
+                .message(Messages.get("common.invalidSort") + ": " + msg)
                 .build();
         return ResponseEntity.badRequest().body(response);
     }
@@ -220,7 +245,7 @@ public class GlobalExceptionHandler {
         String msg = ex.getMessage() != null ? ex.getMessage() : "Tham số yêu cầu không hợp lệ";
         ApiResponse<Object> response = ApiResponse.builder()
                 .code(HttpStatus.BAD_REQUEST.value())
-                .message("Tham số không hợp lệ: " + msg)
+                .message(Messages.get("common.invalidParam") + ": " + msg)
                 .build();
         return ResponseEntity.badRequest().body(response);
     }
@@ -231,9 +256,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiResponse<Object>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         String requiredType = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown";
-        String msg = String.format(
-                "Tham số '%s' không đúng định dạng. Giá trị nhận: '%s'. Kiểu yêu cầu: %s",
-                ex.getName(), String.valueOf(ex.getValue()), requiredType);
+        String msg = Messages.isVietnamese(Messages.currentLocale())
+                ? String.format(
+                        "Tham số '%s' không đúng định dạng. Giá trị nhận: '%s'. Kiểu yêu cầu: %s",
+                        ex.getName(), String.valueOf(ex.getValue()), requiredType)
+                : Messages.get("common.paramTypeMismatch", ex.getName());
         ApiResponse<Object> response = ApiResponse.builder()
                 .code(HttpStatus.BAD_REQUEST.value())
                 .message(msg)
@@ -248,7 +275,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Object>> handleMissingParam(MissingServletRequestParameterException ex) {
         ApiResponse<Object> response = ApiResponse.builder()
                 .code(HttpStatus.BAD_REQUEST.value())
-                .message("Thiếu tham số bắt buộc: " + ex.getParameterName())
+                .message(Messages.get("common.missingParam", ex.getParameterName()))
                 .build();
         return ResponseEntity.badRequest().body(response);
     }
@@ -267,7 +294,7 @@ public class GlobalExceptionHandler {
                 ));
         ApiResponse<Map<String, String>> response = ApiResponse.<Map<String, String>>builder()
                 .code(HttpStatus.BAD_REQUEST.value())
-                .message("Tham số không hợp lệ")
+                .message(Messages.get("common.invalidParams"))
                 .data(errors)
                 .build();
         return ResponseEntity.badRequest().body(response);
@@ -277,7 +304,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Object>> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException ex) {
         ApiResponse<Object> response = ApiResponse.builder()
                 .code(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value())
-                .message("Content-Type không được hỗ trợ cho endpoint này")
+                .message(Messages.get("common.unsupportedMediaType"))
                 .build();
         return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(response);
     }
@@ -301,7 +328,9 @@ public class GlobalExceptionHandler {
         }
         ApiResponse<Object> response = ApiResponse.builder()
                 .code(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .message("Đã xảy ra lỗi máy chủ: " + ex.getMessage())
+                .message(Messages.isVietnamese(Messages.currentLocale())
+                        ? "Đã xảy ra lỗi máy chủ: " + ex.getMessage()
+                        : Messages.get("common.serverError"))
                 .build();
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }

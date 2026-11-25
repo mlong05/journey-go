@@ -4,6 +4,7 @@ import 'package:video_player/video_player.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'photo.dart';
 import '../../core/constants/app_colors.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Mã video YouTube (11 ký tự) từ link watch?v=, youtu.be/, shorts/, embed/, live/.
 String? youTubeIdOf(String url) => RegExp(
@@ -120,7 +121,7 @@ class _InlineVideoState extends State<InlineVideo> {
   Widget _poster() {
     return Semantics(
       button: true,
-      label: 'Phát video giới thiệu',
+      label: appL10n.videoPlayIntro,
       child: GestureDetector(
         onTap: _loading ? null : _play,
         child: Stack(
@@ -186,14 +187,14 @@ class _InlineVideoState extends State<InlineVideo> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Không phát được video này trong ứng dụng',
+            Text(
+              appL10n.videoCannotPlay,
               style: TextStyle(color: AppCultureColors.onDarkMuted, fontSize: 13),
             ),
             TextButton(
               onPressed: () => launchUrl(Uri.parse(widget.url), mode: LaunchMode.externalApplication),
-              child: const Text(
-                'Mở bằng ứng dụng khác',
+              child: Text(
+                appL10n.videoOpenExternal,
                 style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
               ),
             ),

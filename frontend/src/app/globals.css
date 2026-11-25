@@ -11,6 +11,13 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /*
+   * Bề rộng khung trang du khách, co theo màn hình để luôn chừa lề hai bên (kiểu trang lữ hành):
+   * màn < ~1180px dùng hết bề ngang; rộng hơn thì chiếm ~84% màn hình, tối đa 1360px (cộng đồng 1280px).
+   * Dùng: max-w-page (trang chủ, danh sách, chi tiết, checkout), max-w-wide (cộng đồng).
+   */
+  --container-page: min(85rem, max(84vw, min(100%, 73.75rem)));
+  --container-wide: min(80rem, max(84vw, min(100%, 73.75rem)));
 }
 
 /*
@@ -282,4 +289,29 @@ pre {
   .jg-lantern {
     animation: none;
   }
+}
+
+/* Linh vật Hướng dẫn viên AI (AiGuideFloatingWidget): mắt chớp, nhún nhẹ, đèn ăng-ten, bong bóng gợi ý */
+@keyframes jg-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+@keyframes jg-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+@keyframes jg-antenna {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+@keyframes jg-hint-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.jg-blink { animation: jg-blink 4s ease-in-out infinite; }
+.jg-bob { display: inline-block; animation: jg-bob 2.6s ease-in-out infinite; }
+.jg-antenna { animation: jg-antenna 1.6s ease-in-out infinite; }
+.jg-hint-pop { transform-origin: bottom right; animation: jg-hint-pop 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+@media (prefers-reduced-motion: reduce) {
+  .jg-blink, .jg-bob, .jg-antenna, .jg-hint-pop { animation: none; }
 }

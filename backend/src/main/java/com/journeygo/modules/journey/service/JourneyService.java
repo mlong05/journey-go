@@ -65,15 +65,16 @@ public class JourneyService {
 
     @Transactional
     public JourneyResponse startJourney(Long userId, StartJourneyRequest request) {
-        // Tour bị khoá cho tới ngày trải nghiệm: chỉ người đặt / hành khách đã liên kết
-        // mới được bắt đầu, và chỉ từ ngày trải nghiệm trở đi.
         if (request.bookingId() != null) {
-            bookingService.assertJourneyAllowed(request.bookingId(), userId);
-        }
-
-        // Mỗi đơn đặt tour chỉ có một hành trình: đã đi xong thì mở lại hành trình cũ, không tạo mới để check-in lại.
-        if (request.bookingId() != null) {
+            // Mỗi đơn đặt tour chỉ có một hành trình: đã bắt đầu (đang đi / đi xong) thì mở lại hành trình cũ,
+            // không tạo mới để check-in lại.
             var byBooking = journeyRepository.findFirstByUserIdAndBookingIdOrderByCreatedAtDesc(userId, request.bookingId());
+
+            // Chỉ người đặt / hành khách đã liên kết, đơn đã thanh toán, từ ngày khởi hành trở đi.
+            // Hạn "chỉ bắt đầu trong thời gian tour" chỉ áp dụng khi tạo hành trình MỚI ⇒ ai đã bắt đầu
+            // trong hạn vẫn vào tiếp / xem lại được sau khi tour kết thúc.
+            bookingService.assertJourneyAllowed(request.bookingId(), userId, byBooking.isEmpty());
+
             if (byBooking.isPresent()) {
                 log.info("Du khách {} mở lại hành trình của đơn {} (journeyId={}, status={})",
                         userId, request.bookingId(), byBooking.get().getId(), byBooking.get().getStatus());
@@ -152,7 +153,46 @@ public class JourneyService {
     @Transactional(readOnly = true)
     public JourneyResponse getJourneyDetail(Long journeyId, Long userId) {
         Journey journey = findJourneyAndVerifyOwner(journeyId, userId);
-        return JourneyResponse.fromEntity(journey);
+        return withAttemptLimits(JourneyResponse.fromEntity(journey), journey);
+    }
+
+    /**
+     * Thêm maxAttempts / attemptsRemaining cho từng nhiệm vụ để app hiện "Chưa đạt · còn 2 lượt";
+     * câu đố trả lời từng câu thêm totalQuestions để app hiện tiến độ làm dở "2/3 câu".
+     */
+    private JourneyResponse withAttemptLimits(JourneyResponse response, Journey journey) {
+        if (response.destinations() == null || response.destinations().isEmpty()) return response;
+        TourInfo tourInfo;
+        try {
+            tourInfo = tourInfoProvider.getTourInfo(journey.getTourId());
+        } catch (RuntimeException e) {
+            log.warn("Không lấy được thông tin tour {} để tính số lượt: {}", journey.getTourId(), e.getMessage());
+            return response;
+        }
+        if (tourInfo == null || tourInfo.destinations() == null) return response;
+        Map<Long, Integer> maxByTask = new HashMap<>();
+        Map<Long, Integer> perQuestionTotal = new HashMap<>();
+        for (TourInfo.TourDestinationInfo d : tourInfo.destinations()) {
+            if (d.tasks() == null) continue;
+            for (TourInfo.TourTaskInfo t : d.tasks()) {
+                maxByTask.put(t.taskId(), t.maxAttempts() != null ? t.maxAttempts() : 3);
+                if (t.perQuestionPoints() && !t.requiresLocation()) {
+                    perQuestionTotal.put(t.taskId(), t.questions() == null ? 0 : t.questions().size());
+                }
+            }
+        }
+        List<JourneyDestinationProgressResponse> dests = response.destinations().stream()
+                .map(d -> d.tasks() == null ? d : d.toBuilder().tasks(d.tasks().stream().map(t -> {
+                    Integer max = maxByTask.get(t.taskId());
+                    if (max == null) return t;
+                    int used = t.attempts() != null ? t.attempts() : 0;
+                    var b = t.toBuilder().maxAttempts(max).attemptsRemaining(Math.max(0, max - used));
+                    Integer total = perQuestionTotal.get(t.taskId());
+                    if (total != null) b.totalQuestions(total);
+                    return b.build();
+                }).toList()).build())
+                .toList();
+        return response.toBuilder().destinations(dests).build();
     }
 
     /**
@@ -421,7 +461,15 @@ public class JourneyService {
         if (!task.requiresLocation()) {
             List<TaskQuestionsResponse.Question> questions = finished ? null : task.questions().stream()
                     .map(this::toTouristQuestion).toList();
-            return base.unlocked(!finished).questionIndex(0).questions(questions).build();
+            // Câu đố trả lời từng câu: questionIndex = câu đang làm dở (mở lại thì làm tiếp, không làm lại từ đầu)
+            int resumeAt = task.perQuestionPoints() && taskProgress.getCurrentQuestionIndex() != null
+                    ? Math.min(taskProgress.getCurrentQuestionIndex(), total) : 0;
+            // Đang làm dở (đã trả lời ≥ 1 câu, chưa xong) ⇒ kèm số câu đúng + điểm tạm để app hiện tiến độ
+            if (task.perQuestionPoints() && !finished && resumeAt > 0) {
+                base.correctCount(taskProgress.getCorrectCount() == null ? 0 : taskProgress.getCorrectCount())
+                        .pointsSoFar(taskProgress.getPartialPoints() == null ? 0 : taskProgress.getPartialPoints());
+            }
+            return base.unlocked(!finished).questionIndex(resumeAt).questions(questions).build();
         }
 
         // Nhiệm vụ tương tác ngoài thực tế: từng câu một, theo từng địa điểm
@@ -475,6 +523,7 @@ public class JourneyService {
         int correctCount;
         Boolean lastAnswerCorrect;
         int questionIndex;
+        List<TourInfo.QuestionInfo> reviewed = List.of();
 
         if (task.requiresLocation() && total > 0) {
             // ── Từng câu theo từng địa điểm ──
@@ -492,6 +541,7 @@ public class JourneyService {
             }
 
             if (isAnswerCorrect(current, given)) {
+                reviewed = List.of(current); // đúng rồi: xem giải thích của câu này không lộ gì
                 lastAnswerCorrect = true;
                 questionIndex = index + 1;
                 correctCount = questionIndex;
@@ -509,6 +559,7 @@ public class JourneyService {
                 taskProgress.setCurrentQuestionIndex(0);
                 taskProgress.setIsCorrect(false);
                 registerFailedAttempt(taskProgress, max, userId, taskId, journeyId);
+                if (taskProgress.getStatus() == TaskProgressStatus.FAILED) reviewed = List.of(current);
             }
         } else if (task.perQuestionPoints()) {
             // ── Câu đố tour 5 bước: nộp một lần, đúng câu nào cộng điểm câu đó ──
@@ -519,6 +570,7 @@ public class JourneyService {
             taskProgress.setIsCorrect(grade.passed());
             taskProgress.setAttempts(taskProgress.getAttempts() + 1);
             completeTask(task, taskProgress, destProgress, userId, journeyId, grade.points());
+            reviewed = task.questions(); // nộp một lần là xong: xem lại mọi câu
         } else {
             // ── Nộp bài cả nhiệm vụ một lần ──
             GradeResult grade = gradeTask(task, request.answers());
@@ -530,6 +582,11 @@ public class JourneyService {
                 completeTask(task, taskProgress, destProgress, userId, journeyId);
             } else {
                 registerFailedAttempt(taskProgress, max, userId, taskId, journeyId);
+            }
+            // Chỉ xem lại khi đã kết thúc (đúng hết hoặc hết lượt), để không lộ đáp án cho lượt sau
+            if (taskProgress.getStatus() == TaskProgressStatus.COMPLETED
+                    || taskProgress.getStatus() == TaskProgressStatus.FAILED) {
+                reviewed = task.questions();
             }
         }
 
@@ -545,6 +602,112 @@ public class JourneyService {
                 .correctCount(correctCount)
                 .questionIndex(questionIndex)
                 .lastAnswerCorrect(lastAnswerCorrect)
+                .review(buildReview(reviewed, request))
+                .build();
+    }
+
+    /** Xem lại từng câu: đúng/sai, đáp án đúng và giải thích. Chỉ gọi khi được phép lộ đáp án. */
+    private List<JourneyTaskProgressResponse.QuestionReview> buildReview(List<TourInfo.QuestionInfo> questions,
+                                                                         SubmitTaskRequest request) {
+        if (questions == null || questions.isEmpty()) return null;
+        return questions.stream().map(q -> {
+            boolean text = "TEXT".equals(q.questionType());
+            Long correctId = text || q.answers() == null ? null : q.answers().stream()
+                    .filter(TourInfo.AnswerInfo::correct)
+                    .map(TourInfo.AnswerInfo::answerId)
+                    .findFirst().orElse(null);
+            String correctText = null;
+            if (text && q.expectedText() != null) {
+                // Hiện nguyên văn (có dấu) đáp án đầu tiên; nhiều đáp án chấp nhận cách nhau bằng ';'
+                correctText = java.util.Arrays.stream(q.expectedText().split(";"))
+                        .map(String::trim).filter(s -> !s.isEmpty()).findFirst().orElse(null);
+            }
+            boolean ordering = "ORDERING".equals(q.questionType());
+            boolean matching = "MATCHING".equals(q.questionType());
+            return new JourneyTaskProgressResponse.QuestionReview(
+                    q.questionId(), isAnswerCorrect(q, findAnswerFor(request, q.questionId())),
+                    ordering || matching ? null : correctId, correctText,
+                    q.explanation() != null && !q.explanation().isBlank() ? q.explanation().trim() : null,
+                    ordering ? correctOrder(q) : null,
+                    q.number() != null ? q.number().correct() : null,
+                    matching ? correctMatches(q) : null);
+        }).toList();
+    }
+
+    /**
+     * Câu đố chấm theo từng câu: trả lời MỘT câu (theo thứ tự), xem ngay đúng/sai + đáp án + giải thích.
+     * Mỗi câu chỉ trả lời một lần nên lộ đáp án không ảnh hưởng gì; trả lời xong câu cuối thì hoàn thành nhiệm vụ
+     * và chốt điểm (cộng vào ví điểm một lần).
+     */
+    @Transactional
+    public JourneyTaskProgressResponse answerQuestion(Long journeyId, Long taskId, Long questionId,
+                                                      SubmitTaskRequest request, Long userId) {
+        Journey journey = findJourneyAndVerifyOwner(journeyId, userId);
+        JourneyTaskProgress taskProgress = findTaskProgress(journeyId, taskId);
+        JourneyDestinationProgress destProgress = taskProgress.getDestinationProgress();
+        if (!destProgress.isCheckedIn()) {
+            throw new BusinessException("DEST-NOT-CHECKED-IN", "Bạn cần check-in tại điểm đến trước khi làm nhiệm vụ");
+        }
+        if (taskProgress.getStatus() == TaskProgressStatus.COMPLETED
+                || taskProgress.getStatus() == TaskProgressStatus.FAILED) {
+            throw new BusinessException("TASK-ALREADY-DONE", "Bạn đã làm xong nhiệm vụ này");
+        }
+        if (journey.getStatus() != JourneyStatus.IN_PROGRESS) {
+            throw new BusinessException("JOURNEY-NOT-ACTIVE", "Hành trình hiện không ở trạng thái hoạt động");
+        }
+
+        TourInfo.TourTaskInfo task = requireTaskInfo(journey, taskId);
+        if (!task.perQuestionPoints() || task.requiresLocation()) {
+            throw new BusinessException("TASK-NOT-PER-QUESTION", "Nhiệm vụ này nộp bài một lần, không trả lời từng câu");
+        }
+        List<TourInfo.QuestionInfo> questions = task.questions() == null ? List.of() : task.questions();
+        int total = questions.size();
+        int index = taskProgress.getCurrentQuestionIndex() == null ? 0 : taskProgress.getCurrentQuestionIndex();
+        if (index >= total) {
+            throw new BusinessException("TASK-ALREADY-DONE", "Bạn đã trả lời hết câu hỏi của nhiệm vụ này");
+        }
+        TourInfo.QuestionInfo current = questions.get(index);
+        if (!current.questionId().equals(questionId)) {
+            throw new BusinessException("QUESTION-OUT-OF-ORDER", "Hãy trả lời câu hỏi hiện tại của nhiệm vụ");
+        }
+
+        boolean correct = isAnswerCorrect(current, findAnswerFor(request, questionId));
+        if (taskProgress.getStartedAt() == null) taskProgress.setStartedAt(Instant.now());
+        taskProgress.setStatus(TaskProgressStatus.IN_PROGRESS);
+        String answered = describeSubmission(request);
+        if (answered != null) {
+            String prev = taskProgress.getUserAnswer();
+            taskProgress.setUserAnswer(index == 0 || prev == null ? answered : prev + " | " + answered);
+        }
+        int correctCount = (index == 0 || taskProgress.getCorrectCount() == null ? 0 : taskProgress.getCorrectCount())
+                + (correct ? 1 : 0);
+        int points = (index == 0 || taskProgress.getPartialPoints() == null ? 0 : taskProgress.getPartialPoints())
+                + (correct && current.points() != null ? current.points() : 0);
+        taskProgress.setCorrectCount(correctCount);
+        taskProgress.setPartialPoints(points);
+        taskProgress.setCurrentQuestionIndex(index + 1);
+
+        if (index + 1 >= total) {
+            taskProgress.setIsCorrect(correctCount == total);
+            taskProgress.setAttempts(taskProgress.getAttempts() + 1);
+            completeTask(task, taskProgress, destProgress, userId, journeyId, points);
+        }
+
+        taskProgressRepository.save(taskProgress);
+        destinationProgressRepository.save(destProgress);
+        finishDestinationIfDone(journey, destProgress, userId);
+        journeyRepository.save(journey);
+
+        int max = task.maxAttempts() != null ? task.maxAttempts() : 3;
+        return JourneyTaskProgressResponse.fromEntity(taskProgress).toBuilder()
+                .pointsEarned(points)
+                .maxAttempts(max)
+                .attemptsRemaining(Math.max(0, max - taskProgress.getAttempts()))
+                .totalQuestions(total)
+                .correctCount(correctCount)
+                .questionIndex(index + 1)
+                .lastAnswerCorrect(correct)
+                .review(buildReview(List.of(current), request))
                 .build();
     }
 
@@ -744,6 +907,26 @@ public class JourneyService {
             String expected = normalizeText(q.expectedText());
             return expected.isEmpty() || expected.equalsIgnoreCase(actual);
         }
+        if ("ORDERING".equals(q.questionType())) {
+            return given.answerIds() != null && given.answerIds().equals(correctOrder(q));
+        }
+        if ("MATCHING".equals(q.questionType())) {
+            // Đúng toàn bộ mới tính đúng: mỗi mục cột A phải nối đúng một lần với mục cột B của nó.
+            if (given.matches() == null || q.answers() == null || q.answers().isEmpty()) return false;
+            Map<Long, Integer> givenByLeft = new HashMap<>();
+            for (SubmitTaskRequest.MatchPair p : given.matches()) {
+                if (p == null || p.leftId() == null || p.rightKey() == null) continue;
+                if (givenByLeft.put(p.leftId(), p.rightKey()) != null) return false; // nối trùng một mục cột A
+            }
+            List<SubmitTaskRequest.MatchPair> expected = correctMatches(q);
+            return givenByLeft.size() == expected.size()
+                    && expected.stream().allMatch(e -> e.rightKey().equals(givenByLeft.get(e.leftId())));
+        }
+        if ("NUMBER".equals(q.questionType())) {
+            TourInfo.NumberSpec n = q.number();
+            return n != null && given.numberValue() != null
+                    && Math.abs(given.numberValue() - n.correct()) <= n.tolerance();
+        }
         return given.answerId() != null
                 && q.answers().stream().anyMatch(x -> x.correct() && x.answerId().equals(given.answerId()));
     }
@@ -835,14 +1018,90 @@ public class JourneyService {
     // ── Chuyển đổi dữ liệu trả về (không bao giờ kèm đáp án đúng hay mã QR) ─────
 
     private TaskQuestionsResponse.Question toTouristQuestion(TourInfo.QuestionInfo q) {
+        String type = q.questionType();
+        List<TaskQuestionsResponse.Option> options;
+        if ("TEXT".equals(type) || "NUMBER".equals(type) || q.answers() == null) {
+            options = List.of();
+        } else if ("ORDERING".equals(type)) {
+            options = shuffledForOrdering(q).stream()
+                    .map(x -> new TaskQuestionsResponse.Option(x.answerId(), x.content(), null, null))
+                    .toList();
+        } else {
+            options = q.answers().stream()
+                    .map(x -> new TaskQuestionsResponse.Option(x.answerId(), x.content(), x.orderIndex(), x.imageUrl()))
+                    .toList();
+        }
+        // Nối cột: options = cột A (đúng thứ tự nhập); cột B xáo trộn, key = vị trí sau khi xáo (không lộ cặp đúng).
+        List<TaskQuestionsResponse.MatchOption> matchOptions = null;
+        if ("MATCHING".equals(type) && q.answers() != null) {
+            List<TourInfo.AnswerInfo> rights = shuffledForMatching(q);
+            matchOptions = new java.util.ArrayList<>(rights.size());
+            for (int i = 0; i < rights.size(); i++) {
+                matchOptions.add(new TaskQuestionsResponse.MatchOption(i, rights.get(i).matchText()));
+            }
+        }
+        TourInfo.NumberSpec number = q.number();
         return new TaskQuestionsResponse.Question(
-                q.questionId(), q.content(), q.questionType(), q.orderIndex(),
-                "TEXT".equals(q.questionType())
-                        ? List.of()
-                        : q.answers().stream()
-                                .map(x -> new TaskQuestionsResponse.Option(x.answerId(), x.content(), x.orderIndex()))
-                                .toList());
+                q.questionId(), q.content(), type, q.orderIndex(), options,
+                number == null ? null : number.min(),
+                number == null ? null : number.max(),
+                matchOptions);
     }
+
+    /**
+     * Cột B của câu nối cột theo thứ tự hiện cho khách: xáo trộn cố định theo id câu hỏi (seed khác câu xếp thứ tự)
+     * và không bao giờ thẳng hàng với cột A. Server tính lại đúng thứ tự này để đổi key → cặp khi chấm.
+     */
+    private List<TourInfo.AnswerInfo> shuffledForMatching(TourInfo.QuestionInfo q) {
+        List<TourInfo.AnswerInfo> items = new java.util.ArrayList<>(q.answers());
+        long seed = (q.questionId() == null ? 0 : q.questionId()) * 31 + 7;
+        java.util.Collections.shuffle(items, new java.util.Random(seed));
+        if (items.size() > 1) {
+            List<Long> ids = items.stream().map(TourInfo.AnswerInfo::answerId).toList();
+            List<Long> original = q.answers().stream().map(TourInfo.AnswerInfo::answerId).toList();
+            if (ids.equals(original)) java.util.Collections.rotate(items, 1);
+        }
+        return items;
+    }
+
+    /** Câu nối cột: các cặp đúng (id cột A → key cột B theo thứ tự đã xáo cho khách). */
+    private List<SubmitTaskRequest.MatchPair> correctMatches(TourInfo.QuestionInfo q) {
+        List<TourInfo.AnswerInfo> rights = shuffledForMatching(q);
+        List<SubmitTaskRequest.MatchPair> pairs = new java.util.ArrayList<>(rights.size());
+        for (TourInfo.AnswerInfo left : q.answers()) {
+            for (int k = 0; k < rights.size(); k++) {
+                if (rights.get(k).answerId().equals(left.answerId())) {
+                    pairs.add(new SubmitTaskRequest.MatchPair(left.answerId(), k));
+                    break;
+                }
+            }
+        }
+        return pairs;
+    }
+
+    /**
+     * Xáo trộn các mục của câu xếp thứ tự, cố định theo id câu hỏi (mở lại vẫn cùng thứ tự, bản dịch cache được)
+     * và không bao giờ trùng thứ tự đúng.
+     */
+    private List<TourInfo.AnswerInfo> shuffledForOrdering(TourInfo.QuestionInfo q) {
+        List<TourInfo.AnswerInfo> items = new java.util.ArrayList<>(q.answers());
+        java.util.Collections.shuffle(items, new java.util.Random(q.questionId() == null ? 0 : q.questionId()));
+        List<Long> shuffledIds = items.stream().map(TourInfo.AnswerInfo::answerId).toList();
+        if (items.size() > 1 && shuffledIds.equals(correctOrder(q))) {
+            java.util.Collections.rotate(items, 1);
+        }
+        return items;
+    }
+
+    /** Câu xếp thứ tự: id các mục theo thứ tự đúng (thứ tự đối tác nhập). */
+    private List<Long> correctOrder(TourInfo.QuestionInfo q) {
+        if (q.answers() == null) return List.of();
+        return q.answers().stream()
+                .sorted(Comparator.comparing(a -> a.orderIndex() == null ? 0 : a.orderIndex()))
+                .map(TourInfo.AnswerInfo::answerId)
+                .toList();
+    }
+
 
     /** Trạm theo thứ tự câu hỏi; trạm sau câu hiện tại bị ẩn tọa độ để không lộ trước điểm đến kế tiếp. */
     private List<TaskQuestionsResponse.Station> toStationList(List<TourInfo.QuestionInfo> questions, int currentIndex) {

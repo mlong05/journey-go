@@ -8,6 +8,7 @@ import 'journey_share_card.dart';
 import 'journey_widgets.dart';
 import 'map_kit.dart' show MapAttributionText;
 import 'navigation.dart' show formatDuration;
+import '../../l10n/locale_controller.dart';
 
 /// Tổng kết sau khi đi hết hành trình: mức hoàn thành, điểm, nhiệm vụ đạt, thời gian và lộ trình đã đi.
 class JourneySummaryScreen extends StatelessWidget {
@@ -46,20 +47,20 @@ class JourneySummaryScreen extends StatelessWidget {
 
   ({String title, String subtitle, IconData icon, AppTone tone}) get _rank => switch (journey.completionRank) {
     CompletionRank.perfect => (
-      title: 'Hoàn thành trọn vẹn',
-      subtitle: 'Bạn đã chinh phục mọi điểm đến và trả lời đúng mọi thử thách.',
+      title: appL10n.sumPerfectTitle,
+      subtitle: appL10n.sumPerfectSubtitle,
       icon: Icons.emoji_events_rounded,
       tone: AppTone.brass,
     ),
     CompletionRank.partial => (
-      title: 'Đã đi hết hành trình',
-      subtitle: 'Bạn đã bỏ qua ${journey.skippedCount} điểm đến. Lần sau hãy thử đi đủ để nhận thưởng hoàn thành.',
+      title: appL10n.jsRankPartial,
+      subtitle: appL10n.sumPartialSubtitle(journey.skippedCount),
       icon: Icons.flag_rounded,
       tone: AppTone.coral,
     ),
     _ => (
-      title: 'Hoàn thành hành trình',
-      subtitle: 'Bạn đã đi đủ mọi điểm đến. Vài thử thách còn chưa trọn điểm, thử lại ở chuyến sau nhé!',
+      title: appL10n.jsRankDone,
+      subtitle: appL10n.sumDoneSubtitle,
       icon: Icons.workspace_premium_rounded,
       tone: AppTone.jade,
     ),
@@ -82,7 +83,7 @@ class JourneySummaryScreen extends StatelessWidget {
             foregroundColor: AppCultureColors.textDark,
             surfaceTintColor: Colors.transparent,
             scrolledUnderElevation: 0.5,
-            title: const Text('Tổng kết hành trình', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+            title: Text(appL10n.sumTitle, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
             flexibleSpace: FlexibleSpaceBar(
               collapseMode: CollapseMode.pin,
               background: _Hero(journey: journey, rank: rank, coverImage: coverImage),
@@ -102,28 +103,28 @@ class JourneySummaryScreen extends StatelessWidget {
                   _StatTile(
                     icon: Icons.stars_rounded,
                     value: '${journey.totalPoints}',
-                    label: 'điểm nhận được',
+                    label: appL10n.sumPointsEarned,
                     tone: AppCultureColors.amberDark,
                     background: AppCultureColors.rewardBg,
                   ),
                   _StatTile(
                     icon: Icons.place_rounded,
                     value: '${journey.doneCount - journey.skippedCount}/${journey.totalDestinations}',
-                    label: 'điểm đến đã ghé',
+                    label: appL10n.sumDestinationsVisited,
                     tone: AppCultureColors.jadeDark,
                     background: AppCultureColors.jadeLight,
                   ),
                   _StatTile(
                     icon: Icons.task_alt_rounded,
                     value: '${journey.passedTaskCount}/${tasks.length}',
-                    label: 'thử thách đạt trọn',
+                    label: appL10n.sumPerfectChallenges,
                     tone: AppCultureColors.oceanDark,
                     background: AppCultureColors.oceanLight,
                   ),
                   _StatTile(
                     icon: Icons.schedule_rounded,
                     value: duration == null ? '—' : formatDuration(duration.inSeconds),
-                    label: 'thời gian trải nghiệm',
+                    label: appL10n.sumDuration,
                     tone: AppCultureColors.textDark,
                     background: AppCultureColors.surfaceSubtle,
                   ),
@@ -135,7 +136,7 @@ class JourneySummaryScreen extends StatelessWidget {
             child: Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 0), child: _bonusCard()),
           ),
           if (stops.isNotEmpty) ...[
-            _sectionTitle('Lộ trình đã đi'),
+            _sectionTitle(appL10n.sumRoute),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -160,14 +161,14 @@ class JourneySummaryScreen extends StatelessWidget {
               child: Padding(padding: EdgeInsets.only(top: 6), child: MapAttributionText(satellite: false)),
             ),
           ],
-          _sectionTitle('Dấu ấn di sản'),
+          _sectionTitle(appL10n.jsHeritageStamps),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: HeritagePassport(journey: journey, stampSize: 88),
             ),
           ),
-          _sectionTitle('Từng điểm đến'),
+          _sectionTitle(appL10n.sumEachDestination),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             sliver: SliverList.list(
@@ -184,7 +185,7 @@ class JourneySummaryScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     PrimaryButton(
-                      label: 'Chia sẻ thành tích',
+                      label: appL10n.sumShare,
                       icon: Icons.ios_share_rounded,
                       onPressed: () => showJourneyShareSheet(context, journey: journey, coverImage: coverImage),
                     ),
@@ -195,7 +196,7 @@ class JourneySummaryScreen extends StatelessWidget {
                       child: OutlinedButton.icon(
                         onPressed: () => Navigator.of(context).pop(),
                         icon: const Icon(Icons.map_rounded, size: 19),
-                        label: const Text('Xem lại hành trình', style: TextStyle(fontWeight: FontWeight.w700)),
+                        label: Text(appL10n.sumReview, style: const TextStyle(fontWeight: FontWeight.w700)),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppCultureColors.textDark,
                           side: const BorderSide(color: AppCultureColors.border, width: 1.2),
@@ -233,8 +234,8 @@ class JourneySummaryScreen extends StatelessWidget {
           Expanded(
             child: Text(
               earned
-                  ? 'Thưởng hoàn thành: +$bonus điểm (đã gồm trong tổng ${journey.totalPoints} điểm)'
-                  : 'Không có thưởng hoàn thành vì có điểm đến bị bỏ qua.',
+                  ? appL10n.sumBonus('$bonus', journey.totalPoints)
+                  : appL10n.sumNoBonus,
               style: TextStyle(
                 fontSize: 13,
                 height: 1.4,
@@ -457,14 +458,14 @@ class _DestinationRecap extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Điểm ${dest.orderIndex} · ${dest.name}',
+                        appL10n.sumDestinationN(dest.orderIndex, dest.name),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        skipped ? 'Đã bỏ qua' : '${dest.tasksCompleted}/${dest.totalTasks} nhiệm vụ · +$points điểm',
+                        skipped ? appL10n.jsSkippedStatus : appL10n.sumDestinationStats(dest.tasksCompleted, dest.totalTasks, points),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -507,7 +508,7 @@ class _DestinationRecap extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        t.isFailed ? 'Hết lượt' : '+${t.pointsEarned}',
+                        t.isFailed ? appL10n.sumNoAttempts : '+${t.pointsEarned}',
                         style: const TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w700,

@@ -20,6 +20,9 @@ public enum ErrorCode {
     INVALID_OTP("Mã OTP không chính xác hoặc đã được sử dụng", HttpStatus.BAD_REQUEST),
     OTP_EXPIRED("Mã OTP đã hết hạn, vui lòng yêu cầu mã mới", HttpStatus.BAD_REQUEST),
     PASSWORD_NOT_MATCH("Mật khẩu xác nhận không trùng khớp", HttpStatus.BAD_REQUEST),
+    // Sai mật khẩu hiện tại khi đổi mật khẩu: lỗi dữ liệu nhập (400), KHÔNG phải 401 —
+    // 401 dành cho hết phiên để client tự làm mới token / đưa về màn đăng nhập.
+    WRONG_CURRENT_PASSWORD("Mật khẩu hiện tại không chính xác", HttpStatus.BAD_REQUEST),
     SAME_OLD_PASSWORD("Mật khẩu mới không được trùng với mật khẩu hiện tại", HttpStatus.BAD_REQUEST),
     MAIL_SEND_FAILED("Gửi email thất bại, vui lòng kiểm tra lại cấu hình hoặc thử lại sau", HttpStatus.INTERNAL_SERVER_ERROR),
     LOGIN_RATE_LIMITED("Bạn đã nhập sai mật khẩu quá nhiều lần. Vui lòng thử lại sau 5 phút.", HttpStatus.TOO_MANY_REQUESTS),
@@ -170,6 +173,7 @@ public enum ErrorCode {
     BOOKING_INVITATION_ALREADY_PENDING("Hành khách này đang có một lời mời chờ xác nhận", HttpStatus.CONFLICT),
     BOOKING_MESSAGE_EMPTY("Nội dung tin nhắn không được để trống", HttpStatus.BAD_REQUEST),
     BOOKING_TOUR_LOCKED("Tour chỉ mở từ ngày trải nghiệm — chưa thể bắt đầu hành trình", HttpStatus.CONFLICT),
+    BOOKING_EXPERIENCE_EXPIRED("Đã quá ngày trải nghiệm — không thể bắt đầu hành trình", HttpStatus.CONFLICT),
     PROVIDER_CHAT_CONVERSATION_NOT_FOUND("Cuộc trò chuyện không tồn tại", HttpStatus.NOT_FOUND),
     PROVIDER_CHAT_TARGET_REQUIRED("Cần chọn tour hoặc nhà tour để bắt đầu trò chuyện", HttpStatus.BAD_REQUEST),
     PROVIDER_CHAT_NO_PROVIDER("Tour này chưa có nhà tour liên hệ", HttpStatus.BAD_REQUEST),
@@ -199,8 +203,14 @@ public enum ErrorCode {
         this.httpStatus = httpStatus;
     }
 
+    /** Thông điệp tiếng Việt gốc (cũng là bản dự phòng khi thiếu bản dịch). */
     public String getMessage() {
         return message;
+    }
+
+    /** Thông điệp theo Accept-Language của request hiện tại (khoá {@code error.<TÊN_MÃ>} trong i18n/messages*.properties). */
+    public String getLocalizedMessage() {
+        return com.journeygo.common.i18n.Messages.getOrDefault("error." + name(), message);
     }
 
     public HttpStatus getHttpStatus() {

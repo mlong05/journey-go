@@ -4,6 +4,7 @@ import '../../core/models/gamification_model.dart';
 import '../../core/services/gamification_service.dart';
 import 'achievements_screen.dart';
 import 'rewards_widgets.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Bộ sưu tập huy hiệu: mọi huy hiệu đang mở trong hệ thống, đánh dấu cái đã đạt kèm ngày nhận.
 class BadgesScreen extends StatefulWidget {
@@ -93,7 +94,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppCultureColors.background,
-      appBar: buildRewardsAppBar(context, 'Bộ sưu tập huy hiệu'),
+      appBar: buildRewardsAppBar(context, appL10n.achBadgeCollection),
       body: RefreshIndicator(
         color: AppCultureColors.heritageJade,
         onRefresh: _load,
@@ -113,15 +114,15 @@ class _BadgesScreenState extends State<BadgesScreen> {
             child: _error != null
                 ? RewardsMessageView(
                     icon: Icons.cloud_off_rounded,
-                    title: 'Không tải được huy hiệu',
+                    title: appL10n.bdgLoadFailed,
                     message: _error,
                     onRetry: _load,
                   )
-                : const RewardsMessageView(
+                : RewardsMessageView(
                     icon: Icons.workspace_premium_outlined,
-                    title: 'Chưa có huy hiệu nào',
+                    title: appL10n.bdgEmpty,
                     message:
-                        'Check-in tại các điểm di sản để mở khóa huy hiệu đầu tiên.',
+                        appL10n.bdgEmptyHint,
                   ),
           ),
         ],
@@ -166,8 +167,8 @@ class _BadgesScreenState extends State<BadgesScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Đã mở khóa',
+              Text(
+                appL10n.achFilterUnlocked,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -175,7 +176,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
                 ),
               ),
               Text(
-                '$earnedCount / $total huy hiệu',
+                appL10n.bdgCount(earnedCount, total),
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
@@ -209,7 +210,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
                 color: AppCultureColors.jadeLight,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Row(
+              child: Row(
                 children: [
                   Icon(
                     Icons.emoji_events_outlined,
@@ -219,7 +220,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Xem tiến độ & nhận thưởng thành tựu',
+                      appL10n.bdgViewProgress,
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
@@ -276,7 +277,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
             ),
             const Spacer(),
             Text(
-              entry.earned ? formatDate(entry.earnedAt) : 'Chưa mở khóa',
+              entry.earned ? formatDate(entry.earnedAt) : appL10n.bdgLocked,
               style: TextStyle(
                 fontSize: 10.5,
                 fontWeight: FontWeight.w600,
@@ -345,8 +346,8 @@ class _BadgesScreenState extends State<BadgesScreen> {
                 children: [
                   _chip(
                     entry.earned
-                        ? 'Nhận ngày ${formatDate(entry.earnedAt)}'
-                        : 'Chưa mở khóa',
+                        ? appL10n.bdgEarnedOn(formatDate(entry.earnedAt))
+                        : appL10n.bdgLocked,
                     entry.earned
                         ? AppCultureColors.jadeLight
                         : AppCultureColors.surfaceSubtle,
@@ -356,7 +357,7 @@ class _BadgesScreenState extends State<BadgesScreen> {
                   ),
                   if (badge.bonusPoints > 0)
                     _chip(
-                      '+${formatThousands(badge.bonusPoints)} điểm thưởng',
+                      appL10n.bdgBonus(formatThousands(badge.bonusPoints)),
                       AppCultureColors.rewardBg,
                       AppCultureColors.rewardText,
                     ),

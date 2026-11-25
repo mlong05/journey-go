@@ -4,9 +4,11 @@ import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.modules.dashboard.dto.AdminDashboardResponse;
 import com.journeygo.modules.dashboard.dto.ModeratorDashboardResponse;
 import com.journeygo.modules.dashboard.dto.OperationsOverviewResponse;
+import com.journeygo.modules.dashboard.dto.PlatformRevenueReportResponse;
 import com.journeygo.modules.dashboard.dto.ProviderDashboardResponse;
 import com.journeygo.modules.dashboard.service.DashboardService;
 import com.journeygo.modules.dashboard.service.OperationsOverviewService;
+import com.journeygo.modules.dashboard.service.PlatformRevenueReportService;
 import com.journeygo.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class DashboardController {
     private final DashboardService dashboardService;
     private final OperationsOverviewService operationsOverviewService;
+    private final PlatformRevenueReportService platformRevenueReportService;
 
     @GetMapping("/admin")
     @PreAuthorize("hasRole('ADMIN')")
@@ -38,13 +41,23 @@ public class DashboardController {
 
     @GetMapping("/admin/operations")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Trang tổng quan vận hành (kỳ động: hôm nay / 7 ngày / 30 ngày / tháng này / tháng trước / tùy chỉnh)")
+    @Operation(summary = "Trang tổng quan vận hành theo khung so sánh")
     public ResponseEntity<ApiResponse<OperationsOverviewResponse>> operations(
-            @RequestParam(defaultValue = "month") String range,
+            @RequestParam(defaultValue = "rolling") String range,
             @RequestParam(required = false) String from,
-            @RequestParam(required = false) String to) {
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) Long regionId) {
         return ResponseEntity.ok(ApiResponse.success("Lấy số liệu tổng quan vận hành thành công",
-                operationsOverviewService.overview(range, from, to)));
+                operationsOverviewService.overview(range, from, to, regionId)));
+    }
+
+    @GetMapping("/admin/revenue")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Doanh thu nền tảng theo tháng: tháng này vs tháng trước, chuỗi N tháng (mặc định 12)")
+    public ResponseEntity<ApiResponse<PlatformRevenueReportResponse>> revenue(
+            @RequestParam(defaultValue = "12") int months) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy báo cáo doanh thu nền tảng thành công",
+                platformRevenueReportService.report(months)));
     }
 
     @GetMapping("/admin/operations/badges")

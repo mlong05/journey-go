@@ -7,7 +7,7 @@ import RewardSettingsCard from "@/features/catalog/components/RewardSettingsCard
 
 /**
  * Cấu hình trải nghiệm và điểm thưởng (ADMIN).
- *  - Điểm mỗi câu quiz và mỗi trải nghiệm thực tế của tour — backend /api/v1/reward-settings
+ *  - Điểm mỗi câu đố văn hóa và mỗi trải nghiệm thực tế của tour — backend /api/v1/reward-settings
  *  - Loại nhiệm vụ trải nghiệm thực địa — backend /api/v1/task-types
  *
  * ── Thiết kế 2 tab (giống trang "Quản lý tất toán") ──
@@ -17,7 +17,7 @@ import RewardSettingsCard from "@/features/catalog/components/RewardSettingsCard
  *    toàn sàn — mọi loại nhiệm vụ đều trỏ về 1 mã ở đây.
  *
  *  TAB 2 — "Điểm thưởng"
- *    Mức điểm thưởng cho mỗi câu quiz và mỗi trải nghiệm thực tế. Số điểm
+ *    Mức điểm thưởng cho mỗi câu đố văn hóa và mỗi trải nghiệm thực tế. Số điểm
  *    được CHỐT vào tour tại thời điểm duyệt.
  *
  * ⚠️ Trang CUỘN TOÀN TRANG (không khóa khung 100vh) — 1 tab chỉ hiện 1 khối
@@ -49,7 +49,7 @@ export default function AdminExperienceRewardsPage() {
                 Cấu hình trải nghiệm và điểm thưởng
               </h1>
               <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-                Đặt điểm thưởng cho câu hỏi trắc nghiệm và trải nghiệm thực tế
+                Đặt điểm thưởng cho câu đố văn hóa và trải nghiệm thực tế
                 của tour, chuẩn hoá các loại nhiệm vụ dùng chung cho toàn sàn.
               </p>
             </div>

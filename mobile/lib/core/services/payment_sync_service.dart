@@ -25,6 +25,7 @@ import '../models/payment_model.dart';
 import 'api_client.dart';
 import 'payment_service.dart';
 import 'token_storage.dart';
+import '../../l10n/locale_controller.dart';
 
 /// Kết quả đồng bộ trạng thái thanh toán.
 class PaymentSyncResult {
@@ -81,8 +82,8 @@ class PaymentSyncService {
     } on ApiException catch (e) {
       return PaymentSyncResult(message: e.message);
     } catch (_) {
-      return const PaymentSyncResult(
-        message: 'Không thể kiểm tra trạng thái thanh toán. Vui lòng thử lại.',
+      return PaymentSyncResult(
+        message: appL10n.payStatusCheckFailed,
       );
     }
 
@@ -91,7 +92,7 @@ class PaymentSyncService {
         payment: payment,
         isSuccess: true,
         isFinal: true,
-        message: 'Thanh toán thành công!',
+        message: appL10n.paySuccessShort,
       );
     }
 
@@ -101,7 +102,7 @@ class PaymentSyncService {
         isFinal: true,
         message: payment.vnpMessage?.isNotEmpty == true
             ? payment.vnpMessage!
-            : 'Thanh toán không thành công. Bạn có thể thử lại.',
+            : appL10n.payFailedRetry,
       );
     }
 
@@ -111,8 +112,7 @@ class PaymentSyncService {
       return PaymentSyncResult(
         payment: payment,
         isFinal: true,
-        message: 'Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán '
-            'bởi một giao dịch khác.',
+        message: appL10n.paySuperseded,
       );
     }
 
@@ -120,7 +120,7 @@ class PaymentSyncService {
     if (!allowQuery) {
       return PaymentSyncResult(
         payment: payment,
-        message: 'Đang chờ kết quả thanh toán...',
+        message: appL10n.payAwaitingResult,
       );
     }
 
@@ -135,7 +135,7 @@ class PaymentSyncService {
     if (cachedAt != null && now.difference(cachedAt) < _queryCacheTtl) {
       return PaymentSyncResult(
         payment: payment,
-        message: 'Đang chờ kết quả thanh toán...',
+        message: appL10n.payAwaitingResult,
       );
     }
     _queryCache[paymentId] = now;
@@ -148,7 +148,7 @@ class PaymentSyncService {
     } catch (_) {
       return PaymentSyncResult(
         payment: payment,
-        message: 'Đang chờ kết quả thanh toán...',
+        message: appL10n.payAwaitingResult,
       );
     }
 
@@ -161,14 +161,14 @@ class PaymentSyncService {
             payment: fresh,
             isSuccess: true,
             isFinal: true,
-            message: 'Thanh toán thành công!',
+            message: appL10n.paySuccessShort,
           );
         } catch (_) {
           return PaymentSyncResult(
             payment: payment,
             isSuccess: true,
             isFinal: true,
-            message: 'Thanh toán thành công!',
+            message: appL10n.paySuccessShort,
           );
         }
       case 'FAILED':
@@ -177,7 +177,7 @@ class PaymentSyncService {
           isFinal: true,
           message: result.message.isNotEmpty
               ? result.message
-              : 'Thanh toán không thành công. Bạn có thể thử lại.',
+              : appL10n.payFailedRetry,
         );
       case 'CANCELLED':
         return PaymentSyncResult(
@@ -185,7 +185,7 @@ class PaymentSyncService {
           isFinal: true,
           message: result.message.isNotEmpty
               ? result.message
-              : 'Bạn đã hủy giao dịch thanh toán.',
+              : appL10n.paySyncCancelled,
         );
       case 'DUPLICATE':
         return PaymentSyncResult(
@@ -194,7 +194,7 @@ class PaymentSyncService {
           isDuplicate: true,
           message: result.message.isNotEmpty
               ? result.message
-              : 'Giao dịch này đã được xử lý trước đó.',
+              : appL10n.paySyncAlreadyProcessed,
         );
       case 'SUPERSEDED':
         // Giao dịch bị thay thế — đơn hàng đã được thanh toán bởi giao dịch KHÁC.
@@ -207,8 +207,7 @@ class PaymentSyncService {
             isFinal: true,
             message: result.message.isNotEmpty
                 ? result.message
-                : 'Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán '
-                    'bởi một giao dịch khác.',
+                : appL10n.paySuperseded,
           );
         } catch (_) {
           return PaymentSyncResult(
@@ -216,15 +215,14 @@ class PaymentSyncService {
             isFinal: true,
             message: result.message.isNotEmpty
                 ? result.message
-                : 'Giao dịch này đã bị thay thế — đơn hàng đã được thanh toán '
-                    'bởi một giao dịch khác.',
+                : appL10n.paySuperseded,
           );
         }
       default:
         // UNKNOWN — chưa xác minh được ⇒ KHÔNG kết luận thất bại.
         return PaymentSyncResult(
           payment: payment,
-          message: 'Đang chờ kết quả thanh toán...',
+          message: appL10n.payAwaitingResult,
         );
     }
   }

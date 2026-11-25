@@ -2,12 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
+import '../../l10n/locale_controller.dart';
 import '../../core/models/booking_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/booking_service.dart';
 import '../../core/services/payment_result_service.dart';
 import '../../core/services/payment_service.dart';
 import '../../core/services/token_storage.dart';
+import '../../core/services/tour_service.dart';
 import '../booking/booking_detail_screen.dart';
 import '../booking/payment_success_dialog.dart';
 import '../journey/journey_screen.dart';
@@ -67,6 +69,9 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
 
   bool _loading = true;
   String? _loadError;
+
+  /// Ảnh bìa tour (tải riêng sau khi có đơn).
+  String? _tourCover;
   bool _busy = false;
   String? _notice;
   String? _error;
@@ -135,12 +140,24 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
         _loadError = null;
         _loading = false;
       });
+      _loadTourCover(booking.tourId);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
         _loadError = e.message;
         _loading = false;
       });
+    }
+  }
+
+  /// Ảnh bìa tour cho thẻ tóm tắt (đơn đặt không kèm ảnh); lỗi thì để ô giữ chỗ.
+  Future<void> _loadTourCover(int tourId) async {
+    if (_tourCover != null) return;
+    try {
+      final detail = await TourService().getPublicDetail(tourId);
+      if (mounted && detail.coverImageUrl != null) setState(() => _tourCover = detail.coverImageUrl);
+    } catch (_) {
+      // Không có ảnh vẫn thanh toán bình thường.
     }
   }
 
@@ -257,7 +274,7 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
       final init = await _payments.init(widget.bookingId, bankCode: _bankCode);
       final paymentUrl = init.paymentUrl;
       if (paymentUrl == null || paymentUrl.isEmpty) {
-        throw const ApiException('Máy chủ không trả về đường dẫn thanh toán.');
+        throw ApiException(appL10n.coNoPaymentUrl);
       }
 
       // Nhớ giao dịch đang chờ ⇒ nếu hệ điều KILL app trong lúc khách ở trình
@@ -274,7 +291,7 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
       );
       if (!mounted) return;
       if (!opened) {
-        setState(() => _error = 'Không mở được trang thanh toán. Vui lòng thử lại.');
+        setState(() => _error = context.l10n.coOpenPaymentFailed);
         return;
       }
       _startWaiting();
@@ -291,7 +308,7 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
   }
 
   Future<void> _resolveUnclear() async {
-    if (mounted) setState(() => _notice = 'Giao dịch trước đang được xác minh với VNPay...');
+    if (mounted) setState(() => _notice = context.l10n.coVerifyingPrevious);
     await _queryLatest();
     await _refresh();
     if (!mounted) return;
@@ -320,7 +337,7 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
     _awaitStart = DateTime.now();
     _queried = false;
     if (mounted) {
-      setState(() => _notice = 'Đang chờ xác nhận thanh toán. Sau khi thanh toán xong, hãy quay lại ứng dụng.');
+      setState(() => _notice = context.l10n.coAwaitingConfirmation);
     }
     _poll();
   }
@@ -338,8 +355,7 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
     final elapsed = DateTime.now().difference(_awaitStart);
     if (elapsed >= _giveUpAfter) {
       _awaiting = false;
-      setState(() => _notice =
-          'Chưa nhận được kết quả từ VNPay. Tiền của bạn chưa bị mất, hãy kiểm tra lại mục "Đơn của tôi" sau ít phút.');
+      setState(() => _notice = context.l10n.coNoResultYet);
       return;
     }
     if (!_queried && elapsed >= _queryAfter) {
@@ -360,11 +376,11 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Hủy đơn đặt?'),
-        content: const Text('Chỗ đã giữ sẽ được trả lại.'),
+        title: Text(ctx.l10n.coCancelTitle),
+        content: Text(ctx.l10n.coCancelMessage),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Giữ lại')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Hủy đơn')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(ctx.l10n.coKeep)),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(ctx.l10n.coCancelBooking)),
         ],
       ),
     );
@@ -409,14 +425,14 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
   Future<void> _confirmLeave() async {
     final deadline = _booking?.paymentDeadline?.toLocal();
     String two(int n) => n.toString().padLeft(2, '0');
-    final until = deadline == null ? 'hết thời gian giữ chỗ' : '${two(deadline.hour)}:${two(deadline.minute)}';
+    final l10n = context.l10n;
+    final until = deadline == null ? l10n.coHoldEnd : '${two(deadline.hour)}:${two(deadline.minute)}';
     final choice = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Rời màn thanh toán?'),
+        title: Text(l10n.coLeaveTitle),
         content: Text(
-          'Chỗ của bạn vẫn được giữ đến $until (còn $_countdownLabel). '
-          'Bạn có thể quay lại thanh toán ở trang tour, Trang chủ hoặc mục Đơn đặt tour.',
+          l10n.coLeaveMessage(until, _countdownLabel),
           style: const TextStyle(height: 1.45),
         ),
         actionsOverflowDirection: VerticalDirection.up,
@@ -425,13 +441,13 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
           TextButton(
             onPressed: () => Navigator.pop(ctx, 'cancel'),
             style: TextButton.styleFrom(foregroundColor: AppCultureColors.lacquer),
-            child: const Text('Hủy đơn'),
+            child: Text(l10n.coCancelBooking),
           ),
-          TextButton(onPressed: () => Navigator.pop(ctx, 'leave'), child: const Text('Thoát, vẫn giữ chỗ')),
+          TextButton(onPressed: () => Navigator.pop(ctx, 'leave'), child: Text(l10n.coLeaveKeep)),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, 'stay'),
             style: FilledButton.styleFrom(backgroundColor: AppCultureColors.heritageJade),
-            child: const Text('Ở lại'),
+            child: Text(l10n.coStay),
           ),
         ],
       ),
@@ -469,10 +485,17 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
     );
   }
 
+  /// Đơn đang chờ thanh toán và còn hạn giữ chỗ.
+  bool _canPay(BookingModel booking) =>
+      booking.status == BookingStatus.pendingPayment && _remaining != Duration.zero;
+
   Widget _buildScaffold(BuildContext context) {
+    final booking = _booking;
+    final showPayBar = !_loading && _loadError == null && booking != null && _canPay(booking);
     return Scaffold(
       backgroundColor: AppCultureColors.background,
-      appBar: buildRewardsAppBar(context, 'Thanh toán'),
+      appBar: buildRewardsAppBar(context, context.l10n.coTitle),
+      bottomNavigationBar: showPayBar ? _buildPayBar(booking) : null,
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: AppCultureColors.heritageJade))
           : _loadError != null || _booking == null
@@ -496,14 +519,14 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(_loadError ?? 'Không tìm thấy đơn đặt.', textAlign: TextAlign.center),
+            Text(_loadError ?? context.l10n.coNotFound, textAlign: TextAlign.center),
             const SizedBox(height: 12),
             OutlinedButton(
               onPressed: () {
                 setState(() => _loading = true);
                 _load();
               },
-              child: const Text('Thử lại'),
+              child: Text(context.l10n.commonRetry),
             ),
           ],
         ),
@@ -517,139 +540,150 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
     final expired = pending && _remaining == Duration.zero;
     final canPay = pending && !expired;
 
+    final guests = booking.passengers.isNotEmpty ? booking.passengers.length : booking.slotCount;
+    final l10n = context.l10n;
     return [
+      // ── Tóm tắt: ảnh tour, tên, ngày, số khách, mã đơn + trạng thái ──
+      _card(
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: SizedBox(
+                width: 84,
+                height: 84,
+                child: _tourCover == null
+                    ? const DecoratedBox(
+                        decoration: BoxDecoration(gradient: LinearGradient(colors: AppCultureColors.brandGradient)),
+                        child: Icon(Icons.landscape_rounded, color: Colors.white70, size: 34),
+                      )
+                    : Image.network(
+                        _tourCover!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const ColoredBox(color: AppCultureColors.surfaceSubtle),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    booking.tourTitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 16, height: 1.3, fontWeight: FontWeight.w800, color: AppCultureColors.textDark),
+                  ),
+                  const SizedBox(height: 6),
+                  _infoLine(Icons.event_rounded, formatDay(booking.experienceDate)),
+                  if (guests > 0) ...[
+                    const SizedBox(height: 3),
+                    _infoLine(Icons.group_rounded, l10n.coGuestCount(guests)),
+                  ],
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _badge(BookingStatus.label(expired ? BookingStatus.expired : booking.status), paid: paid),
+                      Text(booking.bookingCode,
+                          style: const TextStyle(fontSize: 11.5, color: AppCultureColors.textLight)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      if (pending) _buildHoldBar(expired),
+      // ── Chi tiết thanh toán ──
       _card(
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _cardTitle(l10n.coPaymentDetails),
+            const SizedBox(height: 12),
+            _amountRow(
+              guests > 0 ? l10n.coTourPriceGuests(guests) : l10n.coTourPrice,
+              formatMoney(booking.hasVoucher ? booking.originalAmount : booking.totalAmount),
+            ),
+            if (booking.hasVoucher) ...[
+              const SizedBox(height: 8),
+              _amountRow(
+                l10n.coDiscount(booking.appliedVoucherCode ?? ''),
+                '-${formatMoney(booking.discountAmount)}',
+                valueColor: AppCultureColors.price,
+              ),
+            ],
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Divider(height: 1, color: AppCultureColors.borderLight),
+            ),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(booking.bookingCode,
-                    style: const TextStyle(fontSize: 12, color: AppCultureColors.textMuted)),
-                _badge(
-                    BookingStatus.label(
-                        expired ? BookingStatus.expired : booking.status),
-                    paid: paid),
+                Expanded(
+                  child: Text(l10n.tdTotalPayment,
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppCultureColors.textDark)),
+                ),
+                Text(
+                  formatMoney(booking.totalAmount),
+                  style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: AppCultureColors.price),
+                ),
               ],
             ),
-            const SizedBox(height: 6),
-            Text(booking.tourTitle,
-                style: const TextStyle(
-                    fontSize: 17, fontWeight: FontWeight.w700, color: AppCultureColors.textDark)),
-            const SizedBox(height: 10),
-            Text('Ngày trải nghiệm: ${formatDay(booking.experienceDate)}'),
-            const SizedBox(height: 4),
-            if (booking.hasVoucher) ...[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Giá gốc:', style: TextStyle(fontSize: 14, color: AppCultureColors.textMuted)),
-                  Text(
-                    formatMoney(booking.originalAmount),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppCultureColors.textMuted,
-                      decoration: TextDecoration.lineThrough,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppCultureColors.jadeLight,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.local_offer_rounded, size: 14, color: AppCultureColors.heritageJade),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Voucher ${booking.appliedVoucherCode}',
-                        style: const TextStyle(fontSize: 12, color: AppCultureColors.jadeDark),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Text(
-                      '-${formatMoney(booking.discountAmount)}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppCultureColors.heritageJade,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 6),
-            ],
-            Text(formatMoney(booking.totalAmount),
-                style: const TextStyle(
-                    fontSize: 22, fontWeight: FontWeight.w700, color: AppCultureColors.jadeDark)),
-            if (pending) ...[
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: expired ? AppCultureColors.surfaceSubtle : AppCultureColors.rewardBg,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  expired
-                      ? 'Đã quá hạn thanh toán. Chỗ giữ sẽ được giải phóng.'
-                      : 'Giữ chỗ còn $_countdownLabel',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: expired ? AppCultureColors.textMuted : AppCultureColors.rewardText,
-                  ),
-                ),
-              ),
-            ],
           ],
         ),
       ),
       if (paid) _buildPaidCard(booking),
       if (booking.status == BookingStatus.cancelled)
-        _message('Đơn đã được hủy.', AppCultureColors.surfaceSubtle, AppCultureColors.textMuted),
+        _message(l10n.coCancelled, AppCultureColors.surfaceSubtle, AppCultureColors.textMuted),
       if (_notice != null) _message(_notice!, AppCultureColors.oceanLight, AppCultureColors.oceanDark),
       if (_error != null) _message(_error!, AppCultureColors.lacquer100, AppCultureColors.error),
       if (canPay) ...[
         _card(_buildMethods()),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.lock_rounded, size: 14, color: AppCultureColors.textLight),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  l10n.coSecureNote,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, color: AppCultureColors.textLight),
+                ),
+              ),
+            ],
+          ),
+        ),
         if (_latestOpenAttempt != null && !_awaiting)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: OutlinedButton(
               onPressed: _busy ? null : _resolveUnclear,
-              child: const Text('Kiểm tra kết quả giao dịch trước'),
+              style: OutlinedButton.styleFrom(shape: const StadiumBorder()),
+              child: Text(l10n.coCheckPrevious),
             ),
           ),
-        FilledButton(
-          onPressed: _busy ? null : _pay,
-          style: FilledButton.styleFrom(
-            backgroundColor: AppCultureColors.heritageJade,
-            minimumSize: const Size.fromHeight(52),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-          child: Text(
-            _busy
-                ? 'Đang xử lý...'
-                : 'Thanh toán ${formatMoney(booking.totalAmount)}',
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
+        TextButton(
+          onPressed: _busy ? null : _cancel,
+          style: TextButton.styleFrom(foregroundColor: AppCultureColors.textMuted),
+          child: Text(l10n.coCancelBookingLong),
         ),
-        const SizedBox(height: 8),
-        TextButton(onPressed: _busy ? null : _cancel, child: const Text('Hủy đơn đặt')),
       ],
       if (_attempts.isNotEmpty) ...[
         const SizedBox(height: 8),
         _card(Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Các lần thanh toán', style: TextStyle(fontWeight: FontWeight.w700)),
+            Text(l10n.coAttempts, style: const TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
             for (final p in _attempts)
               Padding(
@@ -665,8 +699,8 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
                               style: const TextStyle(fontSize: 11, color: AppCultureColors.textMuted)),
                           Text(formatDateTime(p.createdAt), style: const TextStyle(fontSize: 12)),
                           if (p.duplicatePayment)
-                            const Text('Giao dịch trùng với một giao dịch đã thanh toán',
-                                style: TextStyle(fontSize: 11, color: AppCultureColors.amberDark)),
+                            Text(l10n.coDuplicateAttempt,
+                                style: const TextStyle(fontSize: 11, color: AppCultureColors.amberDark)),
                         ],
                       ),
                     ),
@@ -692,11 +726,11 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
             child: const Icon(Icons.check_rounded, size: 42, color: AppCultureColors.heritageJade),
           ),
           const SizedBox(height: 12),
-          const Text('Thanh toán thành công',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppCultureColors.textDark)),
+          Text(context.l10n.paySuccessTitle,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppCultureColors.textDark)),
           const SizedBox(height: 6),
           Text(
-            'Đơn đặt của bạn đã được xác nhận. Chúc bạn có chuyến đi đầy cảm hứng!',
+            context.l10n.coPaidMessage,
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 13, height: 1.45, color: AppCultureColors.textMuted),
           ),
@@ -704,8 +738,8 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
           PrimaryButton(
             // Ngày trải nghiệm còn ở tương lai ⇒ đếm ngược thay cho "Bắt đầu trải nghiệm".
             label: booking.isTourLocked
-                ? '${booking.daysUntilStart} ngày nữa lên đường!'
-                : 'Bắt đầu trải nghiệm',
+                ? context.l10n.tripCountdown(booking.daysUntilStart)
+                : context.l10n.tdStartExperience,
             icon: booking.isTourLocked ? Icons.schedule_rounded : Icons.explore_rounded,
             onPressed: _startExperience,
           ),
@@ -721,56 +755,184 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
         .where((m) => m.bankCode == domesticCardBankCode)
         .toList(growable: false);
 
-    final label = visible.isNotEmpty
-        ? visible.first.label
-        : 'Thẻ nội địa và tài khoản ngân hàng';
-    final description = visible.isNotEmpty
-        ? visible.first.description
-        : 'Thanh toán bằng thẻ ATM nội địa hoặc tài khoản ngân hàng '
-            '(Internet Banking, Mobile Banking của các ngân hàng Việt Nam).';
+    // Nhãn phương thức từ backend là tiếng Việt ⇒ chỉ dùng khi app đang để tiếng Việt.
+    final l10n = context.l10n;
+    final useServerText = visible.isNotEmpty && l10n.localeName == 'vi';
+    final label = useServerText ? visible.first.label : l10n.coMethodDomestic;
+    final description = useServerText ? visible.first.description : l10n.coMethodDomesticDesc;
 
-    // Material trong suốt: RadioListTile vẽ hiệu ứng chạm lên Material gần nhất,
-    // nếu không sẽ bị nền trắng của thẻ che mất.
+    final selected = _bankCode == domesticCardBankCode;
     return RadioGroup<String?>(
       groupValue: _bankCode,
-      // `RadioGroup.onChanged` bắt buộc khác null ⇒ khi đang bận ta bỏ qua,
-      // còn `RadioListTile.enabled = !_busy` đã lo việc khoá thao tác.
+      // `RadioGroup.onChanged` bắt buộc khác null ⇒ khi đang bận ta bỏ qua.
       onChanged: (v) {
         if (_busy) return;
         setState(() => _bankCode = v);
       },
-      child: Material(
-        type: MaterialType.transparency,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Phương thức thanh toán',
-                style: TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 2),
-            const Text(
-              'Thanh toán an toàn qua cổng VNPay.',
-              style: TextStyle(fontSize: 12, color: AppCultureColors.textMuted),
-            ),
-            const SizedBox(height: 6),
-            RadioListTile<String?>(
-              value: domesticCardBankCode,
-              enabled: !_busy,
-              activeColor: AppCultureColors.heritageJade,
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                label,
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-              ),
-              subtitle: Text(
-                description,
-                style: const TextStyle(fontSize: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _cardTitle(l10n.coChooseMethod),
+          const SizedBox(height: 12),
+          // Thẻ phương thức: viền xanh ngọc khi đang chọn (chỉ có 1 phương thức được hỗ trợ)
+          Material(
+            color: selected ? AppCultureColors.jadeLight.withValues(alpha: 0.6) : Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: selected ? AppCultureColors.brand : AppCultureColors.border,
+                width: selected ? 1.6 : 1,
               ),
             ),
-          ],
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: _busy ? null : () => setState(() => _bankCode = domesticCardBankCode),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(4, 12, 14, 12),
+                child: Row(
+                  children: [
+                    Radio<String?>(
+                      value: domesticCardBankCode,
+                      enabled: !_busy,
+                      activeColor: AppCultureColors.heritageJade,
+                    ),
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppCultureColors.border),
+                      ),
+                      child: const Icon(Icons.account_balance_rounded, color: AppCultureColors.heritageJade, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(label,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w800, fontSize: 14, color: AppCultureColors.textDark)),
+                          const SizedBox(height: 2),
+                          Text(description,
+                              style: const TextStyle(fontSize: 12, height: 1.35, color: AppCultureColors.textMuted)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Thanh dưới cùng: nút thanh toán rộng hết bề ngang, ghi rõ số tiền.
+  Widget _buildPayBar(BookingModel booking) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        boxShadow: [BoxShadow(color: Color(0x140F172A), blurRadius: 20, offset: Offset(0, -6))],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: FilledButton(
+            onPressed: _busy ? null : _pay,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppCultureColors.heritageJade,
+              minimumSize: const Size.fromHeight(54),
+              shape: const StadiumBorder(),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_busy)
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+                  )
+                else
+                  const Icon(Icons.lock_rounded, size: 18),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    _busy ? context.l10n.coProcessing : context.l10n.coPayAmount(formatMoney(booking.totalAmount)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
+
+  /// Thanh đếm ngược giữ chỗ (hết hạn thì xám).
+  Widget _buildHoldBar(bool expired) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: expired ? AppCultureColors.surfaceSubtle : AppCultureColors.coralTint,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(expired ? Icons.timer_off_rounded : Icons.timer_rounded,
+              size: 18, color: expired ? AppCultureColors.textMuted : AppCultureColors.coralDark),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              expired ? context.l10n.coExpired : context.l10n.coHoldCountdown(_countdownLabel),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: expired ? AppCultureColors.textMuted : AppCultureColors.coralDark,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _cardTitle(String text) => Text(
+        text,
+        style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: AppCultureColors.textDark),
+      );
+
+  Widget _infoLine(IconData icon, String text) => Row(
+        children: [
+          Icon(icon, size: 14, color: AppCultureColors.textLight),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13, color: AppCultureColors.textMuted)),
+          ),
+        ],
+      );
+
+  Widget _amountRow(String label, String value, {Color valueColor = AppCultureColors.textDark}) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(label, style: const TextStyle(fontSize: 14, color: AppCultureColors.textMuted)),
+          ),
+          const SizedBox(width: 12),
+          Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: valueColor)),
+        ],
+      );
 
   Widget _card(Widget child) => Container(
         width: double.infinity,
@@ -779,7 +941,7 @@ class _BookingCheckoutScreenState extends State<BookingCheckoutScreen>
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppCultureColors.border),
+          boxShadow: AppCultureColors.softShadow,
         ),
         child: child,
       );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/models/booking_model.dart';
+import '../../l10n/locale_controller.dart';
 import '../../core/models/tour_model.dart';
 import '../../core/services/api_client.dart';
 import '../../core/services/booking_service.dart';
@@ -46,8 +47,8 @@ Future<bool> openTourDetailScreen(
   if (!context.mounted) return false;
   if (model == null) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Không tải được thông tin tour. Vui lòng thử lại.'),
+      SnackBar(
+        content: Text(context.l10n.tourLoadFailed),
         behavior: SnackBarBehavior.floating,
       ),
     );
