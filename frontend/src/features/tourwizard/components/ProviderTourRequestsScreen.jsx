@@ -23,6 +23,8 @@ import {
   User,
   Mail,
 } from "lucide-react";
+import PaginationBar from "@/components/ui/PaginationBar";
+import { PAGE_SIZE } from "@/lib/pagination";
 import { providerTourService } from "@/features/tourwizard/services/providerTourService";
 import { vnd, shortDate } from "@/features/tourist/utils";
 
@@ -37,6 +39,7 @@ export default function ProviderTourRequestsScreen() {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState([]);
   const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(0);
   const [actionLoading, setActionLoading] = useState({});
   const [error, setError] = useState(null);
@@ -46,12 +49,14 @@ export default function ProviderTourRequestsScreen() {
 
   const fetchList = useCallback((tab, p = 0) => {
     const request = tab === "OPEN"
-      ? providerTourService.listOpenRequests({ page: p, size: 10 })
-      : providerTourService.listMyAcceptedRequests({ page: p, size: 10 });
+      ? providerTourService.listOpenRequests({ page: p, size: PAGE_SIZE })
+      : providerTourService.listMyAcceptedRequests({ page: p, size: PAGE_SIZE });
     return request
       .then((res) => {
+        const totalElements = res?.totalElements || 0;
         setRequests(res?.content || []);
-        setTotal(res?.totalElements || 0);
+        setTotal(totalElements);
+        setTotalPages(res?.totalPages || Math.max(1, Math.ceil(totalElements / PAGE_SIZE)));
         setPage(p);
         setError(null);
       })
@@ -66,6 +71,18 @@ export default function ProviderTourRequestsScreen() {
   useEffect(() => {
     fetchList(activeTab, 0);
   }, [activeTab, fetchList]);
+
+  const handleTabChange = (tabId) => {
+    if (tabId === activeTab) return;
+    setLoading(true);
+    setPage(0);
+    setActiveTab(tabId);
+  };
+
+  const handlePageChange = (nextPage) => {
+    setLoading(true);
+    fetchList(activeTab, nextPage);
+  };
 
   // Hành động Đối tác bấm nhận yêu cầu
   const handleAccept = async (requestId) => {
@@ -135,7 +152,7 @@ export default function ProviderTourRequestsScreen() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={`inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
                 active
                   ? "bg-teal-700 text-white shadow-xs"
@@ -335,6 +352,17 @@ export default function ProviderTourRequestsScreen() {
               </div>
             </div>
           ))}
+          {totalPages > 1 && (
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <PaginationBar
+                page={page}
+                totalPages={totalPages}
+                totalElements={total}
+                unit="yêu cầu"
+                onChange={handlePageChange}
+              />
+            </div>
+          )}
         </div>
       )}
 

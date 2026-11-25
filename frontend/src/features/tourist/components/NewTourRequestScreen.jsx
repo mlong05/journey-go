@@ -22,6 +22,7 @@ import { ROUTES } from "@/constants/routes";
 
 export default function NewTourRequestScreen() {
   const router = useRouter();
+  const today = new Date().toISOString().slice(0, 10);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
@@ -185,6 +186,7 @@ export default function NewTourRequestScreen() {
                 <input
                   type="date"
                   name="preferredDateFrom"
+                  min={today}
                   value={formData.preferredDateFrom}
                   onChange={handleChange}
                   className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:border-teal-500 focus:outline-none"
@@ -195,6 +197,7 @@ export default function NewTourRequestScreen() {
                 <input
                   type="date"
                   name="preferredDateTo"
+                  min={formData.preferredDateFrom || today}
                   value={formData.preferredDateTo}
                   onChange={handleChange}
                   className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:border-teal-500 focus:outline-none"
