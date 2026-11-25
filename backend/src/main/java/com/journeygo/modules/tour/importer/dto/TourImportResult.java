@@ -26,6 +26,9 @@ public record TourImportResult(
     public record Summary(
             String title,
             String tourFormat,
+            String visibility,
+            String specificUserEmail,
+            Long tourRequestId,
             int images,
             int highlights,
             int prices,

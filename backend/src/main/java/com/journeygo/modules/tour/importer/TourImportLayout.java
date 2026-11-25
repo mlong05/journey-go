@@ -30,6 +30,8 @@ final class TourImportLayout {
 
     static final String YES = "Có";
     static final String NO = "Không";
+    static final String VISIBILITY_ALL = "Công khai";
+    static final String VISIBILITY_SPECIFIC = "Tour riêng";
     static final String FORMAT_DAY_TRIP = "Trong ngày";
     static final String FORMAT_MULTI_DAY = "Nhiều ngày";
     static final List<String> ANSWER_LETTERS = List.of("A", "B", "C", "D");
@@ -38,6 +40,9 @@ final class TourImportLayout {
 
     enum Field {
         TITLE("Tên tour", "Tối đa 80 ký tự. Không dùng các từ: rẻ nhất, độc quyền, tốt nhất, số 1."),
+        VISIBILITY("Quyền xem tour", "Chọn: Công khai / Tour riêng. Mặc định: Công khai."),
+        SPECIFIC_USER_EMAIL("Email khách chỉ định", "Bắt buộc nếu chọn Tour riêng (trừ khi nhập Mã yêu cầu tour)."),
+        TOUR_REQUEST_ID("Mã yêu cầu tour", "Không bắt buộc. Nhập ID yêu cầu đã nhận để gắn tour riêng cho khách."),
         FORMAT("Hình thức", "Chọn: Trong ngày / Nhiều ngày."),
         DURATION_HOURS("Thời lượng (giờ)", "Tour trong ngày: số giờ, ví dụ 4."),
         DURATION_MINUTES("Thời lượng (phút)", "Tour trong ngày: số phút lẻ, ví dụ 30 → 4 giờ 30 phút."),
