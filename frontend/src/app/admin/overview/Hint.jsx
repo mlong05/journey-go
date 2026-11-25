@@ -24,8 +24,16 @@ const EDGE = 8;
  * @param {React.ReactNode} children  nội dung nhãn được bọc
  * @param {string}  [className] class tuỳ chọn cho thẻ bọc
  * @param {boolean} [underline] gạch chân đứt để gợi ý có giải thích (mặc định true)
+ * @param {React.ReactNode} [formula]  khối CÔNG THỨC hiển thị BÊN DƯỚI phần giải thích
+ *        (VD: cách tính % so sánh). Cho phép dùng JSX để tô màu / in đậm số liệu.
  */
-export default function Hint({ text, children, className = "", underline = true }) {
+export default function Hint({
+  text,
+  children,
+  className = "",
+  underline = true,
+  formula = null,
+}) {
   const anchorRef = useRef(null);
   const tipRef = useRef(null);
   const tooltipId = useId();
@@ -35,7 +43,7 @@ export default function Hint({ text, children, className = "", underline = true 
   const open = useCallback(
     (event) => {
       const el = anchorRef.current;
-      if (!el || !text) return;
+      if (!el || (!text && !formula)) return;
       const r = el.getBoundingClientRect();
       const pointer =
         event && typeof event.clientX === "number" && (event.clientX || event.clientY)
@@ -52,7 +60,7 @@ export default function Hint({ text, children, className = "", underline = true 
         arrowLeft: null,
       });
     },
-    [text],
+    [text, formula],
   );
 
   const close = useCallback(() => setPos(null), []);
@@ -93,7 +101,10 @@ export default function Hint({ text, children, className = "", underline = true 
     };
   }, [pos, close]);
 
+  // Có nội dung nào để hiển thị không (giải thích hoặc công thức).
   const hasText = Boolean(text);
+  const hasFormula = Boolean(formula);
+  const hasContent = hasText || hasFormula;
 
   return (
     <>
@@ -101,12 +112,12 @@ export default function Hint({ text, children, className = "", underline = true 
         ref={anchorRef}
         onMouseEnter={open}
         onMouseLeave={close}
-        onFocus={hasText ? open : undefined}
-        onBlur={hasText ? close : undefined}
-        tabIndex={hasText ? 0 : undefined}
-        aria-describedby={hasText ? tooltipId : undefined}
-        className={`${hasText ? "cursor-help" : ""} ${
-          hasText && underline
+        onFocus={hasContent ? open : undefined}
+        onBlur={hasContent ? close : undefined}
+        tabIndex={hasContent ? 0 : undefined}
+        aria-describedby={hasContent ? tooltipId : undefined}
+        className={`${hasContent ? "cursor-help" : ""} ${
+          hasContent && underline
             ? "underline decoration-dotted decoration-slate-300 underline-offset-[3px] hover:decoration-slate-500"
             : ""
         } ${className}`}
@@ -114,13 +125,13 @@ export default function Hint({ text, children, className = "", underline = true 
         {children}
       </span>
 
-      {pos && hasText
+      {pos && hasContent
         ? createPortal(
             <span
               ref={tipRef}
               role="tooltip"
               id={tooltipId}
-              className="fixed z-[200] block w-max max-w-[300px] pointer-events-none rounded-xl bg-slate-900 px-3 py-2 text-[11.5px] font-medium leading-relaxed text-white shadow-xl ring-1 ring-white/10"
+              className="fixed z-[200] block w-max max-w-[320px] pointer-events-none rounded-xl bg-slate-900 px-3 py-2 text-[11.5px] font-medium leading-relaxed text-white shadow-xl ring-1 ring-white/10"
               style={{
                 left: pos.x,
                 // "above": mép dưới tooltip nằm cách con trỏ GAP px.
@@ -136,6 +147,13 @@ export default function Hint({ text, children, className = "", underline = true 
               }}
             >
               {text}
+              {/* ⚠️ Khối CÔNG THỨC — hiển thị BÊN DƯỚI phần giải thích, tách bằng
+                  đường kẻ mảnh để người đọc phân biệt được 2 phần. */}
+              {formula ? (
+                <span className="mt-2 block border-t border-white/15 pt-2 text-white/90">
+                  {formula}
+                </span>
+              ) : null}
               {/* Mũi tên chỉ về phía con trỏ */}
               <span
                 aria-hidden="true"
