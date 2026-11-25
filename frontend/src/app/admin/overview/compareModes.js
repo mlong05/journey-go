@@ -8,6 +8,16 @@
 /** Danh sách khung so sánh — thứ tự là thứ tự hiển thị trên tab. */
 export const COMPARE_MODES = [
   {
+    key: "all",
+    label: "Tất cả",
+    hint: "Toàn bộ dữ liệu từ bản ghi cũ nhất trong hệ thống tới nay. Không có mốc so sánh nên biểu đồ chỉ hiển thị một chuỗi liên tục.",
+  },
+  {
+    key: "today",
+    label: "Hôm nay",
+    hint: "Số liệu hôm nay so với hôm qua. Biểu đồ chia theo giờ để thấy dòng tiền phát sinh trong ngày.",
+  },
+  {
     key: "weekly",
     label: "Tuần",
     hint: "7 ngày gần nhất, so với 7 ngày liền trước. Hai kỳ dài bằng nhau nên so sánh luôn công bằng.",
