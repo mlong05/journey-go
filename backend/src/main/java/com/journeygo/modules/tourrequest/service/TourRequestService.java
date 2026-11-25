@@ -97,6 +97,20 @@ public class TourRequestService {
         TourRequest tr = tourRequestRepository.findById(requestId)
                 .orElseThrow(() -> new AppException(ErrorCode.TOUR_REQUEST_NOT_FOUND));
 
+        boolean isOwner = tr.getRequester() != null && tr.getRequester().getId().equals(callerId);
+        boolean isAcceptor = tr.getAcceptedBy() != null && tr.getAcceptedBy().getId().equals(callerId);
+        if (!isOwner && !isAcceptor) {
+            User caller = userRepository.findById(callerId)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+            String roleName = caller.getRole() != null ? caller.getRole().getName() : null;
+            boolean isStaff = Role.ADMIN.equals(roleName) || Role.CONTENT_MODERATOR.equals(roleName);
+            boolean isProviderViewingOpen = Role.CONTENT_PROVIDER.equals(roleName)
+                    && tr.getStatus() == TourRequestStatus.OPEN;
+            if (!isStaff && !isProviderViewingOpen) {
+                throw new AppException(ErrorCode.TOUR_REQUEST_NOT_OWNER, "Bạn không có quyền xem yêu cầu tour này");
+            }
+        }
+
         return TourRequestResponse.fromEntity(tr);
     }
 
