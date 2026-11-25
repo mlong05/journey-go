@@ -18,10 +18,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 
 @Slf4j
 @Service
@@ -73,7 +76,7 @@ public class TourRequestService {
                 .toRole(Role.CONTENT_PROVIDER)
                 .title("Yêu cầu tạo tour theo nhu cầu mới")
                 .body("Du khách " + requester.getFullName() + " vừa đăng yêu cầu: " + NotificationPublisher.quote(saved.getTitle()))
-                .link("/provider/tour-requests/" + saved.getId())
+                .link("/provider/requests")
                 .ref("TOUR_REQUEST", saved.getId())
                 .publish();
 
@@ -96,6 +99,20 @@ public class TourRequestService {
     public TourRequestResponse getDetail(Long requestId, Long callerId) {
         TourRequest tr = tourRequestRepository.findById(requestId)
                 .orElseThrow(() -> new AppException(ErrorCode.TOUR_REQUEST_NOT_FOUND));
+
+        boolean isOwner = tr.getRequester() != null && tr.getRequester().getId().equals(callerId);
+        boolean isAcceptor = tr.getAcceptedBy() != null && tr.getAcceptedBy().getId().equals(callerId);
+        if (!isOwner && !isAcceptor) {
+            User caller = userRepository.findById(callerId)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+            String roleName = caller.getRole() != null ? caller.getRole().getName() : null;
+            boolean isStaff = Role.ADMIN.equals(roleName) || Role.CONTENT_MODERATOR.equals(roleName);
+            boolean isProviderViewingOpen = Role.CONTENT_PROVIDER.equals(roleName)
+                    && tr.getStatus() == TourRequestStatus.OPEN;
+            if (!isStaff && !isProviderViewingOpen) {
+                throw new AppException(ErrorCode.TOUR_REQUEST_NOT_OWNER, "Bạn không có quyền xem yêu cầu tour này");
+            }
+        }
 
         return TourRequestResponse.fromEntity(tr);
     }
@@ -154,27 +171,53 @@ public class TourRequestService {
         TourRequest tr = tourRequestRepository.findById(requestId)
                 .orElseThrow(() -> new AppException(ErrorCode.TOUR_REQUEST_NOT_FOUND));
 
+        if (tr.getRequester() != null && tr.getRequester().getId().equals(providerId)) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR, "Không thể tự nhận yêu cầu tour của chính mình");
+        }
+
         if (tr.getStatus() != TourRequestStatus.OPEN) {
             throw new AppException(ErrorCode.TOUR_REQUEST_ALREADY_ACCEPTED);
         }
 
-        tr.setStatus(TourRequestStatus.ACCEPTED);
-        tr.setAcceptedBy(provider);
-        tr.setAcceptedAt(Instant.now());
+        Instant now = Instant.now();
+        int updated = tourRequestRepository.acceptIfOpen(
+                requestId, provider, now, TourRequestStatus.OPEN, TourRequestStatus.ACCEPTED);
+        if (updated == 0) {
+            throw new AppException(ErrorCode.TOUR_REQUEST_ALREADY_ACCEPTED);
+        }
 
-        TourRequest saved = tourRequestRepository.save(tr);
+        TourRequest saved = tourRequestRepository.findById(requestId)
+                .orElseThrow(() -> new AppException(ErrorCode.TOUR_REQUEST_NOT_FOUND));
         log.info("Provider id={} accepted tour request id={}", providerId, requestId);
 
         // Gửi thông báo cho du khách yêu cầu
         notifications.send(NotificationType.TOUR_REQUEST_ACCEPTED)
-                .to(tr.getRequester().getId())
+                .to(saved.getRequester().getId())
                 .title("Đối tác đã nhận yêu cầu tạo tour của bạn")
                 .body(provider.getFullName() + " đã nhận yêu cầu "
-                        + NotificationPublisher.quote(tr.getTitle()) + " và đang chuẩn bị lịch trình theo yêu cầu của bạn.")
-                .link("/tour-requests/" + tr.getId())
-                .ref("TOUR_REQUEST", tr.getId())
+                        + NotificationPublisher.quote(saved.getTitle()) + " và đang chuẩn bị lịch trình theo yêu cầu của bạn.")
+                .link("/account/requests/" + saved.getId())
+                .ref("TOUR_REQUEST", saved.getId())
                 .publish();
 
         return TourRequestResponse.fromEntity(saved);
+    }
+
+    /**
+     * Tự động hết hạn các yêu cầu OPEN đã quá ngày khởi hành dự kiến (hoặc quá 30 ngày nếu không chọn ngày).
+     */
+    @Scheduled(cron = "0 0 * * * *")
+    @Transactional
+    public void expireOldRequests() {
+        Instant now = Instant.now();
+        int count = tourRequestRepository.expirePastOpenRequests(
+                TourRequestStatus.OPEN,
+                TourRequestStatus.EXPIRED,
+                LocalDate.now(),
+                now.minus(30, ChronoUnit.DAYS),
+                now);
+        if (count > 0) {
+            log.info("Expired {} past OPEN tour requests", count);
+        }
     }
 }

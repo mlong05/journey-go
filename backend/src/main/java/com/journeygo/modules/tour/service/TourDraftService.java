@@ -157,6 +157,10 @@ public class TourDraftService {
             }
         }
         if (request.visibility() != null) {
+            if (tour.getTourRequestId() != null && request.visibility() != TourVisibility.SPECIFIC_USER) {
+                throw new AppException(ErrorCode.VALIDATION_ERROR,
+                        "Tour tạo từ yêu cầu riêng của khách bắt buộc giữ chế độ Tour riêng");
+            }
             tour.setVisibility(request.visibility());
             if (request.visibility() == TourVisibility.SPECIFIC_USER) {
                 String email = request.specificUserEmail() != null ? request.specificUserEmail().trim().toLowerCase() : tour.getSpecificUserEmail();
@@ -464,28 +468,19 @@ public class TourDraftService {
 
         moderationService.submitWizardTour(tour, userId);
 
-        // Nếu là tour riêng: cập nhật trạng thái yêu cầu và gửi thông báo cho du khách
-        if (tour.getVisibility() == TourVisibility.SPECIFIC_USER) {
-            if (tour.getTourRequestId() != null) {
-                tourRequestRepository.findById(tour.getTourRequestId()).ifPresent(tr -> {
-                    tr.setFulfilledTour(tour);
-                    tr.setStatus(TourRequestStatus.FULFILLED);
-                    tourRequestRepository.save(tr);
-                });
-            }
-            if (tour.getSpecificUserEmail() != null) {
-                userRepository.findByEmail(tour.getSpecificUserEmail()).ifPresent(u -> {
-                    notifications.send(NotificationType.CUSTOM_TOUR_CREATED)
-                            .to(u.getId())
-                            .title("Tour thiết kế riêng của bạn đang được kiểm duyệt")
-                            .body("Đối tác " + (tour.getCreatedBy() != null ? tour.getCreatedBy().getFullName() : "nhà tour")
-                                    + " đã tạo tour " + NotificationPublisher.quote(tour.getTitle())
-                                    + " theo yêu cầu của bạn và đã gửi cho ban kiểm duyệt. Bạn sẽ nhận được thông báo ngay khi tour được duyệt để đặt chỗ!")
-                            .link("/tour-requests")
-                            .ref("TOUR", tour.getTourId())
-                            .publish();
-                });
-            }
+        // Nếu là tour riêng: gửi thông báo cho du khách (chỉ chuyển FULFILLED khi Moderator duyệt thành PUBLISHED)
+        if (tour.getVisibility() == TourVisibility.SPECIFIC_USER && tour.getSpecificUserEmail() != null) {
+            userRepository.findByEmail(tour.getSpecificUserEmail()).ifPresent(u -> {
+                notifications.send(NotificationType.CUSTOM_TOUR_CREATED)
+                        .to(u.getId())
+                        .title("Tour thiết kế riêng của bạn đang được kiểm duyệt")
+                        .body("Đối tác " + (tour.getCreatedBy() != null ? tour.getCreatedBy().getFullName() : "nhà tour")
+                                + " đã tạo tour " + NotificationPublisher.quote(tour.getTitle())
+                                + " theo yêu cầu của bạn và đã gửi cho ban kiểm duyệt. Bạn sẽ nhận được thông báo ngay khi tour được duyệt để đặt chỗ!")
+                        .link(tour.getTourRequestId() != null ? "/account/requests/" + tour.getTourRequestId() : "/account/requests")
+                        .ref("TOUR", tour.getTourId())
+                        .publish();
+            });
         }
 
         return mapper.toResponse(tour);
