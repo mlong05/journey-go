@@ -1,6 +1,8 @@
 {
   "common.language": "言語",
   "nav.explore": "探す",
+  "nav.tours": "すべてのツアー",
+  "nav.tourRequests": "リクエストツアー",
   "nav.community": "コミュニティ",
   "nav.myTrips": "マイ旅行",
   "nav.forPartners": "パートナー向け",
