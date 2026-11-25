@@ -33,7 +33,7 @@ export default function DestinationCheckInChart({ destinations, loading }) {
   const total = (destinations || []).reduce((n, d) => n + (d.checkIns || 0), 0);
 
   return (
-    <section className="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white shadow-xs" aria-labelledby="dest-chart-title">
+    <section className="flex h-full min-w-0 flex-col rounded-xl border border-slate-200 bg-white shadow-xs" aria-labelledby="dest-chart-title">
       <div className="flex items-center gap-2.5 border-b border-slate-100 px-4 py-3">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-600">
           <MapPin size={16} />

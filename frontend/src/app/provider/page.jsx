@@ -1,593 +1,605 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
-import Link from "next/link";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  ChevronRight,
-  Coins,
-  Compass,
-  Inbox,
-  MapPin,
-  Navigation,
-  Send,
-  ShieldCheck,
-  Trophy,
-  Users,
-  XCircle,
-} from "lucide-react";
+/**
+ * Trang Tổng quan Đối tác — /provider
+ *
+ * Nguồn dữ liệu:
+ *  - GET /dashboard/provider (range, tourId, regionId) — số liệu chính, 1 request.
+ *  - GET /dashboard/provider/tours — danh sách tour cho bộ lọc.
+ *  - GET /regions — danh sách khu vực cho bộ lọc.
+ *
+ * Bố cục 6 tầng (trên → dưới = quan trọng tăng dần):
+ *   Header (tên · bộ lọc · mốc cập nhật)
+ *   1 · KPI cốt lõi          — 6 thẻ + hàng metric nhỏ
+ *   2 · Trung tâm hành động  — việc cần xử lý + kết quả thẩm định
+ *   3 · Diễn biến            — biểu đồ kỳ này vs kỳ trước + check-in theo điểm đến
+ *   4 · Phân rã & chẩn đoán  — phễu · trạng thái đơn · khu vực · phương thức check-in
+ *   5 · Bảng vận hành        — tour + lịch khởi hành sắp tới
+ *   6 · Chân trang            — nhiệm vụ & đố vui di sản
+ *
+ * Màn nhỏ: các khối xếp dọc; số liệu quan trọng nhất (KPI) ở trên, việc cần xử lý ở dưới.
+ */
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Compass, MapPin, Trophy } from "lucide-react";
 import { useAuthSession } from "@/hooks";
-import { tourService, TOUR_STATUS_META } from "@/features/tour";
 import { dashboardService, percentChange } from "@/features/dashboard";
+import { catalogService } from "@/features/tourwizard/services/providerTourService";
 import { useQueueRefresh } from "@/context/NotificationContext";
-import { formatDateVN } from "@/lib/money";
+import { formatDateTimeVN } from "@/lib/money";
+import ProviderHeader, { PROVIDER_RANGE_OPTIONS } from "./overview/ProviderHeader";
+import ProviderKpiCard from "./overview/ProviderKpiCard";
+import ProviderActionCenter from "./overview/ProviderActionCenter";
+import ProviderFunnel from "./overview/ProviderFunnel";
+import ProviderRegionBreakdown, {
+  ProviderVerificationBreakdown,
+} from "./overview/ProviderRegionBreakdown";
+import ProviderBookingStatusChart from "./overview/ProviderBookingStatusChart";
+import TourPerformanceTable from "./overview/TourPerformanceTable";
+import DeparturesPanel from "./overview/DeparturesPanel";
+import TourDetailDrawer from "./overview/TourDetailDrawer";
 import ProviderTrendChart from "./ProviderTrendChart";
 import DestinationCheckInChart from "./DestinationCheckInChart";
 
-/**
- * Trang Tổng quan Đối tác — /provider
- * Số liệu: GET /api/v1/dashboard/provider (theo khoảng thời gian) + GET /api/v1/tours/my
- *
- * Bố cục (cuộn dọc):
- *   Header 1 hàng (tên đối tác | tab thời gian)
- *   Dải 4 ô số liệu (kèm % so với kỳ trước)
- *   [Diễn biến theo thời gian — kỳ này vs kỳ trước (8/12)] | [Check-in theo điểm đến (4/12)]
- *   [Tour / Điểm đến — 2 tab, danh sách tự cuộn (7/12)] | [Kết quả thẩm định gần đây + Nhiệm vụ (5/12)]
- * Màn nhỏ: các khối xếp dọc.
- */
-
-const RANGE_OPTIONS = [
-  { id: "today", label: "Hôm nay", previous: "hôm qua" },
-  { id: "week", label: "7 ngày", previous: "7 ngày trước" },
-  { id: "month", label: "Tháng này", previous: "cùng kỳ tháng trước" },
-];
-
-const DEST_STATUS = {
-  PUBLISHED: { label: "Đang hoạt động", cls: "bg-emerald-50 text-emerald-700 border-emerald-200/80", dot: "bg-emerald-500" },
-  PENDING: { label: "Chờ phê duyệt", cls: "bg-amber-50 text-amber-700 border-amber-200/80", dot: "bg-amber-500" },
-  REJECTED: { label: "Cần chỉnh sửa", cls: "bg-rose-50 text-rose-700 border-rose-200/80", dot: "bg-rose-500" },
-  DRAFT: { label: "Bản nháp", cls: "bg-slate-100 text-slate-700 border-slate-200", dot: "bg-slate-400" },
-};
-
-/** Bộ lọc tab Tour — "Cần sửa" gồm cả bị từ chối và yêu cầu chỉnh sửa. */
-const TOUR_FILTERS = [
-  { id: "all", label: "Tất cả", match: () => true },
-  { id: "published", label: "Mở bán", match: (s) => s === "PUBLISHED" },
-  { id: "pending", label: "Chờ duyệt", match: (s) => s === "PENDING_REVIEW" },
-  { id: "fix", label: "Cần sửa", match: (s) => s === "REJECTED" || s === "CHANGES_REQUESTED" },
-  { id: "draft", label: "Bản nháp", match: (s) => s === "DRAFT" },
-];
-
-const DEST_FILTERS = [
-  { id: "all", label: "Tất cả", match: () => true },
-  { id: "published", label: "Hoạt động", match: (s) => s === "PUBLISHED" },
-  { id: "pending", label: "Chờ duyệt", match: (s) => s === "PENDING" },
-  { id: "rejected", label: "Cần sửa", match: (s) => s === "REJECTED" },
-];
-
-const UPDATE_ACTION = {
-  APPROVED: { label: "đã được duyệt", icon: CheckCircle2, cls: "bg-emerald-50 text-emerald-600" },
-  REJECTED: { label: "bị từ chối", icon: XCircle, cls: "bg-rose-50 text-rose-600" },
-  SUBMITTED: { label: "đã gửi thẩm định", icon: Send, cls: "bg-sky-50 text-sky-600" },
-};
-
-const TONE = {
-  emerald: "bg-emerald-50 text-emerald-600",
-  amber: "bg-amber-50 text-amber-600",
-  indigo: "bg-indigo-50 text-indigo-600",
-  sky: "bg-sky-50 text-sky-600",
-};
-
-const fmtNumber = (n) => Number(n || 0).toLocaleString("vi-VN");
-
-/**
- * Badge so với kỳ trước: ▲/▼ kèm %. Kỳ trước bằng 0 mà kỳ này có số liệu ⇒ "Mới";
- * cả hai bằng 0 ⇒ không hiện.
- */
-function changeBadge(current, previous) {
-  const pct = percentChange(current, previous);
-  if (pct === null) return Number(current) > 0 ? { text: "Mới", positive: true } : null;
-  return {
-    text: `${pct >= 0 ? "▲" : "▼"} ${Math.abs(pct).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`,
-    positive: pct >= 0,
-  };
+/** Định dạng tiền rút gọn cho KPI: 1,2 tr · 850 k · 2 tỷ. */
+function compactMoney(n) {
+  const v = Number(n) || 0;
+  const f = (x) => x.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
+  if (v >= 1e9) return `${f(v / 1e9)} tỷ`;
+  if (v >= 1e6) return `${f(v / 1e6)} tr`;
+  if (v >= 1e3) return `${f(v / 1e3)} k`;
+  return f(v);
 }
 
-function timeAgo(iso) {
-  if (!iso) return "";
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return "";
-  const minutes = Math.max(0, Math.floor((Date.now() - t) / 60000));
-  if (minutes < 1) return "vừa xong";
-  if (minutes < 60) return `${minutes} phút trước`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} giờ trước`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days} ngày trước`;
-  return formatDateVN(iso);
-}
+const fmtInt = (n) => Number(n || 0).toLocaleString("vi-VN");
 
 export default function ProviderOverviewPage() {
   const authData = useAuthSession();
 
-  const [timeRange, setTimeRange] = useState("month");
-  const [listTab, setListTab] = useState("tours"); // "tours" | "destinations"
-  const [tourFilter, setTourFilter] = useState("all");
-  const [destFilter, setDestFilter] = useState("all");
+  const [timeRange, setTimeRange] = useState("all");
+  const [customRange, setCustomRange] = useState({ from: "", to: "" });
+  const [tourId, setTourId] = useState(null);
+  const [regionId, setRegionId] = useState(null);
+  const [tourOptions, setTourOptions] = useState([]);
+  const [regions, setRegions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [stats, setStats] = useState(null);
-  const [myTours, setMyTours] = useState([]);
+  const [selectedTour, setSelectedTour] = useState(null);
 
-  // Thời gian thực: booking mới, đối soát, kết quả duyệt → tải ngầm lại số liệu
+  // Tải ngầm lại khi có booking/tất toán/thẩm định mới.
   const [reloadKey, setReloadKey] = useState(0);
-  const lastRange = React.useRef(timeRange);
-  useQueueRefresh(["bookings", "settlements", "my-content"], () => setReloadKey((k) => k + 1));
+  useQueueRefresh(
+    ["bookings", "settlements", "my-content", "tour-review", "destination-review"],
+    () => setReloadKey((k) => k + 1),
+  );
 
+  // Danh mục cho bộ lọc — tải 1 lần, không phụ thuộc khoảng thời gian.
   useEffect(() => {
-    let isSubscribed = true;
-    // Chỉ hiện trạng thái đang tải khi đổi khoảng thời gian, không hiện khi tải ngầm
-    const silent = lastRange.current === timeRange && reloadKey > 0;
-    lastRange.current = timeRange;
-    queueMicrotask(() => {
-      if (isSubscribed && !silent) setIsLoading(true);
+    let cancelled = false;
+    Promise.all([
+      dashboardService.getProviderTours().catch(() => []),
+      catalogService.regions().catch(() => []),
+    ]).then(([tours, regs]) => {
+      if (cancelled) return;
+      setTourOptions(Array.isArray(tours) ? tours : []);
+      setRegions(Array.isArray(regs) ? regs : []);
     });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-    async function loadData() {
+  const load = useCallback(
+    async (silent) => {
+      if (!silent) setIsLoading(true);
       try {
-        const [dashboard, tours] = await Promise.all([
-          dashboardService.getProvider(timeRange),
-          tourService.getMy().catch(() => []),
-        ]);
-        if (!isSubscribed) return;
+        const dashboard = await dashboardService.getProvider(timeRange, {
+          from: customRange.from,
+          to: customRange.to,
+          tourId,
+          regionId,
+        });
         setStats(dashboard);
-        setMyTours(Array.isArray(tours) ? tours : []);
         setError("");
       } catch (err) {
         console.error("[Provider Overview] Load error:", err);
-        if (isSubscribed) setError(err?.message || "Không tải được số liệu tổng quan.");
+        setError(err?.message || "Không tải được số liệu tổng quan.");
       } finally {
-        if (isSubscribed) setIsLoading(false);
+        setIsLoading(false);
+        setIsRefreshing(false);
       }
-    }
+    },
+    [timeRange, customRange, tourId, regionId],
+  );
 
-    loadData();
+  // ⚠️ `load` là callback ổn định theo bộ lọc ⇒ effect chỉ chạy lại khi bộ lọc ĐỔI.
+  // setState trong effect phải đi qua queueMicrotask để không gây cascading render
+  // (xem convention của các trang admin khác).
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) load(false);
+    });
     return () => {
-      isSubscribed = false;
+      cancelled = true;
     };
-  }, [timeRange, reloadKey]);
+  }, [load, reloadKey]);
 
-  const providerName = authData?.user?.fullName || authData?.user?.name || "Đối tác cung cấp nội dung";
-  const range = RANGE_OPTIONS.find((r) => r.id === timeRange) ?? RANGE_OPTIONS[2];
+  const providerName =
+    authData?.user?.fullName || authData?.user?.name || "Đối tác cung cấp nội dung";
+  const range =
+    PROVIDER_RANGE_OPTIONS.find((r) => r.id === timeRange) ?? PROVIDER_RANGE_OPTIONS[0];
 
-  const destStats = stats?.destinations ?? { total: 0, published: 0, pending: 0, rejected: 0, draft: 0 };
-  const checkIns = stats?.checkIns ?? { current: 0, previous: 0, allTime: 0 };
-  const revenue = stats?.revenue ?? { current: 0, previous: 0, allTime: 0, currentBookings: 0 };
+  const revenueSummary = stats?.revenueSummary ?? null;
+  const bookings = stats?.bookings ?? null;
+  const checkInSummary = stats?.checkInSummary ?? null;
+  const series = useMemo(() => stats?.series ?? [], [stats]);
+  const actions = useMemo(() => stats?.actions ?? [], [stats]);
   const missions = stats?.missions ?? { tasks: 0, answered: 0, correct: 0 };
-  const destinations = useMemo(() => stats?.destinationRows ?? [], [stats]);
-  const updates = stats?.moderationUpdates ?? [];
 
-  const correctRate = missions.answered > 0 ? (missions.correct / missions.answered) * 100 : null;
   const loadingValue = isLoading && !stats;
 
-  const tourCounts = useMemo(() => {
-    const counts = {};
-    for (const f of TOUR_FILTERS) counts[f.id] = myTours.filter((t) => f.match(t.status)).length;
-    return counts;
-  }, [myTours]);
-
-  const destCounts = useMemo(() => {
-    const counts = {};
-    for (const f of DEST_FILTERS) counts[f.id] = destinations.filter((d) => f.match(d.status)).length;
-    return counts;
-  }, [destinations]);
-
-  const filteredTours = myTours.filter(
-    (t) => (TOUR_FILTERS.find((f) => f.id === tourFilter) ?? TOUR_FILTERS[0]).match(t.status),
-  );
-  const filteredDests = destinations.filter(
-    (d) => (DEST_FILTERS.find((f) => f.id === destFilter) ?? DEST_FILTERS[0]).match(d.status),
+  /** Chuỗi sparkline từ `series` cho từng chỉ số. */
+  const sparks = useMemo(
+    () => ({
+      revenue: series.map((p) => Number(p.revenue) || 0),
+      bookings: series.map((p) => Number(p.bookings) || 0),
+      checkIns: series.map((p) => Number(p.checkIns) || 0),
+      tourists: series.map((p) => Number(p.uniqueTourists) || 0),
+    }),
+    [series],
   );
 
+  /** So sánh kỳ này vs kỳ trước cho từng ô KPI (null = không so sánh được). */
+  const deltas = useMemo(() => {
+    // ⚠️ Khoảng "Tất cả" không có kỳ trước (không có "hôm qua" tương ứng với toàn bộ
+    // lịch sử) ⇒ không hiển thị badge % (trước đây nó lùi về 2013 — dữ liệu không có).
+    if (timeRange === "all") {
+      return { revenue: null, bookings: null, checkIns: null, tourists: null };
+    }
+    const sum = (key) => series.reduce((s, p) => s + (Number(p[key]) || 0), 0);
+    const prevSum = (key) => series.reduce((s, p) => s + (Number(p[`prev${key[0].toUpperCase()}${key.slice(1)}`]) || 0), 0);
+    return {
+      revenue: percentChange(sum("revenue"), prevSum("revenue")),
+      bookings: percentChange(sum("bookings"), prevSum("bookings")),
+      checkIns: percentChange(sum("checkIns"), prevSum("checkIns")),
+      tourists: percentChange(sum("uniqueTourists"), prevSum("uniqueTourists")),
+    };
+  }, [series, timeRange]);
+
+  const gross = Number(revenueSummary?.grossAmount) || 0;
+  const net = Number(revenueSummary?.netAmount) || 0;
+  const held = Number(revenueSummary?.heldAmount) || 0;
+  const wallet = Number(revenueSummary?.walletBalance) || 0;
+  const pendingSettlement = Number(revenueSummary?.pendingSettlementAmount) || 0;
+  const uniqueTourists = Number(revenueSummary?.uniqueTourists) || 0;
+  const avgValue = Number(revenueSummary?.avgBookingValue) || 0;
+  const completionRate = Number(bookings?.completionRate) || 0;
+  const refundRate = Number(bookings?.refundRate) || 0;
+  const totalBookings = Number(bookings?.total) || 0;
+
+  const correctRate = missions.answered > 0 ? (missions.correct / missions.answered) * 100 : null;
+  const urgentCount = actions.filter((a) => a.severity === "URGENT").length;
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    setReloadKey((k) => k + 1);
+  };
+
+  const handleRangeChange = (next) => {
+    setTimeRange(next);
+    if (next !== "custom") setCustomRange({ from: "", to: "" });
+  };
+
+  const handleApplyCustom = (next) => {
+    setCustomRange(next);
+    setTimeRange("custom");
+  };
+
+  // ── 6 thẻ KPI cốt lõi ────────────────────────────────────────────────
   const kpis = [
     {
       id: "revenue",
-      label: `Doanh thu tour · ${range.label}`,
-      value: `${fmtNumber(revenue.current)} ₫`,
-      badge: changeBadge(revenue.current, revenue.previous),
-      hint: `${fmtNumber(revenue.currentBookings)} đơn · Tổng ${fmtNumber(revenue.allTime)} ₫`,
-      icon: Coins,
+      label: "Doanh thu (giá trị đơn)",
+      tooltip:
+        "Tổng tiền du khách trả cho các đơn đã thanh toán trong kỳ. Chưa trừ hoa hồng, voucher và hoàn tiền.",
+      value: `${compactMoney(gross)} ₫`,
+      change: deltas.revenue,
       tone: "amber",
+      sparkline: sparks.revenue,
+      href: "/provider/finance",
+      footnote: `${fmtInt(totalBookings)} đơn trong kỳ · AOV ${compactMoney(avgValue)} ₫`,
+    },
+    {
+      id: "net",
+      label: "Tiền bạn nhận",
+      tooltip:
+        "Tiền đối tác thực nhận sau hoa hồng nền tảng, voucher và hoàn tiền. Số tiền sắp về ví của bạn.",
+      value: `${compactMoney(net)} ₫`,
+      change: deltas.revenue,
+      tone: "emerald",
+      sparkline: sparks.revenue,
+      href: "/provider/finance/settlements",
+      footnote:
+        held > 0
+          ? `${compactMoney(held)} ₫ đang bị giữ chờ đủ điều kiện tất toán`
+          : `Số dư ví ${compactMoney(wallet)} ₫`,
+    },
+    {
+      id: "bookings",
+      label: "Số đơn đặt",
+      tooltip: "Số đơn đã thanh toán trong kỳ đang chọn.",
+      value: fmtInt(revenueSummary?.bookingCount),
+      change: deltas.bookings,
+      tone: "indigo",
+      sparkline: sparks.bookings,
+      href: "/provider/bookings",
+      footnote: `${fmtInt(bookings?.paid ?? 0)} đã thanh toán · ${fmtInt(bookings?.pendingPayment ?? 0)} chờ thanh toán`,
     },
     {
       id: "checkins",
-      label: `Lượt check-in · ${range.label}`,
-      value: fmtNumber(checkIns.current),
-      badge: changeBadge(checkIns.current, checkIns.previous),
-      hint: `Tổng ${fmtNumber(checkIns.allTime)} lượt`,
-      icon: Users,
-      tone: "emerald",
+      label: "Lượt check-in",
+      tooltip: "Số lượt check-in hợp lệ tại điểm đến của bạn trong kỳ.",
+      value: fmtInt(checkInSummary?.current),
+      change: deltas.checkIns,
+      tone: "sky",
+      sparkline: sparks.checkIns,
+      href: "/provider/bookings",
+      footnote: `${fmtInt(checkInSummary?.uniqueCheckInUsers ?? 0)} khách khác nhau đã check-in`,
+    },
+    {
+      id: "tourists",
+      label: "Khách du khách",
+      tooltip: "Số khách du khách khác nhau đã đặt tour của bạn trong kỳ.",
+      value: fmtInt(uniqueTourists),
+      change: deltas.tourists,
+      tone: "violet",
+      sparkline: sparks.tourists,
+      href: "/provider/bookings",
+      footnote: `${fmtInt(totalBookings)} lượt đặt · ${completionRate.toFixed(1)}% hoàn thành`,
     },
     {
       id: "tours",
-      label: "Tour mở bán",
-      value: `${tourCounts.published ?? 0} / ${myTours.length}`,
-      hint: `${tourCounts.pending ?? 0} chờ duyệt · ${tourCounts.fix ?? 0} cần sửa`,
-      icon: Compass,
-      tone: "indigo",
-    },
-    {
-      id: "destinations",
-      label: "Điểm đến hoạt động",
-      value: `${destStats.published} / ${destStats.total}`,
-      hint: `${destStats.pending} chờ duyệt · ${destStats.rejected} cần sửa`,
-      icon: MapPin,
-      tone: "sky",
+      label: "Tour đang mở bán",
+      tooltip: "Số tour của bạn đã được duyệt và đang bán trên sàn.",
+      value: fmtInt(stats?.tourPerformance?.filter((t) => t.status === "PUBLISHED").length ?? 0),
+      change: null,
+      tone: "slate",
+      sparkline: [],
+      href: "/provider/tours",
+      footnote: `${fmtInt(stats?.tourPerformance?.filter((t) => t.status === "PENDING_REVIEW").length ?? 0)} tour đang chờ duyệt`,
     },
   ];
 
-  const filters = listTab === "tours" ? TOUR_FILTERS : DEST_FILTERS;
-  const counts = listTab === "tours" ? tourCounts : destCounts;
-  const activeFilter = listTab === "tours" ? tourFilter : destFilter;
-  const setActiveFilter = listTab === "tours" ? setTourFilter : setDestFilter;
-
   return (
-    // Cuộn dọc cả trang; danh sách tour / điểm đến và kết quả thẩm định vẫn cuộn riêng trong thẻ.
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto [scrollbar-width:thin]">
-      {/* ── Header 1 hàng ─────────────────────────────────────────────────── */}
-      <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="min-w-0 truncate text-lg font-bold tracking-tight text-slate-900 sm:text-xl" title={providerName}>
-          {providerName}
-        </h1>
-        <div className="flex w-fit shrink-0 items-center gap-0.5 rounded-lg bg-slate-100 p-1">
-          {RANGE_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setTimeRange(opt.id)}
-              className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-                timeRange === opt.id ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
+    <div className="flex h-full min-h-0 flex-col gap-8 overflow-y-auto [scrollbar-width:thin]">
+      {/* ── HEADER ──────────────────────────────────────────────────────── */}
+      <ProviderHeader
+        providerName={providerName}
+        range={timeRange}
+        onRangeChange={handleRangeChange}
+        customRange={customRange}
+        onApplyCustom={handleApplyCustom}
+        tours={tourOptions}
+        tourId={tourId}
+        onTourChange={setTourId}
+        regions={regions}
+        regionId={regionId}
+        onRegionChange={setRegionId}
+        updatedAt={stats?.updatedAt}
+        onRefresh={handleRefresh}
+        isRefreshing={isRefreshing}
+        urgentCount={urgentCount}
+      />
 
       {error && (
-        <div className="flex shrink-0 items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
+        <div className="flex shrink-0 items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
           <AlertTriangle size={15} className="shrink-0" />
           <span className="min-w-0 truncate">{error}</span>
         </div>
       )}
 
-      {/* ── Dải 4 ô số liệu ──────────────────────────────────────────────── */}
-      <section
-        aria-label="Chỉ số tổng quan"
-        className="grid shrink-0 grid-cols-1 gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 shadow-xs sm:grid-cols-2 xl:grid-cols-4"
-      >
-        {kpis.map((k) => {
-          const Icon = k.icon;
-          return (
-            <div key={k.id} className="flex min-w-0 items-center gap-3 bg-white px-4 py-3">
-              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${TONE[k.tone]}`}>
-                <Icon size={17} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-medium text-slate-500" title={k.label}>
-                  {k.label}
-                </p>
-                <div className="flex min-w-0 items-baseline gap-2">
-                  <span
-                    className={`min-w-0 truncate text-lg font-bold tabular-nums ${
-                      loadingValue ? "text-slate-300" : "text-slate-900"
-                    }`}
-                    title={k.value}
-                  >
-                    {loadingValue ? "…" : k.value}
-                  </span>
-                  {!loadingValue && k.badge && (
-                    <span
-                      className={`shrink-0 rounded-full px-1.5 text-[10.5px] font-bold ${
-                        k.badge.positive ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
-                      }`}
-                      title={`So với ${range.previous}`}
-                    >
-                      {k.badge.text}
-                    </span>
-                  )}
-                </div>
-                <p className="truncate text-[11px] text-slate-400" title={k.hint}>
-                  {k.hint}
-                </p>
-              </div>
-            </div>
-          );
-        })}
-      </section>
-
-      {/* ── Biểu đồ: diễn biến kỳ này vs kỳ trước | check-in theo điểm đến ── */}
-      <section aria-label="Biểu đồ" className="grid shrink-0 grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className="min-w-0 xl:col-span-8">
-          <ProviderTrendChart series={stats?.series} unit={stats?.seriesUnit} rangeLabel={range.label}
-            previousLabel={range.previous} loading={loadingValue} />
+      {/* ── TẦNG 1 · KPI CỐT LÕI ───────────────────────────────────────── */}
+      <section aria-label="Chỉ số tổng quan" className="shrink-0">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+          {kpis.map((k) => (
+            <ProviderKpiCard key={k.id} {...k} loading={loadingValue} />
+          ))}
         </div>
-        <div className="flex min-w-0 xl:col-span-4 [&>section]:flex-1">
-          <DestinationCheckInChart destinations={destinations} loading={loadingValue} />
+
+        {/* Hàng metric nhỏ — không nhồi vào 6 thẻ KPI chính. */}
+        <div className="mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-slate-200/80 bg-slate-200/80 sm:grid-cols-3 lg:grid-cols-5">
+          <MiniStat
+            label="Giá trị đơn TB"
+            value={avgValue > 0 ? `${compactMoney(avgValue)} ₫` : "—"}
+            hint="Giá trị trung bình của mỗi đơn đã thanh toán trong kỳ."
+          />
+          <MiniStat
+            label="Tỷ lệ hoàn thành"
+            value={totalBookings > 0 ? `${completionRate.toFixed(1)}%` : "—"}
+            hint="Đơn hoàn thành trải nghiệm / tổng đơn đã tạo. Đơn chưa hoàn thành sẽ bị giữ tiền."
+            tone={completionRate < 50 && totalBookings > 0 ? "amber" : "emerald"}
+          />
+          <MiniStat
+            label="Tỷ lệ hoàn tiền"
+            value={`${refundRate.toFixed(1)}%`}
+            hint="Tỷ lệ đơn đã thanh toán bị hoàn tiền trong kỳ."
+            tone={refundRate > 10 ? "rose" : "slate"}
+          />
+          <MiniStat
+            label="Số dư ví"
+            value={`${compactMoney(wallet)} ₫`}
+            hint="Số dư hiện có trong ví của bạn — tiền đã được giải ngân."
+          />
+          <MiniStat
+            label="Chờ tất toán"
+            value={pendingSettlement > 0 ? `${compactMoney(pendingSettlement)} ₫` : "—"}
+            hint="Tiền đã đủ điều kiện nhưng chưa được giải ngân."
+            tone="indigo"
+          />
         </div>
       </section>
 
-      {/* ── Hai cột ──────────────────────────────────────────────────────── */}
-      <section className="grid shrink-0 grid-cols-1 gap-4 xl:h-[560px] xl:grid-cols-12 xl:grid-rows-[minmax(0,1fr)]">
-        {/* Cột trái: Tour / Điểm đến */}
-        <div className="flex h-[520px] min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs xl:col-span-7 xl:h-auto xl:min-h-0">
-          <div className="flex shrink-0 flex-col gap-2.5 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex w-fit shrink-0 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
-              {[
-                { id: "tours", label: "Tour", count: myTours.length, icon: Compass },
-                { id: "destinations", label: "Điểm đến", count: destStats.total, icon: MapPin },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setListTab(t.id)}
-                  className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
-                    listTab === t.id ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  <t.icon size={13} />
-                  {t.label}
-                  <span className="rounded-full bg-slate-200 px-1.5 text-[10px] tabular-nums text-slate-600">
-                    {t.count}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <div className="flex min-w-0 items-center gap-2">
-              <select
-                value={activeFilter}
-                onChange={(e) => setActiveFilter(e.target.value)}
-                className="h-8 min-w-0 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 focus:outline-none"
-                aria-label="Lọc theo trạng thái"
-              >
-                {filters.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.label} ({counts[f.id] ?? 0})
-                  </option>
-                ))}
-              </select>
-              {listTab === "tours" && (
-                <Link
-                  href="/provider/tours"
-                  className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-xs font-bold text-slate-600 hover:text-slate-900"
-                >
-                  Quản lý tour <ChevronRight size={13} />
-                </Link>
-              )}
-            </div>
-          </div>
-
-          {/* Vùng danh sách — cuộn RIÊNG bên trong */}
-          <div className="min-h-0 flex-1 overflow-auto [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
-            {listTab === "tours" ? (
-              filteredTours.length === 0 ? (
-                <EmptyState
-                  icon={Compass}
-                  text={
-                    isLoading
-                      ? "Đang tải tour…"
-                      : myTours.length === 0
-                        ? "Bạn chưa có tour nào — vào Quản lý tour để tạo hành trình."
-                        : "Không có tour nào ở trạng thái này."
-                  }
-                />
-              ) : (
-                <table className="w-full min-w-[520px] border-collapse text-left text-xs">
-                  <thead className="sticky top-0 z-10">
-                    <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500">
-                      <th className="px-4 py-2.5">Tên tour</th>
-                      <th className="px-3 py-2.5 text-right">Điểm đến</th>
-                      <th className="px-3 py-2.5 text-right">Thời lượng</th>
-                      <th className="px-4 py-2.5">Trạng thái</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredTours.map((t) => {
-                      const meta = TOUR_STATUS_META[t.status] ?? TOUR_STATUS_META.DRAFT;
-                      const title = t.title || "Tour chưa đặt tên";
-                      return (
-                        <tr key={t.tourId ?? t.id} className="hover:bg-slate-50/70">
-                          <td className="max-w-0 px-4 py-2.5">
-                            <p className="truncate text-[13px] font-semibold text-slate-900" title={title}>
-                              {title}
-                            </p>
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-slate-600">
-                            {t.destinations?.length ?? t.destinationCount ?? 0} điểm
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-slate-600">
-                            {t.durationDays ? `${t.durationDays} ngày` : "—"}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-2.5">
-                            <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-bold ${meta.cls}`}>
-                              <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
-                              {meta.label}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )
-            ) : filteredDests.length === 0 ? (
-              <EmptyState
-                icon={MapPin}
-                text={
-                  isLoading
-                    ? "Đang tải điểm đến…"
-                    : destinations.length === 0
-                      ? "Chưa có điểm đến di tích nào."
-                      : "Không có điểm đến nào ở trạng thái này."
-                }
-              />
-            ) : (
-              <table className="w-full min-w-[520px] border-collapse text-left text-xs">
-                <thead className="sticky top-0 z-10">
-                  <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500">
-                    <th className="px-4 py-2.5">Điểm đến</th>
-                    <th className="px-3 py-2.5 text-right">Check-in</th>
-                    <th className="px-3 py-2.5 text-center">GPS</th>
-                    <th className="px-4 py-2.5">Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredDests.map((d) => {
-                    const status = DEST_STATUS[d.status] ?? DEST_STATUS.DRAFT;
-                    const hasGps = d.latitude != null && d.longitude != null;
-                    const name = d.name || "Điểm đến chưa đặt tên";
-                    const address = d.address || "Chưa cập nhật địa chỉ";
-                    return (
-                      <tr key={d.id} className="hover:bg-slate-50/70">
-                        <td className="max-w-0 px-4 py-2.5">
-                          <p className="truncate text-[13px] font-semibold text-slate-900" title={name}>
-                            {name}
-                          </p>
-                          <p className="truncate text-[11px] text-slate-500" title={address}>
-                            {address}
-                          </p>
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right font-bold tabular-nums text-slate-900">
-                          {fmtNumber(d.checkIns)}
-                        </td>
-                        <td className="px-3 py-2.5 text-center">
-                          <span
-                            className={`inline-flex h-6 w-6 items-center justify-center rounded-md ${
-                              hasGps ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400"
-                            }`}
-                            title={hasGps ? `${d.latitude}, ${d.longitude}` : "Chưa có tọa độ"}
-                          >
-                            <Navigation size={12} />
-                          </span>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-2.5">
-                          <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-bold ${status.cls}`}>
-                            <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
-                            {status.label}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
+      {/* ── TẦNG 2 · TRUNG TÂM HÀNH ĐỘNG ─────────────────────────────────── */}
+      {/* `max-h` (không phải `h` cố định) ⇒ 2 card cao bằng nhau theo nội dung, tự co lại
+          khi danh sách ngắn ⇒ không để lại khoảng trống bên dưới khối "Cần bạn xử lý".
+          Danh sách dài hơn 420px sẽ cuộn BÊN TRONG card. */}
+      <section aria-label="Việc cần xử lý" className="grid shrink-0 grid-cols-1 items-stretch gap-4 xl:max-h-[420px] xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-7">
+          <ProviderActionCenter actions={actions} isLoading={loadingValue} />
         </div>
-
-        {/* Cột phải */}
-        <div className="flex min-w-0 flex-col gap-4 xl:col-span-5 xl:min-h-0">
-          {/* Kết quả thẩm định gần đây */}
-          <div className="flex h-[360px] min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs xl:h-auto xl:min-h-0 xl:flex-1">
-            <div className="flex shrink-0 items-center gap-2.5 border-b border-slate-100 px-4 py-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                <ShieldCheck size={16} />
-              </span>
-              <div className="min-w-0">
-                <h2 className="truncate text-sm font-bold text-slate-900">Kết quả thẩm định gần đây</h2>
-                <p className="truncate text-[11px] text-slate-500">Tour và điểm đến bạn đã gửi duyệt</p>
-              </div>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
-              {updates.length === 0 ? (
-                <EmptyState icon={Inbox} text={isLoading ? "Đang tải…" : "Chưa có kết quả thẩm định nào."} />
-              ) : (
-                <ul className="divide-y divide-slate-100">
-                  {updates.map((u, i) => {
-                    const act = UPDATE_ACTION[u.action] ?? {
-                      label: u.action?.toLowerCase() ?? "cập nhật",
-                      icon: ShieldCheck,
-                      cls: "bg-slate-100 text-slate-500",
-                    };
-                    const ActIcon = act.icon;
-                    const typeLabel = u.type === "TOUR" ? "Tour" : "Điểm đến";
-                    const name = u.targetName || `#${u.targetId}`;
-                    const detail = u.reason || u.note;
-                    return (
-                      <li key={`${u.type}-${u.targetId}-${u.createdAt ?? i}`} className="flex gap-3 px-4 py-2.5">
-                        <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${act.cls}`}>
-                          <ActIcon size={14} />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[13px] text-slate-700" title={`${typeLabel} "${name}" ${act.label}`}>
-                            <span className="font-semibold text-slate-900">{name}</span> {act.label}
-                          </p>
-                          <p className="truncate text-[11px] text-slate-500" title={detail || undefined}>
-                            {typeLabel}
-                            {detail ? ` · ${detail}` : ""}
-                          </p>
-                        </div>
-                        <span className="shrink-0 whitespace-nowrap pt-0.5 text-[11px] text-slate-400">
-                          {timeAgo(u.createdAt)}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          </div>
-
-          {/* Nhiệm vụ & đố vui */}
-          <div className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-xs">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
-                <Trophy size={16} />
-              </span>
-              <h2 className="min-w-0 truncate text-sm font-bold text-slate-900">Nhiệm vụ & đố vui di sản</h2>
-            </div>
-            <dl className="mt-3 grid grid-cols-3 gap-2">
-              <MiniStat label="Nhiệm vụ" value={fmtNumber(missions.tasks)} />
-              <MiniStat label="Lượt trả lời" value={fmtNumber(missions.answered)} />
-              <MiniStat
-                label="Tỷ lệ đúng"
-                value={
-                  correctRate === null
-                    ? "—"
-                    : `${correctRate.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`
-                }
-              />
-            </dl>
-          </div>
+        <div className="min-w-0 xl:col-span-5">
+          <ModerationFeed updates={stats?.moderationUpdates ?? []} isLoading={loadingValue} />
         </div>
       </section>
+      {/* ── TẦNG 3 · DIỄN BIẾN ─────────────────────────────────────────── */}
+      <section aria-label="Biểu đồ diễn biến" className="grid shrink-0 grid-cols-1 items-stretch gap-4 xl:grid-cols-12">
+        <div className="flex min-w-0 flex-col xl:col-span-8 [&>section]:flex-1">
+          <ProviderTrendChart
+            series={series}
+            unit={stats?.seriesUnit}
+            rangeLabel={range.label}
+            previousLabel={range.previous}
+            hasBaseline={timeRange !== "all"}
+            loading={loadingValue}
+          />
+        </div>
+        <div className="flex min-w-0 flex-col xl:col-span-4 [&>section]:flex-1">
+          <DestinationCheckInChart destinations={stats?.destinationRows ?? []} loading={loadingValue} />
+        </div>
+      </section>
+
+      {/* ── TẦNG 4 · PHÂN RÃ & CHẨN ĐOÁN ───────────────────────────────── */}
+      <section aria-label="Phân rã và chẩn đoán" className="grid shrink-0 grid-cols-1 items-stretch gap-4 xl:grid-cols-12">
+        <div className="flex min-w-0 flex-col xl:col-span-5 [&>section]:flex-1">
+          <ProviderFunnel funnel={stats?.funnel} isLoading={loadingValue} />
+        </div>
+        <div className="flex min-w-0 flex-col xl:col-span-7 [&>section]:flex-1">
+          <ProviderBookingStatusChart breakdown={stats?.bookingStatusBreakdown} isLoading={loadingValue} />
+        </div>
+        <div className="flex min-w-0 flex-col xl:col-span-6 [&>section]:flex-1">
+          <ProviderRegionBreakdown regions={stats?.regionBreakdown} isLoading={loadingValue} />
+        </div>
+        <div className="flex min-w-0 flex-col xl:col-span-6 [&>section]:flex-1">
+          <ProviderVerificationBreakdown methods={stats?.checkInByMethod} isLoading={loadingValue} />
+        </div>
+      </section>
+
+      {/* ── TẦNG 5 · BẢNG VẬN HÀNH ─────────────────────────────────────── */}
+      <section aria-label="Bảng vận hành" className="grid shrink-0 grid-cols-1 items-stretch gap-4 xl:grid-cols-12">
+        <div className="flex min-w-0 flex-col xl:col-span-7 [&>section]:flex-1">
+          <TourPerformanceTable
+            tours={stats?.tourPerformance}
+            isLoading={loadingValue}
+            onSelect={setSelectedTour}
+          />
+        </div>
+        <div className="flex min-w-0 flex-col xl:col-span-5 [&>section]:flex-1">
+          <DeparturesPanel departures={stats?.upcomingDepartures} isLoading={loadingValue} />
+        </div>
+      </section>
+
+      {/* ── TẦNG 6 · CHÂN TRÁNG ────────────────────────────────────────── */}
+      <section aria-label="Nhiệm vụ và đố vui di sản" className="shrink-0">
+        <MissionsPanel missions={missions} correctRate={correctRate} isLoading={loadingValue} />
+      </section>
+
+      <TourDetailDrawer tour={selectedTour} onClose={() => setSelectedTour(null)} />
     </div>
   );
 }
 
-function MiniStat({ label, value }) {
+/** Ô chỉ số nhỏ — luôn kèm tooltip giải thích nghiệp vụ. */
+function MiniStat({ label, value, hint, tone = "slate" }) {
+  const dot = {
+    emerald: "bg-emerald-500",
+    amber: "bg-amber-500",
+    rose: "bg-rose-500",
+    indigo: "bg-indigo-500",
+    slate: "bg-slate-400",
+  }[tone];
+
   return (
-    <div className="min-w-0 rounded-lg bg-slate-50 px-2.5 py-2">
-      <dt className="truncate text-[11px] text-slate-500" title={label}>
+    <div className="min-w-0 bg-white px-3.5 py-2.5" title={hint}>
+      <p className="flex items-center gap-1.5 truncate text-[11px] font-semibold text-slate-500">
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} aria-hidden="true" />
         {label}
-      </dt>
-      <dd className="truncate text-base font-bold tabular-nums text-slate-900" title={value}>
+      </p>
+      <p className="mt-0.5 truncate text-[15px] font-bold tabular-nums text-slate-900" title={value}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * "Kết quả thẩm định gần đây" — timeline có badge màu + nhãn chữ.
+ */
+function ModerationFeed({ updates, isLoading }) {
+  const list = updates || [];
+
+  const ACTION = {
+    APPROVED: { label: "đã được duyệt", cls: "bg-emerald-50 text-emerald-600" },
+    REJECTED: { label: "bị từ chối", cls: "bg-rose-50 text-rose-600" },
+    SUBMITTED: { label: "đã gửi thẩm định", cls: "bg-sky-50 text-sky-600" },
+  };
+
+  return (
+    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+      <header className="flex shrink-0 items-center gap-2.5 border-b border-slate-100 px-5 py-4">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+          <Compass size={16} strokeWidth={1.9} />
+        </span>
+        <div className="min-w-0">
+          <h2 className="truncate text-sm font-bold tracking-tight text-slate-900">
+            Kết quả thẩm định gần đây
+          </h2>
+          <p className="truncate text-xs text-slate-500">Tour và điểm đến bạn đã gửi duyệt</p>
+        </div>
+      </header>
+
+      <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+        {isLoading && list.length === 0 ? (
+          <div className="space-y-2 p-4">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="jg-shimmer h-12 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : list.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-1 px-6 py-8 text-center">
+            <p className="text-sm font-semibold text-slate-600">Chưa có kết quả thẩm định nào</p>
+            <p className="max-w-[280px] text-xs text-slate-400">
+              Khi bạn gửi tour hoặc điểm đến đi duyệt, kết quả sẽ hiện ở đây.
+            </p>
+            {/* Gợi ý bước tiếp theo — lấp khoảng trống bằng thông tin hành động. */}
+            <ul className="mt-2 w-full max-w-[300px] space-y-1.5 text-left">
+              {[
+                "Gửi tour mới đi duyệt ở Quản lý tour.",
+                "Gửi điểm đến mới đi duyệt ở Hồ sơ đối tác.",
+                "Kết quả và lý do (nếu bị từ chối) sẽ hiện ở đây.",
+              ].map((t, i) => (
+                <li
+                  key={t}
+                  className="flex items-start gap-2 rounded-lg border border-slate-200/80 bg-slate-50/70 px-2.5 py-2 text-[11px] leading-snug text-slate-600"
+                >
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[9.5px] font-bold text-indigo-700">
+                    {i + 1}
+                  </span>
+                  <span>{t}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {list.map((u, i) => {
+              const act = ACTION[u.action] ?? { label: u.action?.toLowerCase() ?? "cập nhật", cls: "bg-slate-100 text-slate-500" };
+              const typeLabel = u.type === "TOUR" ? "Tour" : "Điểm đến";
+              const name = u.targetName || `#${u.targetId}`;
+              const detail = u.reason || u.note;
+              return (
+                <li key={`${u.type}-${u.targetId}-${u.createdAt ?? i}`} className="flex gap-3 px-5 py-3">
+                  <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${act.cls}`}>
+                    <MapPin size={13} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] text-slate-700" title={`${typeLabel} "${name}" ${act.label}`}>
+                      <span className="font-semibold text-slate-900">{name}</span> {act.label}
+                    </p>
+                    <p className="truncate text-[11px] text-slate-500" title={detail || undefined}>
+                      {typeLabel}
+                      {detail ? ` · ${detail}` : ""}
+                    </p>
+                  </div>
+                  <span className="shrink-0 whitespace-nowrap pt-0.5 text-[11px] text-slate-400">
+                    {u.createdAt ? formatDateTimeVN(u.createdAt, { hour: "2-digit", minute: "2-digit" }) : ""}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Nhiệm vụ & đố vui di sản + thanh so sánh "nhiệm vụ đã tạo" vs "lượt trả lời".
+ *
+ * Thanh so sánh phát hiện nhiệm vụ "chết": tạo nhiều đố vui nhưng du khách không
+ * thèm làm ⇒ nội dung cần xem lại.
+ */
+function MissionsPanel({ missions, correctRate, isLoading }) {
+  const tasks = Number(missions?.tasks) || 0;
+  const answered = Number(missions?.answered) || 0;
+  const correct = Number(missions?.correct) || 0;
+  const answerRate = tasks > 0 ? (answered / tasks) * 100 : 0;
+
+  return (
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+          <Trophy size={16} strokeWidth={1.9} />
+        </span>
+        <div className="min-w-0">
+          <h2 className="truncate text-sm font-bold tracking-tight text-slate-900">
+            Nhiệm vụ & đố vui di sản
+          </h2>
+          <p className="truncate text-xs text-slate-500">
+            {tasks > 0
+              ? `Mỗi nhiệm vụ nhận được ${(answered / tasks).toFixed(1)} lượt trả lời`
+              : "Chưa có nhiệm vụ nào — tạo nhiệm vụ để tăng tương tác"}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <dl className="grid grid-cols-3 gap-2">
+          <MissionStat label="Nhiệm vụ" value={fmtInt(tasks)} />
+          <MissionStat label="Lượt trả lời" value={fmtInt(answered)} />
+          <MissionStat
+            label="Tỷ lệ đúng"
+            value={correctRate === null ? "—" : `${correctRate.toFixed(1)}%`}
+          />
+        </dl>
+
+        <div className="min-w-0">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-[11.5px] font-semibold text-slate-600">
+              Nhiệm vụ đã tạo vs lượt trả lời
+            </span>
+            <span className="text-[11px] font-bold tabular-nums text-slate-900">
+              {answerRate.toFixed(1)}%
+            </span>
+          </div>
+          <div className="flex h-2 w-full overflow-hidden rounded-full bg-slate-100">
+            <div className="h-full bg-violet-500" style={{ width: "100%" }} />
+          </div>
+          <div className="mt-1.5 flex items-center gap-2">
+            <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full bg-emerald-500" style={{ width: `${Math.min(100, answerRate)}%` }} />
+            </div>
+          </div>
+          <p className="mt-1.5 text-[10.5px] text-slate-400">
+            {tasks > 0 && answerRate < 30
+              ? "Ít du khách trả lời đố vui — thử nội dung hấp dẫn hơn hoặc gắn đố vui vào điểm đến."
+              : "Tỷ lệ du khách trả lời đố vui so với tổng số nhiệm vụ bạn đã tạo."}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MissionStat({ label, value }) {
+  return (
+    <div className="min-w-0 rounded-xl border border-slate-100 bg-slate-50/70 p-2.5">
+      <dt className="truncate text-[10.5px] font-semibold text-slate-500">{label}</dt>
+      <dd className="mt-0.5 truncate text-base font-bold tabular-nums text-slate-900" title={value}>
         {value}
       </dd>
-    </div>
-  );
-}
-
-function EmptyState({ icon: Icon, text }) {
-  return (
-    <div className="flex h-full min-h-[140px] flex-col items-center justify-center gap-2 px-6 text-center">
-      <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
-        <Icon size={20} />
-      </span>
-      <p className="text-sm text-slate-500">{text}</p>
     </div>
   );
 }
