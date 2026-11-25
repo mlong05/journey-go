@@ -4,6 +4,7 @@ import com.journeygo.modules.destination.entity.Region;
 import com.journeygo.modules.destination.entity.Theme;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.tour.entity.enums.TourStatus;
+import com.journeygo.modules.tour.entity.enums.TourVisibility;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.SQLRestriction;
@@ -53,6 +54,20 @@ public class Tour {
     @Column(nullable = false, length = 30, columnDefinition = "varchar(30) default 'DRAFT'")
     @Builder.Default
     private TourStatus status = TourStatus.DRAFT;
+
+    /** ALL: Công khai; SPECIFIC_USER: Chỉ người dùng được chỉ định theo email xem và mua được */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "visibility", nullable = false, length = 20)
+    @Builder.Default
+    private TourVisibility visibility = TourVisibility.ALL;
+
+    /** Email của người dùng cụ thể được phép xem và mua tour khi visibility = SPECIFIC_USER */
+    @Column(name = "specific_user_email", length = 100)
+    private String specificUserEmail;
+
+    /** ID của TourRequest nếu tour này được tạo để đáp ứng yêu cầu của khách */
+    @Column(name = "tour_request_id")
+    private Long tourRequestId;
 
     /** Populated by admin/moderator when rejecting the tour. */
     /** Ảnh bìa riêng của tour (URL https tải lên qua /upload/image); trống thì dùng ảnh điểm đến đầu tiên */

@@ -16,3 +16,6 @@ export { default as MyPostsScreen } from "./components/MyPostsScreen";
 export { default as InvitationsScreen } from "./components/InvitationsScreen";
 export { default as InvitationAcceptScreen } from "./components/InvitationAcceptScreen";
 export { default as AchievementsScreen } from "./components/AchievementsScreen";
+export { default as TourRequestsScreen } from "./components/TourRequestsScreen";
+export { default as NewTourRequestScreen } from "./components/NewTourRequestScreen";
+export { default as TourRequestDetailScreen } from "./components/TourRequestDetailScreen";

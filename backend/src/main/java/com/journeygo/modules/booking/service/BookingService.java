@@ -32,6 +32,7 @@ import com.journeygo.modules.tour.entity.GuestType;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.entity.TourSlot;
 import com.journeygo.modules.tour.entity.enums.TourStatus;
+import com.journeygo.modules.tour.entity.enums.TourVisibility;
 import com.journeygo.modules.tour.repository.TourRepository;
 import com.journeygo.modules.tour.repository.TourSlotRepository;
 import com.journeygo.modules.user.entity.User;
@@ -127,6 +128,7 @@ public class BookingService {
                 .orElseThrow(() -> new AppException(ErrorCode.TOUR_NOT_FOUND));
 
         validateTourBookable(tour);
+        validateTourVisibility(tour, tourist);
         validateExperienceDate(tour, request.experienceDate());
 
         // ── Chống đặt lại tour đã mua ──────────────────────────────────────────
@@ -902,6 +904,16 @@ public class BookingService {
         if (tour.getStatus() != TourStatus.PUBLISHED || !tour.isApproved()) {
             throw new AppException(ErrorCode.BOOKING_TOUR_NOT_AVAILABLE,
                     "Tour chưa được xuất bản — không thể đặt");
+        }
+    }
+
+    private void validateTourVisibility(Tour tour, User tourist) {
+        if (tour.getVisibility() == TourVisibility.SPECIFIC_USER) {
+            if (tourist == null || tourist.getEmail() == null
+                    || !tourist.getEmail().trim().equalsIgnoreCase(tour.getSpecificUserEmail())) {
+                throw new AppException(ErrorCode.TOUR_ACCESS_DENIED,
+                        "Tour này là tour thiết kế riêng, chỉ người yêu cầu mới có quyền đặt mua");
+            }
         }
     }
 

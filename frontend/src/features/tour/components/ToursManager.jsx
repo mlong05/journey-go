@@ -898,10 +898,16 @@ export default function ToursManager({
                         <h3 className="text-sm font-bold text-slate-900 truncate" title={tour.title}>
                           {tour.title}
                         </h3>
-                        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-600">
-                          <span className="font-semibold text-slate-600 truncate">
-                            {TOUR_TYPE_META[tour.tourType] || "Khác"}
-                          </span>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-600">
+                          {tour.visibility === "SPECIFIC_USER" ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-bold text-teal-700 border border-teal-200" title={`Chỉ mở cho: ${tour.specificUserEmail || "Khách yêu cầu"}`}>
+                              Tour riêng: {tour.specificUserEmail || "Theo yêu cầu"}
+                            </span>
+                          ) : (
+                            <span className="font-semibold text-slate-600 truncate">
+                              {TOUR_TYPE_META[tour.tourType] || "Khác"}
+                            </span>
+                          )}
                         </div>
                         {tour.status === "REJECTED" && tour.rejectionReason && (
                           <p

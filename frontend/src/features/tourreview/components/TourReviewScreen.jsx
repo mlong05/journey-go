@@ -3,7 +3,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Loader2, Flag, BadgeCheck, MessageSquareWarning, Ban, Eye, FileText, History, CheckCircle2, XCircle, AlertTriangle, Info,
+  ArrowLeft, Loader2, Flag, BadgeCheck, MessageSquareWarning, Ban, Eye, FileText, History, CheckCircle2, XCircle, AlertTriangle, Info, Sparkles, Mail, Lock,
 } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { LimitedField } from "@/components/ui/LimitedField";
@@ -244,7 +244,14 @@ export default function TourReviewScreen({ tourId }) {
         <div className="shrink-0 flex items-center gap-3">
           <button type="button" onClick={() => router.push("/moderator/tours")} className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer" aria-label="Quay lại"><ArrowLeft size={16} /></button>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold text-teal-700 uppercase tracking-wide">Thẩm định tour</p>
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] font-bold text-teal-700 uppercase tracking-wide">Thẩm định tour</p>
+              {tour.visibility === "SPECIFIC_USER" && (
+                <span className="inline-flex items-center gap-1 rounded bg-teal-100 text-teal-800 px-2 py-0.5 text-[10px] font-bold">
+                  <Sparkles size={11} /> Tour riêng theo yêu cầu
+                </span>
+              )}
+            </div>
             <h1 className="text-lg font-bold text-slate-900 truncate">{tour.title}</h1>
             {(submitterName || submittedAt) && (
               <p className="text-xs text-slate-500 truncate">
@@ -256,6 +263,25 @@ export default function TourReviewScreen({ tourId }) {
           </div>
           <span className={`px-2 py-0.5 rounded-md border text-[11px] font-bold shrink-0 ${meta.cls}`}>{meta.label}</span>
         </div>
+
+        {tour.visibility === "SPECIFIC_USER" && (
+          <div className="shrink-0 p-3.5 rounded-xl border border-teal-200 bg-teal-50/70 text-xs text-teal-900 flex items-start gap-3">
+            <div className="p-1.5 rounded-lg bg-teal-100 text-teal-800 shrink-0 mt-0.5">
+              <Lock size={15} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-bold text-sm text-teal-950 flex items-center gap-1.5">
+                Tour được thiết kế riêng theo yêu cầu của khách hàng
+                {tour.tourRequestId && <span className="text-xs font-normal text-teal-700 font-mono">(Mã yêu cầu: #{tour.tourRequestId})</span>}
+              </p>
+              <p className="mt-1 text-slate-700">
+                Tour này chỉ mở quyền xem và đặt mua cho duy nhất tài khoản:{" "}
+                <b className="font-semibold text-teal-900 underline">{tour.specificUserEmail || "Chưa có email"}</b>.
+                Khi bạn duyệt, hệ thống sẽ tự động gửi thông báo trực tiếp đến khách hàng này.
+              </p>
+            </div>
+          </div>
+        )}
 
         {!pending && (
           <div className="shrink-0 p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-600">
