@@ -42,6 +42,7 @@
   },
   "home.tour.priceFrom": "From",
   "home.tour.viewDetail": "View details",
+  "home.tour.booked": "Booked",
   "home.upcoming.eyebrow": "Your upcoming trip",
   "home.upcoming.daysLeft": {
     "one": "{count} day until departure",

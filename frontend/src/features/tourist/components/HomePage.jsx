@@ -182,6 +182,7 @@ function TourRow({ tour, today }) {
           ? <img ref={imgRef} src={cover} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.05] motion-reduce:transition-none" />
           : <span className="absolute inset-0 grid place-items-center text-slate-300"><ImageOff size={30} /></span>}
         {tour.themeName && <span className="absolute left-3 top-3 max-w-[70%] truncate rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-orange-700">{tour.themeName}</span>}
+        {tour.purchased && <span className="absolute right-3 top-3 rounded-full bg-teal-700 px-3 py-1 text-xs font-bold text-white shadow-xs">{t("home.tour.booked")}</span>}
         {(tour.stopCount > 0 || tour.taskCount > 0) && (
           <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-slate-900/75 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm">
             {tour.stopCount > 0 && <><Flag size={12} />{t("tourCard.stops", { count: tour.stopCount })}</>}
@@ -406,14 +407,18 @@ export default function HomePage() {
     if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - (window.innerWidth >= 768 ? 156 : 88), behavior: "smooth" });
   }
 
-  /** Tour có thể đặt (bỏ tour đã mua và tour chỉ còn ngày hôm nay hoặc quá khứ). */
+  /**
+   * Tour hiển thị (bỏ tour chỉ còn ngày hôm nay hoặc quá khứ). Tour đã mua vẫn hiện, kèm nhãn "Đã đặt":
+   * bấm vào xem được vé / chi tiết, còn đặt lại thì bị chặn ở trang chi tiết và backend cho tới khi chuyến đi xong.
+   */
   const pool = useMemo(
     () =>
       data.tours
-        .filter((tour) => !purchasedIds.has(Number(tour.tourId)))
         .map((tour) => {
           const dates = upcoming(tour, minBookableDate);
-          return dates.length ? { ...tour, nextDepartureDate: dates[0] } : null;
+          return dates.length
+            ? { ...tour, nextDepartureDate: dates[0], purchased: purchasedIds.has(Number(tour.tourId)) }
+            : null;
         })
         .filter(Boolean),
     [data.tours, purchasedIds, minBookableDate],
@@ -561,7 +566,7 @@ export default function HomePage() {
               <div key={resultsKey} className={view === "list" ? "space-y-4" : "grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4"}>
                 {results.slice(0, limit).map((tour, i) => (
                   <div key={tour.tourId} className="jg-card-in min-w-0" style={{ "--i": Math.max(0, i - (limit - PAGE)) }}>
-                    {view === "list" ? <TourRow tour={tour} today={minBookableDate} /> : <TourCard tour={tour} />}
+                    {view === "list" ? <TourRow tour={tour} today={minBookableDate} /> : <TourCard tour={tour} badge={tour.purchased ? t("home.tour.booked") : undefined} />}
                   </div>
                 ))}
               </div>
