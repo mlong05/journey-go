@@ -18,7 +18,7 @@ import DepartureSchedule from "./DepartureSchedule";
 import LoginRequiredModal from "./LoginRequiredModal";
 import { useTouristSession } from "../hooks/useTouristSession";
 import { usePurchasedBooking } from "../hooks/usePurchasedBooking";
-import { dateTime, durationLabel, shortDate, longDate, vnd } from "../utils";
+import { dateTime, durationLabel, shortDate, longDate, tomorrowIso, vnd } from "../utils";
 import { useT, useI18n, translate, getLocale } from "@/i18n";
 
 /** "**08:00** Đón khách" → giờ in đậm + nội dung. */
@@ -376,7 +376,8 @@ export default function TourDetailScreen({ tourId }) {
   useEffect(() => {
     let alive = true;
     Promise.all([touristService.tourDetail(tourId), touristService.availability(tourId).catch(() => [])])
-      .then(([detail, d]) => { if (alive) { setTour(detail); setDates(d); } })
+      // Chỉ mở đặt từ ngày mai: bỏ ngày hôm nay (và ngày đã qua) khỏi danh sách chọn.
+      .then(([detail, d]) => { if (alive) { setTour(detail); setDates(d.filter((x) => x.date >= tomorrowIso())); } })
       .catch((err) => alive && setError(err?.message || translate(getLocale(), "tour.notFound")));
     return () => { alive = false; };
   }, [tourId, locale]);
