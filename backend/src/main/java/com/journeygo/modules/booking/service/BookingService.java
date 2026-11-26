@@ -31,10 +31,13 @@ import com.journeygo.modules.providerprofile.repository.ProviderProfileRepositor
 import com.journeygo.modules.tour.entity.GuestType;
 import com.journeygo.modules.tour.entity.Tour;
 import com.journeygo.modules.tour.entity.TourSlot;
+import com.journeygo.modules.tour.entity.TourSlotStatus;
 import com.journeygo.modules.tour.entity.enums.TourStatus;
 import com.journeygo.modules.tour.entity.enums.TourVisibility;
 import com.journeygo.modules.tour.repository.TourRepository;
 import com.journeygo.modules.tour.repository.TourSlotRepository;
+import com.journeygo.modules.tourmerge.entity.TourMerge;
+import com.journeygo.modules.tourmerge.repository.TourMergeRepository;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
 import com.journeygo.modules.voucher.dto.request.ValidateVoucherRequest;
@@ -109,6 +112,7 @@ public class BookingService {
     private final UserVoucherRepository userVoucherRepository;
     private final VoucherService voucherService;
     private final ProviderProfileRepository providerProfileRepository;
+    private final TourMergeRepository tourMergeRepository;
 
     // ── Create ────────────────────────────────────────────────────────────────
 
@@ -151,24 +155,8 @@ public class BookingService {
         ExperienceSlot legacySlot = null;
 
         if (tour.isWizardTour()) {
-            // Tour luồng 5 bước: giữ chỗ trên TourSlot (sức chứa theo ngày khởi hành).
-            tourSlot = tourSlotRepository
-                    .findByTourAndDateForUpdate(tour.getTourId(), request.experienceDate())
-                    .orElseThrow(() -> new AppException(ErrorCode.BOOKING_SLOT_NOT_FOUND,
-                            "Tour chưa mở bán ngày " + request.experienceDate()));
-            if (tourSlot.getCapacity() == null || tourSlot.getCapacity() <= 0) {
-                throw new AppException(ErrorCode.BOOKING_SLOT_FULL,
-                        "Tour đã hết chỗ ngày " + request.experienceDate());
-            }
-            if (price.slotCount() <= 0) {
-                throw new AppException(ErrorCode.BOOKING_NO_AVAILABLE_EXPERIENCE,
-                        "Tour này không có hành khách nào chiếm chỗ — không thể đặt");
-            }
-            int updated = tourSlotRepository.atomicReserveSlots(tourSlot.getId(), price.slotCount());
-            if (updated == 0) {
-                throw new AppException(ErrorCode.BOOKING_SLOT_FULL,
-                        "Tour đã hết chỗ ngày " + request.experienceDate());
-            }
+            // Tour luồng 5 bước: giữ chỗ trên TourSlot (có kiểm tra đoàn ghép APPROVED nếu tồn tại).
+            tourSlot = reserveWizardTourSlot(tour, request.experienceDate(), price.slotCount());
         } else {
             // Tour luồng cũ: giữ chỗ trên ExperienceSlot (mỗi booking 1 slot).
             ExperienceSlot slot = findLegacyExperienceSlot(tour, request.experienceDate());
@@ -295,6 +283,101 @@ public class BookingService {
                 saved.getId(), saved.getBookingCode(), touristId, tour.getTourId(),
                 price.totalAmount(), price.slotCount(), price.passengers().size());
         return BookingResponse.fromEntity(saved);
+    }
+
+    /**
+     * Giữ chỗ trên {@link TourSlot}; nếu slot đang nằm trong đoàn ghép {@code APPROVED},
+     * khóa cả 2 slot theo thứ tự ID tăng dần (tránh deadlock) và kiểm tra trần {@code mergedCapacity}.
+     */
+    private TourSlot reserveWizardTourSlot(Tour tour, LocalDate experienceDate, int requestedSeats) {
+        if (requestedSeats <= 0) {
+            throw new AppException(ErrorCode.BOOKING_NO_AVAILABLE_EXPERIENCE,
+                    "Tour này không có hành khách nào chiếm chỗ — không thể đặt");
+        }
+
+        TourSlot candidate = tourSlotRepository
+                .findByTour_TourIdAndSlotDate(tour.getTourId(), experienceDate)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_SLOT_NOT_FOUND,
+                        "Tour chưa mở bán ngày " + experienceDate));
+
+        TourMerge approvedMerge = tourMergeRepository
+                .findApprovedBySlotIdForUpdate(candidate.getId())
+                .orElse(null);
+
+        if (approvedMerge != null) {
+            return reserveWithinMergedGroup(approvedMerge, candidate.getId(), experienceDate, requestedSeats);
+        }
+
+        TourSlot lockedSlot = tourSlotRepository
+                .findByTourAndDateForUpdate(tour.getTourId(), experienceDate)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_SLOT_NOT_FOUND,
+                        "Tour chưa mở bán ngày " + experienceDate));
+
+        // Double-check sau khi giữ khóa slot đề phòng Moderator vừa duyệt ghép cùng thời điểm.
+        TourMerge lateMerge = tourMergeRepository
+                .findApprovedBySlotIdForUpdate(lockedSlot.getId())
+                .orElse(null);
+        if (lateMerge != null) {
+            return reserveWithinMergedGroupAfterSlotLock(lateMerge, lockedSlot, experienceDate, requestedSeats);
+        }
+
+        if (lockedSlot.getCapacity() == null || lockedSlot.getCapacity() <= 0) {
+            throw new AppException(ErrorCode.BOOKING_SLOT_FULL,
+                    "Tour đã hết chỗ ngày " + experienceDate);
+        }
+        int updated = tourSlotRepository.atomicReserveSlots(lockedSlot.getId(), requestedSeats);
+        if (updated == 0) {
+            throw new AppException(ErrorCode.BOOKING_SLOT_FULL,
+                    "Tour đã hết chỗ ngày " + experienceDate);
+        }
+        return lockedSlot;
+    }
+
+    private TourSlot reserveWithinMergedGroup(TourMerge merge, Long targetSlotId,
+                                              LocalDate experienceDate, int requestedSeats) {
+        Long hostId = merge.getHostSlot().getId();
+        Long guestId = merge.getGuestSlot().getId();
+        Long firstId = Math.min(hostId, guestId);
+        Long secondId = Math.max(hostId, guestId);
+
+        TourSlot firstLocked = tourSlotRepository.findByIdForUpdate(firstId)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_SLOT_NOT_FOUND,
+                        "Tour chưa mở bán ngày " + experienceDate));
+        TourSlot secondLocked = tourSlotRepository.findByIdForUpdate(secondId)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_SLOT_NOT_FOUND,
+                        "Tour chưa mở bán ngày " + experienceDate));
+
+        TourSlot bookedSlot = targetSlotId.equals(firstId) ? firstLocked : secondLocked;
+        return checkMergedCapacityAndReserve(merge, firstLocked, secondLocked, bookedSlot, experienceDate, requestedSeats);
+    }
+
+    private TourSlot reserveWithinMergedGroupAfterSlotLock(TourMerge merge, TourSlot alreadyLocked,
+                                                           LocalDate experienceDate, int requestedSeats) {
+        Long hostId = merge.getHostSlot().getId();
+        Long guestId = merge.getGuestSlot().getId();
+        Long otherId = alreadyLocked.getId().equals(hostId) ? guestId : hostId;
+        TourSlot otherSlot = tourSlotRepository.findById(otherId)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_SLOT_NOT_FOUND,
+                        "Tour chưa mở bán ngày " + experienceDate));
+        return checkMergedCapacityAndReserve(merge, alreadyLocked, otherSlot, alreadyLocked, experienceDate, requestedSeats);
+    }
+
+    private TourSlot checkMergedCapacityAndReserve(TourMerge merge, TourSlot slotA, TourSlot slotB,
+                                                   TourSlot targetSlot, LocalDate experienceDate, int requestedSeats) {
+        if (targetSlot.getStatus() != TourSlotStatus.OPEN) {
+            throw new AppException(ErrorCode.BOOKING_SLOT_FULL,
+                    "Tour đã đóng bán ngày " + experienceDate);
+        }
+        int bookedA = slotA.getBookedCount() == null ? 0 : slotA.getBookedCount();
+        int bookedB = slotB.getBookedCount() == null ? 0 : slotB.getBookedCount();
+        int mergedCapacity = merge.getMergedCapacity() == null ? 0 : merge.getMergedCapacity();
+        if (mergedCapacity <= 0 || bookedA + bookedB + requestedSeats > mergedCapacity) {
+            throw new AppException(ErrorCode.BOOKING_SLOT_FULL,
+                    "Tour đã hết chỗ ngày " + experienceDate);
+        }
+        int currentBooked = targetSlot.getBookedCount() == null ? 0 : targetSlot.getBookedCount();
+        targetSlot.setBookedCount(currentBooked + requestedSeats);
+        return tourSlotRepository.saveAndFlush(targetSlot);
     }
 
     /**

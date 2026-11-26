@@ -12,6 +12,8 @@ import com.journeygo.modules.tour.entity.TourSlot;
 import com.journeygo.modules.tour.entity.TourSlotStatus;
 import com.journeygo.modules.tour.repository.TourRepository;
 import com.journeygo.modules.tour.repository.TourSlotRepository;
+import com.journeygo.modules.tourmerge.entity.TourMerge;
+import com.journeygo.modules.tourmerge.repository.TourMergeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -49,6 +51,7 @@ public class TourAvailabilityService {
     private final TourSlotRepository tourSlotRepository;
     private final ExperienceSlotRepository experienceSlotRepository;
     private final ExperienceRepository experienceRepository;
+    private final TourMergeRepository tourMergeRepository;
 
     /**
      * Số chỗ còn của tour theo từng ngày (chỉ tính ngày từ hôm nay trở đi).
@@ -90,8 +93,11 @@ public class TourAvailabilityService {
 
         List<Long> wizardIds = tours.stream().filter(Tour::isWizardTour).map(Tour::getTourId).toList();
         if (!wizardIds.isEmpty()) {
-            for (TourSlot slot : tourSlotRepository.findByTourIdsBetween(wizardIds, from, to)) {
-                result.computeIfAbsent(slot.getTour().getTourId(), id -> new ArrayList<>()).add(toAvailability(slot));
+            List<TourSlot> slots = tourSlotRepository.findByTourIdsBetween(wizardIds, from, to);
+            Map<Long, TourMerge> approvedMerges = loadApprovedMergesBySlotId(slots);
+            for (TourSlot slot : slots) {
+                result.computeIfAbsent(slot.getTour().getTourId(), id -> new ArrayList<>())
+                        .add(toAvailability(slot, approvedMerges.get(slot.getId())));
             }
         }
 
@@ -113,21 +119,32 @@ public class TourAvailabilityService {
      * Tour luồng 5 bước — số chỗ còn lấy thẳng từ {@link TourSlot} của từng ngày.
      */
     private List<TourSlotAvailabilityResponse.DateAvailability> wizardAvailability(Tour tour, LocalDate today) {
-        List<TourSlot> slots = tourSlotRepository.findByTour_TourIdOrderBySlotDateAsc(tour.getTourId());
-        List<TourSlotAvailabilityResponse.DateAvailability> result = new ArrayList<>();
+        List<TourSlot> slots = tourSlotRepository.findByTour_TourIdOrderBySlotDateAsc(tour.getTourId()).stream()
+                .filter(slot -> !slot.getSlotDate().isBefore(today))
+                .toList();
+        Map<Long, TourMerge> approvedMerges = loadApprovedMergesBySlotId(slots);
+        List<TourSlotAvailabilityResponse.DateAvailability> result = new ArrayList<>(slots.size());
         for (TourSlot slot : slots) {
-            if (slot.getSlotDate().isBefore(today)) {
-                continue;
-            }
-            result.add(toAvailability(slot));
+            result.add(toAvailability(slot, approvedMerges.get(slot.getId())));
         }
         return result;
     }
 
-    /** Số chỗ còn của một {@link TourSlot}: capacity - bookedCount; đặt được khi slot mở và còn chỗ. */
-    private static TourSlotAvailabilityResponse.DateAvailability toAvailability(TourSlot slot) {
-        int capacity = slot.getCapacity() == null ? 0 : slot.getCapacity();
-        int booked = slot.getBookedCount() == null ? 0 : slot.getBookedCount();
+    /** Số chỗ còn của một {@link TourSlot} (tính trần {@code mergedCapacity} nếu slot đang thuộc đoàn ghép APPROVED). */
+    private static TourSlotAvailabilityResponse.DateAvailability toAvailability(TourSlot slot, TourMerge merge) {
+        int capacity;
+        int booked;
+        if (merge != null) {
+            capacity = merge.getMergedCapacity() == null ? 0 : merge.getMergedCapacity();
+            int hostBooked = merge.getHostSlot() != null && merge.getHostSlot().getBookedCount() != null
+                    ? merge.getHostSlot().getBookedCount() : 0;
+            int guestBooked = merge.getGuestSlot() != null && merge.getGuestSlot().getBookedCount() != null
+                    ? merge.getGuestSlot().getBookedCount() : 0;
+            booked = hostBooked + guestBooked;
+        } else {
+            capacity = slot.getCapacity() == null ? 0 : slot.getCapacity();
+            booked = slot.getBookedCount() == null ? 0 : slot.getBookedCount();
+        }
         int remaining = Math.max(0, capacity - booked);
         boolean available = slot.getStatus() == TourSlotStatus.OPEN && remaining > 0;
         return TourSlotAvailabilityResponse.DateAvailability.builder()
@@ -137,6 +154,26 @@ public class TourAvailabilityService {
                 .remaining(remaining)
                 .available(available)
                 .build();
+    }
+
+    private Map<Long, TourMerge> loadApprovedMergesBySlotId(List<TourSlot> slots) {
+        if (slots == null || slots.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> slotIds = slots.stream().map(TourSlot::getId).filter(java.util.Objects::nonNull).distinct().toList();
+        if (slotIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, TourMerge> map = new HashMap<>();
+        for (TourMerge merge : tourMergeRepository.findApprovedBySlotIds(slotIds)) {
+            if (merge.getHostSlot() != null) {
+                map.put(merge.getHostSlot().getId(), merge);
+            }
+            if (merge.getGuestSlot() != null) {
+                map.put(merge.getGuestSlot().getId(), merge);
+            }
+        }
+        return map;
     }
 
     /**
@@ -222,11 +259,14 @@ public class TourAvailabilityService {
         // Tour luồng 5 bước: một truy vấn duy nhất cho mọi tour.
         List<Long> wizardIds = tours.stream().filter(Tour::isWizardTour).map(Tour::getTourId).toList();
         if (!wizardIds.isEmpty()) {
-            for (TourSlot slot : tourSlotRepository.findByTourIdsBetween(wizardIds, firstBookable, firstBookable.plusDays(MAX_LOOKAHEAD_DAYS))) {
+            List<TourSlot> slots = tourSlotRepository.findByTourIdsBetween(
+                    wizardIds, firstBookable, firstBookable.plusDays(MAX_LOOKAHEAD_DAYS));
+            Map<Long, TourMerge> approvedMerges = loadApprovedMergesBySlotId(slots);
+            for (TourSlot slot : slots) {
                 if (slot.getStatus() != TourSlotStatus.OPEN) continue;
-                int capacity = slot.getCapacity() == null ? 0 : slot.getCapacity();
-                int booked = slot.getBookedCount() == null ? 0 : slot.getBookedCount();
-                if (capacity - booked <= 0) continue;
+                TourSlotAvailabilityResponse.DateAvailability avail =
+                        toAvailability(slot, approvedMerges.get(slot.getId()));
+                if (avail.remaining() <= 0) continue;
                 result.merge(slot.getTour().getTourId(), slot.getSlotDate(),
                         (a, b) -> a.isBefore(b) ? a : b);
             }

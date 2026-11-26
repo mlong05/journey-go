@@ -193,7 +193,21 @@ public enum ErrorCode {
     TOUR_REQUEST_NOT_ACCEPTED_BY_YOU("Chỉ đối tác đã nhận yêu cầu mới có thể thao tác", HttpStatus.FORBIDDEN),
     TOUR_SPECIFIC_USER_NOT_FOUND("Không tìm thấy người dùng với email được chỉ định", HttpStatus.BAD_REQUEST),
     TOUR_SPECIFIC_USER_EMAIL_REQUIRED("Tour riêng bắt buộc phải có email người nhận hợp lệ", HttpStatus.BAD_REQUEST),
-    TOUR_ACCESS_DENIED("Tour này là tour riêng, bạn không có quyền xem hoặc đặt mua", HttpStatus.FORBIDDEN);
+    TOUR_ACCESS_DENIED("Tour này là tour riêng, bạn không có quyền xem hoặc đặt mua", HttpStatus.FORBIDDEN),
+
+    // ── Tour Merge B2B (Ghép tour 1-1) ────────────────────────────────────────
+    TOUR_MERGE_NOT_FOUND("Yêu cầu ghép tour không tồn tại", HttpStatus.NOT_FOUND),
+    TOUR_MERGE_SAME_SLOT("Không thể ghép một slot với chính nó", HttpStatus.BAD_REQUEST),
+    TOUR_MERGE_SLOT_NOT_OPEN("Slot không ở trạng thái mở bán hoặc tour chưa được xuất bản", HttpStatus.BAD_REQUEST),
+    TOUR_MERGE_SLOT_ALREADY_IN_MERGE("Một trong hai slot đã tham gia yêu cầu ghép khác", HttpStatus.CONFLICT),
+    TOUR_MERGE_DATE_MISMATCH("Hai slot phải có cùng ngày khởi hành", HttpStatus.BAD_REQUEST),
+    TOUR_MERGE_TIME_DIFF_EXCEEDED("Giờ khởi hành của hai tour chênh lệch vượt quá ngưỡng cho phép", HttpStatus.BAD_REQUEST),
+    TOUR_MERGE_PREFIX_MISMATCH("Lịch trình chặng đầu của hai tour không trùng khớp theo đúng thứ tự", HttpStatus.BAD_REQUEST),
+    TOUR_MERGE_CAPACITY_EXCEEDED("Tổng số khách đã đặt vượt quá sức chứa của phương tiện ghép", HttpStatus.CONFLICT),
+    TOUR_MERGE_INVALID_STATUS("Trạng thái yêu cầu ghép tour không cho phép thao tác này", HttpStatus.CONFLICT),
+    TOUR_MERGE_FORBIDDEN("Bạn không có quyền thực hiện thao tác trên yêu cầu ghép tour này", HttpStatus.FORBIDDEN),
+    TOUR_MERGE_REJECT_REASON_REQUIRED("Vui lòng nhập lý do từ chối hoặc hủy ghép", HttpStatus.BAD_REQUEST),
+    TOUR_MERGE_INVALID_PROVIDER("Thông tin đối tác tham gia ghép tour không hợp lệ", HttpStatus.BAD_REQUEST);
 
     private final String message;
     private final HttpStatus httpStatus;

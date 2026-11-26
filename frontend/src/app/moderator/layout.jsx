@@ -7,6 +7,7 @@ import {
   MessageSquare,
   History,
   Route,
+  GitMerge,
 } from "lucide-react";
 import { useRequireLogin } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -33,6 +34,14 @@ const MODERATOR_NAV_ITEMS = [
     label: "Thẩm định tour",
     href: "/moderator/tours",
     icon: Route,
+    group: "Hàng chờ duyệt",
+    badge: null,
+  },
+  {
+    id: "tour-merges",
+    label: "Duyệt ghép tour",
+    href: "/moderator/tour-merges",
+    icon: GitMerge,
     group: "Hàng chờ duyệt",
     badge: null,
   },
@@ -103,7 +112,7 @@ function ModeratorLayoutInner({ children }) {
   // Trang khung cố định: tiêu đề, thẻ số liệu, bộ lọc đứng yên, chỉ vùng danh sách tự cuộn
   // (gồm cả trang thẩm định một tour: chỉ cột nội dung tự cuộn)
   // Trang tổng quan (/moderator) cũng khóa khung: chỉ "Hàng chờ cần xử lý" tự cuộn.
-  const isScrollLockedPage = /^\/moderator(\/(tours|community|tours\/[^/]+))?\/?$/.test(pathname || "");
+  const isScrollLockedPage = /^\/moderator(\/(tours|tour-merges|community|tours\/[^/]+))?\/?$/.test(pathname || "");
 
   const currentItem = [...MODERATOR_NAV_ITEMS]
     .sort((a, b) => b.href.length - a.href.length)
