@@ -63,3 +63,12 @@ frontend/dev.out
 frontend/dev.err
 backend/run.out
 backend/run.err
+
+# Script SQL/JS tạm để dò lỗi (KHÔNG commit — file nháp một lần)
+backend/src/main/resources/seed/tmp_*.sql
+backend/src/main/resources/seed/tmp_*.js
+backend/src/main/resources/seed/tmp_*.mjs
+scripts/tmp_*.js
+scripts/tmp_*.mjs
+scripts/tmp_*.sql
+scripts/*.tmp
