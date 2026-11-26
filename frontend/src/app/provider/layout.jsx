@@ -9,6 +9,7 @@ import {
   Headphones,
   Wallet,
   UserCog,
+  GitMerge,
 } from "lucide-react";
 import { useRequireLogin } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -42,6 +43,14 @@ const PROVIDER_NAV_ITEMS = [
     label: "Khách hàng đã đặt tour",
     href: "/provider/bookings",
     icon: Users,
+    group: "Vận hành",
+    badge: null,
+  },
+  {
+    id: "tour-merges",
+    label: "Ghép tour B2B",
+    href: "/provider/tour-merges",
+    icon: GitMerge,
     group: "Vận hành",
     badge: null,
   },
@@ -104,6 +113,7 @@ export default function ProviderLayout({ children }) {
     pathname === "/provider/" ||
     pathname?.startsWith("/provider/tours") ||
     pathname?.startsWith("/provider/bookings") ||
+    pathname?.startsWith("/provider/tour-merges") ||
     pathname?.startsWith("/provider/support") ||
     pathname?.startsWith("/provider/partner-info") ||
     pathname?.startsWith("/provider/finance");

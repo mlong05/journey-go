@@ -44,6 +44,10 @@ public interface TourSlotRepository extends JpaRepository<TourSlot, Long> {
 
     List<TourSlot> findByTour_TourIdAndSlotDateInAndStatus(Long tourId, List<LocalDate> dates, TourSlotStatus status);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM TourSlot s WHERE s.id = :id")
+    Optional<TourSlot> findByIdForUpdate(@Param("id") Long id);
+
     /**
      * Lấy slot kèm khóa pessimistic write — dùng khi cần đảm bảo tính nguyên tử khi
      * nhiều người đặt cùng một ngày.

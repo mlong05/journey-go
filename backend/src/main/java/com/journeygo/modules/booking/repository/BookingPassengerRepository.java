@@ -56,4 +56,32 @@ public interface BookingPassengerRepository extends JpaRepository<BookingPasseng
                                                @Param("from") LocalDate from,
                                                @Param("to") LocalDate to,
                                                @Param("refundStatuses") List<RefundStatus> refundStatuses);
+
+    /**
+     * Danh sách hành khách đang tham gia (đã thanh toán, chưa hoàn tiền) thuộc các TourSlot chỉ định —
+     * dùng cho bảng tổng hợp hành khách đoàn ghép (Passenger Manifest) của 2 tour ghép.
+     *
+     * <p>Mỗi dòng: {@code [BookingPassenger, bookingCode, tourId, tourTitle, providerUserId, tourSlotId]}.
+     */
+    @Query("""
+            SELECT p, b.bookingCode, t.tourId, t.title, t.createdBy.id, h.tourSlot.id
+            FROM BookingPassenger p
+            JOIN p.booking b
+            JOIN b.tour t
+            JOIN b.slotHolds h
+            WHERE h.tourSlot.id IN :slotIds
+              AND h.released = false
+              AND p.status = com.journeygo.modules.booking.entity.enums.BookingPassengerStatus.ACTIVE
+              AND b.status IN :attendingStatuses
+              AND NOT EXISTS (
+                  SELECT rr.id FROM RefundRequest rr
+                  WHERE rr.payment.booking.id = b.id
+                    AND rr.status IN :refundStatuses
+              )
+            ORDER BY h.tourSlot.id ASC, b.id ASC, p.createdAt ASC
+            """)
+    List<Object[]> findAttendingPassengersByTourSlotIds(
+            @Param("slotIds") List<Long> slotIds,
+            @Param("attendingStatuses") List<com.journeygo.modules.booking.entity.enums.BookingStatus> attendingStatuses,
+            @Param("refundStatuses") List<RefundStatus> refundStatuses);
 }
