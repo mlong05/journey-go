@@ -1,7 +1,19 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// ── Signing config cho bản RELEASE (APK phát hành) ───────────────────────────
+// Đọc từ `android/key.properties` (KHÔNG commit) để không hardcode mật khẩu.
+// Nếu thiếu file ⇒ fallback về debug key ⇒ `flutter build apk --release` vẫn chạy
+// (dùng chỉ để test nội bộ), nhưng APK đó KHÔNG đưa lên Play Store được.
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
 android {
@@ -17,7 +29,6 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.journeygo.mobile"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -27,11 +38,35 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Bản phát hành dùng keystore riêng (android/journeygo-release.jks).
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                // Không có key.properties ⇒ dùng debug key để build được (chỉ để test).
+                signingConfigs.getByName("debug")
+            }
+            // KHÔNG bật minify/shrinkResources: app dùng reflection ở một số plugin
+            // (google_sign_in, flutter_local_notifications, geolocator) ⇒ rủi ro
+            // lỗi runtime trên bản phát hành. Bật sau khi đã test đầy đủ.
+            isMinifyEnabled = false
+            isShrinkResources = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
