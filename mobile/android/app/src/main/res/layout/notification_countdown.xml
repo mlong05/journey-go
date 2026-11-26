@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Nội dung thông báo đếm ngược của hoạt động thực địa: số phút:giây CỠ LỚN do hệ thống Android tự đếm
+     (Chronometer), nên vẫn chạy đúng trên màn hình khóa kể cả khi app đã tắt. Dùng với DecoratedCustomViewStyle
+     ⇒ vẫn có biểu tượng + tên app + màu nền chuẩn của hệ thống. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="2dp"
+    android:paddingBottom="2dp">
+
+    <TextView
+        android:id="@+id/countdown_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="13sp" />
+
+    <Chronometer
+        android:id="@+id/countdown_time"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFeatureSettings="tnum"
+        android:gravity="start"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textSize="40sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/countdown_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="12sp" />
+</LinearLayout>

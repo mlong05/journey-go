@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' show HapticFeedback;
+import 'package:flutter/services.dart' show HapticFeedback, MethodChannel;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
@@ -95,6 +95,9 @@ class NotificationAlerts {
 
   static const _timerChannelId = 'journeygo_activity_timer';
   static const _countdownChannelId = 'journeygo_activity_countdown';
+
+  /// Cầu nối tới MainActivity.kt: dựng thông báo đếm ngược có số cỡ lớn.
+  static const MethodChannel _countdownChannel = MethodChannel('com.journeygo.mobile/countdown');
   bool _tzReady = false;
 
   /// Hẹn một thông báo hệ thống vào thời điểm [at] (vd hết giờ đếm ngược hoạt động thực địa) — vẫn hiện
@@ -189,6 +192,25 @@ class NotificationAlerts {
     final remaining = endsAt.difference(DateTime.now());
     if (!_ready || !_allowed || remaining <= Duration.zero) return;
     try {
+      // Android: thông báo có SỐ ĐẾM CỠ LỚN (giao diện tùy biến, hệ thống tự đếm). Không dựng được thì dùng
+      // thông báo thường của plugin bên dưới (bộ đếm nhỏ ở dòng tiêu đề).
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        try {
+          final ok = await _countdownChannel.invokeMethod<bool>('show', {
+            'id': id,
+            'endsAtMs': endsAt.millisecondsSinceEpoch,
+            'title': title,
+            'body': body,
+            'payload': payload,
+            'channelId': _countdownChannelId,
+            'channelName': appL10n.notifChannelCountdown,
+            'channelDesc': appL10n.notifChannelCountdownDesc,
+          });
+          if (ok == true) return;
+        } catch (e) {
+          debugPrint('Thông báo đếm ngược tùy biến lỗi, dùng thông báo thường: $e');
+        }
+      }
       await _plugin.show(
         id: id,
         title: title,
