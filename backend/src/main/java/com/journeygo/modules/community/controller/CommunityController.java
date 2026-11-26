@@ -5,12 +5,14 @@ import com.journeygo.modules.community.dto.*;
 import com.journeygo.modules.community.entity.enums.ReportStatus;
 import com.journeygo.modules.community.service.CommentReportService;
 import com.journeygo.modules.community.service.CommunityService;
+import com.journeygo.modules.tour.service.TourTranslationService;
 import com.journeygo.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -28,6 +30,7 @@ public class CommunityController {
 
     private final CommunityService communityService;
     private final CommentReportService commentReportService;
+    private final TourTranslationService tourTranslationService;
 
     // ── PUBLIC / FEED ───────────────────────────────────────────────────────────
 
@@ -41,7 +44,8 @@ public class CommunityController {
     ) {
         Long currentUserId = userPrincipal != null ? userPrincipal.getId() : null;
         Page<PostResponse> page = communityService.getFeed(pageable, destinationId, tourId, currentUserId);
-        return ResponseEntity.ok(ApiResponse.success("Lấy bảng tin cộng đồng thành công", page));
+        return ResponseEntity.ok(ApiResponse.success("Lấy bảng tin cộng đồng thành công",
+                tourTranslationService.localizePostPage(page, LocaleContextHolder.getLocale())));
     }
 
     @GetMapping("/posts/{id}")
@@ -54,6 +58,9 @@ public class CommunityController {
         boolean canModerate = userPrincipal != null && userPrincipal.getAuthorities().stream()
                 .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()) || "ROLE_MODERATOR".equals(a.getAuthority()));
         PostResponse post = communityService.getPostDetail(id, currentUserId, canModerate);
+        if (!canModerate) {
+            post = tourTranslationService.localizePost(post, LocaleContextHolder.getLocale());
+        }
         return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết bài viết thành công", post));
     }
 
@@ -140,7 +147,8 @@ public class CommunityController {
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
         Page<PostResponse> page = communityService.getMyPosts(userPrincipal.getId(), pageable);
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách bài viết cá nhân thành công", page));
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách bài viết cá nhân thành công",
+                tourTranslationService.localizePostPage(page, LocaleContextHolder.getLocale())));
     }
 
     @PostMapping("/posts/{id}/comments")

@@ -8,6 +8,7 @@ import com.journeygo.modules.booking.dto.request.CreateBookingRequest;
 import com.journeygo.modules.booking.dto.response.BookingResponse;
 import com.journeygo.modules.booking.entity.enums.BookingStatus;
 import com.journeygo.modules.booking.service.BookingService;
+import com.journeygo.modules.tour.service.TourTranslationService;
 import com.journeygo.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -15,6 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -33,6 +35,7 @@ import java.util.List;
 public class BookingController {
 
     private final BookingService bookingService;
+    private final TourTranslationService tourTranslationService;
 
     @PostMapping
     @PreAuthorize("hasAnyRole('TOURIST', 'ADMIN')")
@@ -43,9 +46,10 @@ public class BookingController {
     public ResponseEntity<ApiResponse<BookingResponse>> create(
             @Valid @RequestBody CreateBookingRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        BookingResponse created = bookingService.createBooking(request, userPrincipal.getId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Đặt tour thành công",
-                        bookingService.createBooking(request, userPrincipal.getId())));
+                        tourTranslationService.localizeBooking(created, LocaleContextHolder.getLocale())));
     }
 
     @GetMapping("/my")
@@ -55,8 +59,9 @@ public class BookingController {
     public ResponseEntity<ApiResponse<PageResponse<BookingResponse>>> getMyBookings(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        PageResponse<BookingResponse> page = bookingService.getMyBookings(userPrincipal.getId(), pageable);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách booking thành công",
-                bookingService.getMyBookings(userPrincipal.getId(), pageable)));
+                tourTranslationService.localizeBookingPage(page, LocaleContextHolder.getLocale())));
     }
 
     @GetMapping("/my/pending")
@@ -67,8 +72,9 @@ public class BookingController {
     public ResponseEntity<ApiResponse<List<BookingResponse>>> getMyPendingBookings(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestParam(required = false) Long tourId) {
+        List<BookingResponse> list = bookingService.getMyActivePendingBookings(userPrincipal.getId(), tourId);
         return ResponseEntity.ok(ApiResponse.success("Lấy đơn đang giữ chỗ thành công",
-                bookingService.getMyActivePendingBookings(userPrincipal.getId(), tourId)));
+                tourTranslationService.localizeBookings(list, LocaleContextHolder.getLocale())));
     }
 
     @GetMapping("/accessible")
@@ -79,8 +85,9 @@ public class BookingController {
                     + "Hành khách được mời không thấy thông tin cá nhân của hành khách khác.")
     public ResponseEntity<ApiResponse<List<BookingResponse>>> getAccessibleBookings(
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        List<BookingResponse> list = bookingService.getAccessibleBookings(userPrincipal.getId());
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách booking thành công",
-                bookingService.getAccessibleBookings(userPrincipal.getId())));
+                tourTranslationService.localizeBookings(list, LocaleContextHolder.getLocale())));
     }
 
     @GetMapping("/{bookingId}")
@@ -90,8 +97,11 @@ public class BookingController {
             @PathVariable Long bookingId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         boolean isAdmin = AuthorizationGuard.isAdmin();
-        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin booking thành công",
-                bookingService.getById(bookingId, userPrincipal.getId(), isAdmin)));
+        BookingResponse detail = bookingService.getById(bookingId, userPrincipal.getId(), isAdmin);
+        if (!isAdmin) {
+            detail = tourTranslationService.localizeBooking(detail, LocaleContextHolder.getLocale());
+        }
+        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin booking thành công", detail));
     }
 
     @PostMapping("/{bookingId}/cancel")
@@ -104,8 +114,11 @@ public class BookingController {
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         boolean isAdmin = AuthorizationGuard.isAdmin();
         String reason = request != null ? request.reason() : null;
-        return ResponseEntity.ok(ApiResponse.success("Hủy booking thành công",
-                bookingService.cancelBooking(bookingId, userPrincipal.getId(), isAdmin, reason)));
+        BookingResponse cancelled = bookingService.cancelBooking(bookingId, userPrincipal.getId(), isAdmin, reason);
+        if (!isAdmin) {
+            cancelled = tourTranslationService.localizeBooking(cancelled, LocaleContextHolder.getLocale());
+        }
+        return ResponseEntity.ok(ApiResponse.success("Hủy booking thành công", cancelled));
     }
 
     @GetMapping

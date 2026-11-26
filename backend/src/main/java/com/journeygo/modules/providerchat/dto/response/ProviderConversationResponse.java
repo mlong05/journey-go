@@ -6,7 +6,7 @@ import lombok.Builder;
 
 import java.time.Instant;
 
-@Builder
+@Builder(toBuilder = true)
 @Schema(description = "Cuộc trò chuyện với nhà tour")
 public record ProviderConversationResponse(
 

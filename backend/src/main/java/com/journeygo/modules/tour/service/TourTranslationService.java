@@ -8,8 +8,12 @@ import com.journeygo.common.dto.PageResponse;
 import com.journeygo.common.i18n.ContentTranslationService;
 import com.journeygo.modules.aiguide.config.GeminiAiProperties;
 import com.journeygo.modules.aiguide.service.GeminiChatClient;
+import com.journeygo.modules.booking.dto.response.BookingResponse;
+import com.journeygo.modules.booking.dto.response.PendingInvitationResponse;
+import com.journeygo.modules.community.dto.PostResponse;
 import com.journeygo.modules.destination.dto.RegionResponse;
 import com.journeygo.modules.destination.dto.ThemeResponse;
+import com.journeygo.modules.providerchat.dto.response.ProviderConversationResponse;
 import com.journeygo.modules.tour.dto.TourPriceResponse;
 import com.journeygo.modules.tour.dto.TourPublicDetailResponse;
 import com.journeygo.modules.tour.dto.TourResponse;
@@ -19,6 +23,8 @@ import com.journeygo.modules.tour.entity.TourTranslation;
 import com.journeygo.modules.tour.repository.TourTranslationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -122,6 +128,192 @@ public class TourTranslationService {
                 .first(page.isFirst())
                 .last(page.isLast())
                 .build();
+    }
+
+    /**
+     * Dịch hàng loạt tiêu đề tour theo {@code locale}, ưu tiên lấy từ bảng {@code tour_translations}
+     * rồi mới tra / dịch qua {@code content_translations} ({@code TOUR_TITLE}).
+     */
+    public Map<Long, String> translateTourTitles(Map<Long, String> tourTitles, Locale locale) {
+        String lang = contentTranslationService.resolveTargetLang(locale);
+        if (lang == null || tourTitles == null || tourTitles.isEmpty()) return Collections.emptyMap();
+
+        Map<Long, String> translatedTitles = new HashMap<>();
+        for (TourTranslation tt : translationRepository.findByLocaleAndTourIdIn(lang, tourTitles.keySet())) {
+            try {
+                String title = objectMapper.readTree(tt.getTranslatedJson()).path("title").asText("");
+                if (StringUtils.hasText(title)) translatedTitles.put(tt.getTourId(), title);
+            } catch (Exception ignored) {
+                // bỏ qua nếu cache hỏng
+            }
+        }
+        Map<Long, String> missingTitles = new LinkedHashMap<>();
+        tourTitles.forEach((id, title) -> {
+            if (id != null && StringUtils.hasText(title) && !translatedTitles.containsKey(id)) {
+                missingTitles.put(id, title);
+            }
+        });
+        if (!missingTitles.isEmpty()) {
+            translatedTitles.putAll(contentTranslationService.translateBatchLabels("TOUR_TITLE", missingTitles, lang));
+        }
+        return translatedTitles;
+    }
+
+    /** Dịch danh sách booking (tên tour + thông tin tập trung nếu đã có trong cache dịch tour). */
+    public List<BookingResponse> localizeBookings(List<BookingResponse> bookings, Locale locale) {
+        if (bookings == null || bookings.isEmpty()) return bookings;
+        String lang = contentTranslationService.resolveTargetLang(locale);
+        if (lang == null) return bookings;
+
+        Map<Long, String> tourTitles = new LinkedHashMap<>();
+        for (BookingResponse b : bookings) {
+            if (b != null && b.tourId() != null && StringUtils.hasText(b.tourTitle())) {
+                tourTitles.put(b.tourId(), b.tourTitle());
+            }
+        }
+        if (tourTitles.isEmpty()) return bookings;
+
+        Map<Long, JsonNode> cachedTourNodes = new HashMap<>();
+        for (TourTranslation tt : translationRepository.findByLocaleAndTourIdIn(lang, tourTitles.keySet())) {
+            try {
+                cachedTourNodes.put(tt.getTourId(), objectMapper.readTree(tt.getTranslatedJson()));
+            } catch (Exception ignored) {
+                // bỏ qua nếu cache hỏng
+            }
+        }
+        Map<Long, String> translatedTitles = translateTourTitles(tourTitles, locale);
+
+        return bookings.stream().map(b -> {
+            if (b == null || b.tourId() == null) return b;
+            JsonNode node = cachedTourNodes.get(b.tourId());
+            return b.toBuilder()
+                    .tourTitle(translatedTitles.getOrDefault(b.tourId(), b.tourTitle()))
+                    .departureTime(textOr(node, "departureTime", b.departureTime()))
+                    .meetingPoint(textOr(node, "meetingPoint", b.meetingPoint()))
+                    .pickupInfo(textOr(node, "pickupInfo", b.pickupInfo()))
+                    .build();
+        }).toList();
+    }
+
+    public PageResponse<BookingResponse> localizeBookingPage(PageResponse<BookingResponse> page, Locale locale) {
+        if (page == null || page.getContent() == null || page.getContent().isEmpty()) return page;
+        String lang = contentTranslationService.resolveTargetLang(locale);
+        if (lang == null) return page;
+        return PageResponse.<BookingResponse>builder()
+                .content(localizeBookings(page.getContent(), locale))
+                .page(page.getPage())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .first(page.isFirst())
+                .last(page.isLast())
+                .build();
+    }
+
+    /** Dịch chi tiết 1 booking (tên tour + điểm tập trung / đón khách). */
+    public BookingResponse localizeBooking(BookingResponse booking, Locale locale) {
+        if (booking == null || booking.tourId() == null) return booking;
+        String lang = contentTranslationService.resolveTargetLang(locale);
+        if (lang == null) return booking;
+
+        BookingResponse base = localizeBookings(List.of(booking), locale).get(0);
+        // Nếu điểm hẹn / giờ đón chưa được dịch từ tour_translations thì dịch qua ContentTranslationService
+        boolean hasScheduleText = StringUtils.hasText(booking.departureTime())
+                || StringUtils.hasText(booking.meetingPoint())
+                || StringUtils.hasText(booking.pickupInfo());
+        boolean unchanged = Objects.equals(base.meetingPoint(), booking.meetingPoint())
+                && Objects.equals(base.pickupInfo(), booking.pickupInfo());
+        if (hasScheduleText && unchanged) {
+            ObjectNode payload = objectMapper.createObjectNode();
+            putIfText(payload, "departureTime", booking.departureTime());
+            putIfText(payload, "meetingPoint", booking.meetingPoint());
+            putIfText(payload, "pickupInfo", booking.pickupInfo());
+            JsonNode tr = contentTranslationService.translateObject("BOOKING_TOUR_INFO", booking.tourId(), lang, payload);
+            if (tr != null) {
+                base = base.toBuilder()
+                        .departureTime(textOr(tr, "departureTime", base.departureTime()))
+                        .meetingPoint(textOr(tr, "meetingPoint", base.meetingPoint()))
+                        .pickupInfo(textOr(tr, "pickupInfo", base.pickupInfo()))
+                        .build();
+            }
+        }
+        return base;
+    }
+
+    /** Dịch tên tour trong danh sách lời mời tham gia tour. */
+    public List<PendingInvitationResponse> localizePendingInvitations(List<PendingInvitationResponse> list, Locale locale) {
+        if (list == null || list.isEmpty()) return list;
+        String lang = contentTranslationService.resolveTargetLang(locale);
+        if (lang == null) return list;
+        Map<Long, String> tourTitles = new LinkedHashMap<>();
+        for (PendingInvitationResponse inv : list) {
+            if (inv != null && inv.tourId() != null && StringUtils.hasText(inv.tourTitle())) {
+                tourTitles.put(inv.tourId(), inv.tourTitle());
+            }
+        }
+        if (tourTitles.isEmpty()) return list;
+        Map<Long, String> translated = translateTourTitles(tourTitles, locale);
+        return list.stream().map(inv -> inv == null || inv.tourId() == null
+                ? inv
+                : inv.toBuilder().tourTitle(translated.getOrDefault(inv.tourId(), inv.tourTitle())).build()
+        ).toList();
+    }
+
+    /** Dịch tên tour và điểm đến đính kèm trên bài viết cộng đồng. */
+    public List<PostResponse> localizePosts(List<PostResponse> posts, Locale locale) {
+        if (posts == null || posts.isEmpty()) return posts;
+        String lang = contentTranslationService.resolveTargetLang(locale);
+        if (lang == null) return posts;
+        Map<Long, String> tourTitles = new LinkedHashMap<>();
+        Map<Long, String> destNames = new LinkedHashMap<>();
+        for (PostResponse p : posts) {
+            if (p == null) continue;
+            if (p.tourId() != null && StringUtils.hasText(p.tourTitle())) tourTitles.put(p.tourId(), p.tourTitle());
+            if (p.destinationId() != null && StringUtils.hasText(p.destinationName())) destNames.put(p.destinationId(), p.destinationName());
+        }
+        Map<Long, String> trTours = translateTourTitles(tourTitles, locale);
+        Map<Long, String> trDests = contentTranslationService.translateBatchLabels("DESTINATION", destNames, lang);
+        return posts.stream().map(p -> p == null ? null : p.toBuilder()
+                .tourTitle(p.tourId() != null ? trTours.getOrDefault(p.tourId(), p.tourTitle()) : p.tourTitle())
+                .destinationName(p.destinationId() != null ? trDests.getOrDefault(p.destinationId(), p.destinationName()) : p.destinationName())
+                .build()
+        ).toList();
+    }
+
+    public PostResponse localizePost(PostResponse post, Locale locale) {
+        if (post == null) return null;
+        return localizePosts(List.of(post), locale).get(0);
+    }
+
+    public Page<PostResponse> localizePostPage(Page<PostResponse> page, Locale locale) {
+        if (page == null || page.getContent().isEmpty()) return page;
+        String lang = contentTranslationService.resolveTargetLang(locale);
+        if (lang == null) return page;
+        return new PageImpl<>(localizePosts(page.getContent(), locale), page.getPageable(), page.getTotalElements());
+    }
+
+    /** Dịch tên tour gắn với hội thoại hỗ trợ nhà tour. */
+    public List<ProviderConversationResponse> localizeConversations(List<ProviderConversationResponse> list, Locale locale) {
+        if (list == null || list.isEmpty()) return list;
+        String lang = contentTranslationService.resolveTargetLang(locale);
+        if (lang == null) return list;
+        Map<Long, String> tourTitles = new LinkedHashMap<>();
+        for (ProviderConversationResponse c : list) {
+            if (c != null && c.tourId() != null && StringUtils.hasText(c.tourTitle())) {
+                tourTitles.put(c.tourId(), c.tourTitle());
+            }
+        }
+        if (tourTitles.isEmpty()) return list;
+        Map<Long, String> translated = translateTourTitles(tourTitles, locale);
+        return list.stream().map(c -> c == null || c.tourId() == null
+                ? c
+                : c.toBuilder().tourTitle(translated.getOrDefault(c.tourId(), c.tourTitle())).build()
+        ).toList();
+    }
+
+    public ProviderConversationResponse localizeConversation(ProviderConversationResponse conv, Locale locale) {
+        if (conv == null) return null;
+        return localizeConversations(List.of(conv), locale).get(0);
     }
 
     /** Dịch danh sách Vùng miền theo Accept-Language (cache DB). */

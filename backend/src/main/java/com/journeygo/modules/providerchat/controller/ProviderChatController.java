@@ -7,12 +7,14 @@ import com.journeygo.modules.providerchat.dto.response.ProviderConversationRespo
 import com.journeygo.modules.providerchat.dto.response.ProviderMessagePageResponse;
 import com.journeygo.modules.providerchat.dto.response.ProviderMessageResponse;
 import com.journeygo.modules.providerchat.service.ProviderChatService;
+import com.journeygo.modules.tour.service.TourTranslationService;
 import com.journeygo.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -36,6 +38,7 @@ import java.util.List;
 public class ProviderChatController {
 
     private final ProviderChatService chatService;
+    private final TourTranslationService tourTranslationService;
 
     // ── Du khách ──────────────────────────────────────────────────────────────
 
@@ -51,11 +54,13 @@ public class ProviderChatController {
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         // Có bookingId ⇒ mở hội thoại gắn với đơn (khung "Hỗ trợ trong đơn này").
         if (request != null && request.bookingId() != null) {
+            ProviderConversationResponse conv = chatService.startForBooking(request.bookingId(), userPrincipal.getId());
             return ResponseEntity.ok(ApiResponse.success("Mở cuộc trò chuyện thành công",
-                    chatService.startForBooking(request.bookingId(), userPrincipal.getId())));
+                    tourTranslationService.localizeConversation(conv, LocaleContextHolder.getLocale())));
         }
+        ProviderConversationResponse conv = chatService.start(userPrincipal.getId(), request);
         return ResponseEntity.ok(ApiResponse.success("Mở cuộc trò chuyện thành công",
-                chatService.start(userPrincipal.getId(), request)));
+                tourTranslationService.localizeConversation(conv, LocaleContextHolder.getLocale())));
     }
 
     @GetMapping("/conversations")
@@ -63,8 +68,9 @@ public class ProviderChatController {
     @Operation(summary = "Danh sách cuộc trò chuyện của tôi (tab \"Hỗ trợ từ nhà tour\")")
     public ResponseEntity<ApiResponse<List<ProviderConversationResponse>>> listConversations(
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        List<ProviderConversationResponse> list = chatService.listForTouristSorted(userPrincipal.getId());
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách cuộc trò chuyện thành công",
-                chatService.listForTouristSorted(userPrincipal.getId())));
+                tourTranslationService.localizeConversations(list, LocaleContextHolder.getLocale())));
     }
 
     @GetMapping("/conversations/{conversationId}/messages")

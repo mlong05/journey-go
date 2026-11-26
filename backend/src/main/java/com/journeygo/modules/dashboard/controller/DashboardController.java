@@ -70,12 +70,15 @@ public class DashboardController {
 
     @GetMapping("/provider")
     @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN')")
-    @Operation(summary = "Số liệu tổng quan của đối tác đang đăng nhập (range: today | week | month)")
+    @Operation(summary = "Số liệu tổng quan của đối tác đang đăng nhập (range: today|week|month|quarter|year; compareScope: same_span|full_prev; compareMode: prev_1|prev_2|prev_4|prev_7|yoy; forecast: true|false)")
     public ResponseEntity<ApiResponse<ProviderDashboardResponse>> provider(
             @RequestParam(defaultValue = "month") String range,
+            @RequestParam(defaultValue = "same_span") String compareScope,
+            @RequestParam(defaultValue = "prev_1") String compareMode,
+            @RequestParam(defaultValue = "false") boolean forecast,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.success("Lấy số liệu tổng quan thành công",
-                dashboardService.provider(principal.getId(), range)));
+                dashboardService.provider(principal.getId(), range, compareScope, compareMode, forecast)));
     }
 
     @GetMapping("/moderator")

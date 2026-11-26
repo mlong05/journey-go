@@ -24,12 +24,14 @@ import com.journeygo.modules.booking.service.BookingInvitationNotificationServic
 import com.journeygo.modules.booking.service.BookingInvitationService;
 import com.journeygo.modules.booking.service.BookingPassengerChangeService;
 import com.journeygo.modules.booking.service.BookingService;
+import com.journeygo.modules.tour.service.TourTranslationService;
 import com.journeygo.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -56,6 +58,7 @@ public class BookingPassengerController {
     private final BookingChatService chatService;
     private final BookingPassengerRepository passengerRepository;
     private final BookingPassengerChangeRepository changeRepository;
+    private final TourTranslationService tourTranslationService;
 
     // ── Hành khách ───────────────────────────────────────────────────────────
 
@@ -130,8 +133,9 @@ public class BookingPassengerController {
         String email = userPrincipal.getEmail();
         // Đồng bộ thông báo cho các lời mời chưa từng báo (VD: lời mời gửi sau lần đăng nhập).
         invitationNotificationService.notifyPendingInvitations(userPrincipal.getId(), email);
+        List<PendingInvitationResponse> list = invitationNotificationService.listPending(userPrincipal.getId(), email);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách lời mời thành công",
-                invitationNotificationService.listPending(userPrincipal.getId(), email)));
+                tourTranslationService.localizePendingInvitations(list, LocaleContextHolder.getLocale())));
     }
 
     @PostMapping("/my-invitations/{invitationId}/confirm")

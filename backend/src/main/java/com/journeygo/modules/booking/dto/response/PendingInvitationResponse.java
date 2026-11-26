@@ -16,13 +16,14 @@ import java.time.Instant;
  * kèm thêm thông tin người mời và tour để app hiển thị đúng câu:
  * <i>"Bạn đã được {người đặt} mời vào tour {tên tour}. Vui lòng bấm xác nhận để tham gia vào tour."</i>
  */
-@Builder
+@Builder(toBuilder = true)
 @Schema(description = "Lời mời tham gia tour (trong app)")
 public record PendingInvitationResponse(
 
         @Schema(description = "ID lời mời") Long id,
         @Schema(description = "ID booking") Long bookingId,
         @Schema(description = "Mã đơn đặt tour") String bookingCode,
+        @Schema(description = "ID tour") Long tourId,
         @Schema(description = "ID hành khách được mời") Long passengerId,
         @Schema(description = "Họ tên hành khách") String passengerName,
         @Schema(description = "Email được mời") String invitedEmail,
@@ -46,6 +47,7 @@ public record PendingInvitationResponse(
                 .id(inv.getId())
                 .bookingId(booking != null ? booking.getId() : null)
                 .bookingCode(booking != null ? booking.getBookingCode() : null)
+                .tourId(booking != null && booking.getTour() != null ? booking.getTour().getTourId() : null)
                 .passengerId(passenger != null ? passenger.getId() : null)
                 .passengerName(passenger != null ? passenger.getFullName() : null)
                 .invitedEmail(inv.getInvitedEmail())

@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
-@Builder
+@Builder(toBuilder = true)
 @Schema(description = "Thông tin booking")
 public record BookingResponse(
 
