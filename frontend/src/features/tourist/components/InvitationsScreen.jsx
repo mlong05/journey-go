@@ -30,7 +30,7 @@ export default function InvitationsScreen() {
 
   const load = useCallback(() => touristService.myInvitations()
     .then((items) => setState({ loading: false, items, error: "" }))
-    .catch((err) => setState({ loading: false, items: [], error: err?.message || translate(getLocale(), "trips.invErrLoad") })), []);
+    .catch((err) => setState({ loading: false, items: [], error: err?.message || translate(locale, "trips.invErrLoad") })), [locale]);
   useEffect(() => { load(); }, [load]);
 
   const confirm = async (inv) => {

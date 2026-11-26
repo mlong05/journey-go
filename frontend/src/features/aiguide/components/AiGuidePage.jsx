@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2, MessageSquare, Sparkles, Headset, Clock, Bot } from "lucide-react";
 import { INTL_LOCALE, useI18n } from "@/i18n";
 import AccountLayout from "@/features/tourist/components/AccountLayout";
+import { useTouristSession } from "@/features/tourist/hooks/useTouristSession";
 import { aiGuideService } from "../services/aiGuideService";
 import AiChatThread from "./AiChatThread";
 
@@ -49,6 +50,8 @@ function getSessionStatusBadge(handoffStatus, t) {
  */
 export default function AiGuidePage() {
   const { t, locale } = useI18n();
+  const { user } = useTouristSession();
+  const userName = (user?.fullName || user?.name || "").trim();
   const [sessions, setSessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -404,6 +407,7 @@ export default function AiGuidePage() {
           handoffLoading={handoffLoading}
           onRequestHumanSupport={handleRequestHumanSupport}
           onReturnToAi={handleReturnToAi}
+          userName={userName}
         />
       </div>
     </AccountLayout>

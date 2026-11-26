@@ -11,8 +11,9 @@ export const SLIDE_ITEMS = [
     tagKey: "misc.slide.thanhha.tag",
     sloganKey: "misc.slide.thanhha.slogan",
     subSloganKey: "misc.slide.thanhha.subSlogan",
-    image: "/image/hoian-pottery-craft.jpg",
-    position: "40% 50%",
+    image: "/image/quangphucau-incense.jpg",
+    position: "54% 25%",
+    credit: { author: "Trần Tuấn Việt", license: "CC BY-SA 4.0", url: "https://commons.wikimedia.org/wiki/File:Incense_in_Vietnam.jpg" },
   },
   {
     id: "trangan",

@@ -291,7 +291,7 @@ pre {
   }
 }
 
-/* Linh vật Hướng dẫn viên AI (AiGuideFloatingWidget): mắt chớp, nhún nhẹ, đèn ăng-ten, bong bóng gợi ý */
+/* Linh vật Hướng dẫn viên AI (AiGuideFloatingWidget): mắt chớp, nhún nhẹ, nghiêng đầu nhìn quanh, vẫy tay, đèn ăng-ten */
 @keyframes jg-blink {
   0%, 92%, 100% { transform: scaleY(1); }
   95% { transform: scaleY(0.1); }
@@ -299,6 +299,28 @@ pre {
 @keyframes jg-bob {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-2px); }
+}
+@keyframes jg-robot-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+@keyframes jg-robot-shadow {
+  0%, 100% { transform: scaleX(1); opacity: 0.24; }
+  50% { transform: scaleX(0.86); opacity: 0.14; }
+}
+@keyframes jg-robot-head {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-5deg); }
+  45% { transform: rotate(0deg); }
+  70% { transform: rotate(5deg); }
+  88% { transform: rotate(0deg); }
+}
+@keyframes jg-robot-wave {
+  0%, 55%, 100% { transform: rotate(0deg); }
+  63% { transform: rotate(-22deg); }
+  71% { transform: rotate(10deg); }
+  79% { transform: rotate(-20deg); }
+  87% { transform: rotate(6deg); }
 }
 @keyframes jg-antenna {
   0%, 100% { opacity: 1; }
@@ -310,8 +332,14 @@ pre {
 }
 .jg-blink { animation: jg-blink 4s ease-in-out infinite; }
 .jg-bob { display: inline-block; animation: jg-bob 2.6s ease-in-out infinite; }
+.jg-robot-float { animation: jg-robot-float 3s ease-in-out infinite; }
+.jg-robot-shadow { transform-origin: center; animation: jg-robot-shadow 3s ease-in-out infinite; }
+.jg-robot-head { animation: jg-robot-head 7s ease-in-out infinite; }
+.jg-robot-wave { animation: jg-robot-wave 4.2s ease-in-out infinite; }
 .jg-antenna { animation: jg-antenna 1.6s ease-in-out infinite; }
-.jg-hint-pop { transform-origin: bottom right; animation: jg-hint-pop 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+.jg-hint-pop { transform-origin: bottom right; animation: jg-hint-pop 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.15) both; }
 @media (prefers-reduced-motion: reduce) {
-  .jg-blink, .jg-bob, .jg-antenna, .jg-hint-pop { animation: none; }
+  .jg-blink, .jg-bob, .jg-robot-float, .jg-robot-shadow, .jg-robot-head, .jg-robot-wave, .jg-antenna, .jg-hint-pop {
+    animation: none;
+  }
 }

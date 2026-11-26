@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { INTL_LOCALE, useI18n } from "@/i18n";
 
 /**
  * Thanh phân trang dùng chung cho TOÀN BỘ web.
@@ -25,10 +26,12 @@ export default function PaginationBar({
   page,
   totalPages,
   totalElements,
-  unit = "bản ghi",
+  unit,
   onChange,
   className = "",
 }) {
+  const { t, locale } = useI18n();
+  const resolvedUnit = unit ?? t("pagination.defaultUnit");
   const total = Math.max(Number(totalPages) || 0, 1);
   const current = Math.min(Math.max((Number(page) || 0) + 1, 1), total);
   const count = Number(totalElements) || 0;
@@ -66,13 +69,15 @@ export default function PaginationBar({
       {/* Bên trái: thông tin tổng số bản ghi */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
         <span className="text-xs text-slate-600 font-semibold">
-          Đang xem trang{" "}
+          {t("pagination.showingPage")}{" "}
           <strong className="font-bold text-slate-900">{current}</strong> /{" "}
           <strong className="font-bold text-slate-900">{total}</strong>{" "}
           <span className="text-slate-400">
-            (Tổng{" "}
-            <strong className="text-slate-700">{count.toLocaleString("vi-VN")}</strong>{" "}
-            {unit})
+            ({t("pagination.totalPrefix")}
+            <strong className="text-slate-700">
+              {count.toLocaleString(INTL_LOCALE[locale] || "vi-VN")}
+            </strong>{" "}
+            {resolvedUnit})
           </span>
         </span>
       </div>
@@ -84,8 +89,8 @@ export default function PaginationBar({
           onClick={() => goTo(1)}
           disabled={current === 1}
           className={navBtn}
-          title="Trang đầu"
-          aria-label="Trang đầu"
+          title={t("pagination.firstPage")}
+          aria-label={t("pagination.firstPage")}
         >
           <ChevronsLeft size={14} />
         </button>
@@ -94,8 +99,8 @@ export default function PaginationBar({
           onClick={() => goTo(current - 1)}
           disabled={current === 1}
           className={navBtn}
-          title="Trang trước"
-          aria-label="Trang trước"
+          title={t("pagination.prevPage")}
+          aria-label={t("pagination.prevPage")}
         >
           <ChevronLeft size={14} />
         </button>
@@ -130,8 +135,8 @@ export default function PaginationBar({
           onClick={() => goTo(current + 1)}
           disabled={current === total}
           className={navBtn}
-          title="Trang sau"
-          aria-label="Trang sau"
+          title={t("pagination.nextPage")}
+          aria-label={t("pagination.nextPage")}
         >
           <ChevronRight size={14} />
         </button>
@@ -140,8 +145,8 @@ export default function PaginationBar({
           onClick={() => goTo(total)}
           disabled={current === total}
           className={navBtn}
-          title="Trang cuối"
-          aria-label="Trang cuối"
+          title={t("pagination.lastPage")}
+          aria-label={t("pagination.lastPage")}
         >
           <ChevronsRight size={14} />
         </button>

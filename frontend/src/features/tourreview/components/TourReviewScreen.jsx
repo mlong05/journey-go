@@ -114,6 +114,7 @@ export default function TourReviewScreen({ tourId }) {
   const [error, setError] = useState("");
   const [tab, setTab] = useState("content"); // content | preview | history
   const [notes, setNotes] = useState([]);
+  const [activeStopIdx, setActiveStopIdx] = useState(0);
   const [criteria, setCriteria] = useState({});
   const [openHint, setOpenHint] = useState(null); // tiêu chí đang mở mô tả
   const [generalNote, setGeneralNote] = useState("");
@@ -136,6 +137,7 @@ export default function TourReviewScreen({ tourId }) {
     return () => {
       setDone(null);
       setNotes([]);
+      setActiveStopIdx(0);
       setCriteria({});
       setGeneralNote("");
       setRejectMode(false);
@@ -182,7 +184,15 @@ export default function TourReviewScreen({ tourId }) {
 
   const scrollTo = (n) => {
     setTab("content");
-    setTimeout(() => document.getElementById(anchorId(n))?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+    if (n.stopId != null) {
+      const idx = (tour?.stops || []).findIndex((s) => String(s.id) === String(n.stopId));
+      if (idx >= 0) setActiveStopIdx(idx);
+    }
+    setTimeout(() => document.getElementById(anchorId(n))?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+  };
+
+  const jumpToSection = (secId) => {
+    document.getElementById(secId)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const criteriaBody = () => Object.fromEntries(REVIEW_CRITERIA.map((c) => [c.key, criteria[c.key]]));
@@ -291,24 +301,75 @@ export default function TourReviewScreen({ tourId }) {
           </div>
         )}
 
-        <div className="shrink-0 flex gap-1.5">
-          {[["content", "Nội dung tour", FileText], ["preview", "Xem trước phía khách", Eye], ["history", "Lịch sử kiểm duyệt", History]].map(([k, l, Icon]) => (
-            <button key={k} type="button" onClick={() => setTab(k)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer ${tab === k ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-600"}`}>
-              <Icon size={13} />{l}
-            </button>
-          ))}
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex gap-1.5">
+            {[["content", "Nội dung tour", FileText], ["preview", "Xem trước phía khách", Eye], ["history", "Lịch sử kiểm duyệt", History]].map(([k, l, Icon]) => (
+              <button key={k} type="button" onClick={() => setTab(k)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer ${tab === k ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                <Icon size={13} />{l}
+              </button>
+            ))}
+          </div>
+
+          {(tab === "content" || tab === "preview") && (
+            <nav aria-label="Mục lục hồ sơ tour" className="flex flex-wrap items-center gap-1">
+              {[
+                ["BASIC_INFO", "1. Thông tin"],
+                ["PRICING", "2. Giá vé"],
+                ["STOPS", `3. Điểm đến (${(tour.stops || []).length})`],
+                ["ITINERARY", "4. Lịch trình"],
+                ["SCHEDULE", "5. Khởi hành"],
+              ].map(([stepKey, secLabel]) => {
+                const stepFlags = notes.filter((n) => n.step === stepKey).length;
+                return (
+                  <button
+                    key={stepKey}
+                    type="button"
+                    onClick={() => jumpToSection(`sec-${stepKey}`)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white hover:border-teal-300 hover:bg-teal-50/60 hover:text-teal-800 px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition-colors cursor-pointer"
+                  >
+                    <span>{secLabel}</span>
+                    {stepFlags > 0 && (
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-orange-500 px-1.5 py-px text-[10px] font-extrabold text-white">
+                        {stepFlags}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => jumpToSection("sec-NOTES")}
+                className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] font-bold transition-colors cursor-pointer ${
+                  notes.length > 0
+                    ? "border-orange-300 bg-orange-50 text-orange-800 hover:bg-orange-100"
+                    : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                }`}
+              >
+                <Flag size={11} className={notes.length > 0 ? "text-orange-600" : "text-slate-400"} />
+                <span>Ghi chú ({notes.length})</span>
+              </button>
+            </nav>
+          )}
         </div>
 
           <div className={`min-w-0 xl:flex-1 xl:min-h-0 xl:overflow-y-auto xl:pr-1 pb-6 ${SCROLL}`}>
             {/* Tab "Xem trước": cột trái vẫn hiện nội dung để đối chiếu, điện thoại nằm ở cột phải */}
             {(tab === "content" || tab === "preview") && (
               <>
-                {pending && <p className="text-[11px] text-slate-500 mb-2">Bấm nút lá cờ ở góc phải mỗi khối để <b>Gắn cờ / Ghi chú</b>. Khối bị gắn cờ có viền cam.</p>}
-                <TourContentView tour={tour} Block={FlaggableBlock} storyPanel={false} />
+                {pending && <p className="text-[11px] text-slate-500 mb-2.5">Bấm nút lá cờ ở góc phải mỗi mục để <b>Gắn cờ / Ghi chú</b>. Mục bị gắn cờ hiển thị viền cam và đếm trên thanh mục lục.</p>}
+                <TourContentView
+                  tour={tour}
+                  Block={FlaggableBlock}
+                  storyPanel={false}
+                  moderationMode
+                  flaggedNotes={notes}
+                  activeStopIdx={activeStopIdx}
+                  onActiveStopIdxChange={setActiveStopIdx}
+                />
 
                 {/* Ghi chú gắn cờ — cuối nội dung tour */}
-                <section className="mt-5 rounded-2xl border border-slate-200 bg-white px-4 py-3 space-y-2">
+                <section id="sec-NOTES" className="mt-5 rounded-2xl border border-slate-200 bg-white px-4 py-3 space-y-2 scroll-mt-16">
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5"><Flag size={14} className="text-orange-500" />Ghi chú ({notes.length})</h3>
                   {notes.length === 0 ? (
                     <p className="text-[11px] text-slate-400">{pending ? "Chưa có ghi chú. Gắn cờ trên khối nội dung để thêm." : "Lần duyệt này không có ghi chú gắn cờ."}</p>

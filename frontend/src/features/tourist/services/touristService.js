@@ -15,19 +15,116 @@
  *   • POST /payments/bookings/{id}/init      → URL thanh toán VNPay (appRedirect=false ⇒ quay về web)
  */
 import { apiClient } from "@/services/apiClient";
+import { getLocale } from "@/i18n/core";
 
 const data = (res) => (res && Object.prototype.hasOwnProperty.call(res, "data") ? res.data : res);
 
 /**
- * Tóm tắt tour đã thấy trong danh sách (ảnh bìa, tên…). Trang chi tiết dùng để hiện ngay ảnh lớn
- * khi chuyển trang ⇒ hiệu ứng ảnh thẻ phóng thành ảnh lớn chạy được trước khi dữ liệu đầy đủ về.
+ * Bộ nhớ đệm tóm tắt tour phía trình duyệt:
+ *  • `metaCache`: trường không phụ thuộc ngôn ngữ (ảnh bìa, regionId, themeId…).
+ *  • `localizedCache`: trường theo ngôn ngữ (`${locale}:${tourId}` → title, departureTime, meetingPoint, pickupInfo…).
  */
-const previewCache = new Map();
-export const getTourPreview = (tourId) => previewCache.get(String(tourId)) || null;
+const metaCache = new Map();
+const localizedCache = new Map();
+const inFlightTourDetail = new Map();
+
+function recordTourSummary(tour, locale = getLocale()) {
+  if (!tour) return;
+  const id = String(tour.tourId ?? tour.id ?? "");
+  if (!id) return;
+  const prevMeta = metaCache.get(id) || {};
+  const coverImageUrl = tour.coverImageUrl || tour.tourCoverImageUrl || tour.images?.[0]?.imageUrl || prevMeta.coverImageUrl;
+  metaCache.set(id, {
+    ...prevMeta,
+    tourId: Number(id),
+    coverImageUrl,
+    regionId: tour.regionId ?? tour.region?.id ?? prevMeta.regionId,
+    themeId: tour.themeId ?? tour.theme?.id ?? prevMeta.themeId,
+    title: prevMeta.title || tour.title,
+  });
+  if (locale) {
+    const prevLoc = localizedCache.get(`${locale}:${id}`) || {};
+    localizedCache.set(`${locale}:${id}`, {
+      ...prevLoc,
+      ...(tour.title ? { title: tour.title } : {}),
+      ...(tour.regionName || tour.region?.name ? { regionName: tour.regionName || tour.region?.name } : {}),
+      ...(tour.themeName || tour.theme?.name ? { themeName: tour.themeName || tour.theme?.name } : {}),
+      ...(tour.departureTime ? { departureTime: tour.departureTime } : {}),
+      ...(tour.meetingPoint ? { meetingPoint: tour.meetingPoint } : {}),
+      ...(tour.pickupInfo ? { pickupInfo: tour.pickupInfo } : {}),
+    });
+  }
+}
+
+export const getTourPreview = (tourId, locale = getLocale()) => {
+  const id = String(tourId ?? "");
+  if (!id) return null;
+  const meta = metaCache.get(id);
+  const loc = locale ? localizedCache.get(`${locale}:${id}`) : null;
+  if (!meta && !loc) return null;
+  return { ...(meta || {}), ...(loc || {}) };
+};
+
+async function ensureLocalizedTours(tourIds, locale, { needSchedule = false } = {}) {
+  if (!locale || locale === "vi") return;
+  const unique = [...new Set((tourIds || []).filter((id) => id != null).map((id) => String(id)))];
+  const missing = unique.filter((id) => {
+    const loc = localizedCache.get(`${locale}:${id}`);
+    if (!loc?.title) return true;
+    if (needSchedule && !loc.meetingPoint && !loc.pickupInfo && !loc.departureTime) return true;
+    return false;
+  }).slice(0, 15);
+  if (!missing.length) return;
+  await Promise.all(missing.map((id) => {
+    const key = `${locale}:${id}`;
+    let p = inFlightTourDetail.get(key);
+    if (!p) {
+      p = apiClient.get(`/tours/${id}/public-detail`)
+        .then((res) => {
+          const detail = data(res);
+          recordTourSummary(detail, locale);
+          return detail;
+        })
+        .catch(() => null)
+        .finally(() => inFlightTourDetail.delete(key));
+      inFlightTourDetail.set(key, p);
+    }
+    return p;
+  }));
+}
+
+async function localizeBookingItems(items, locale, { includeSchedule = false } = {}) {
+  if (!Array.isArray(items) || !items.length || !locale || locale === "vi") return items;
+  await ensureLocalizedTours(items.map((b) => b?.tourId), locale, { needSchedule: includeSchedule });
+  return items.map((b) => {
+    const loc = b?.tourId != null ? localizedCache.get(`${locale}:${b.tourId}`) : null;
+    if (!loc) return b;
+    return {
+      ...b,
+      tourTitle: loc.title || b.tourTitle,
+      ...(includeSchedule ? {
+        departureTime: loc.departureTime || b.departureTime,
+        meetingPoint: loc.meetingPoint || b.meetingPoint,
+        pickupInfo: loc.pickupInfo || b.pickupInfo,
+      } : {}),
+    };
+  });
+}
+
+async function localizeTourTitleField(items, locale) {
+  if (!Array.isArray(items) || !items.length || !locale || locale === "vi") return items;
+  await ensureLocalizedTours(items.map((x) => x?.tourId), locale);
+  return items.map((x) => {
+    const loc = x?.tourId != null ? localizedCache.get(`${locale}:${x.tourId}`) : null;
+    return loc?.title ? { ...x, tourTitle: loc.title } : x;
+  });
+}
+
 const list = (payload) => (Array.isArray(payload) ? payload : Array.isArray(payload?.content) ? payload.content : []);
 
 export const touristService = {
   async publishedTours({ q, regionId, themeId, format, order, page = 0, size = 60 } = {}) {
+    const locale = getLocale();
     const query = new URLSearchParams({ page: String(page), size: String(size) });
     if (q) query.set("q", q);
     if (regionId) query.set("regionId", String(regionId));
@@ -35,14 +132,18 @@ export const touristService = {
     if (format) query.set("format", format);
     if (order) query.set("order", order);
     const payload = data(await apiClient.get(`/tours/published?${query}`));
+    const allItems = list(payload);
+    allItems.forEach((t) => recordTourSummary(t, locale));
     // Chỉ hiện tour còn ngày khởi hành sắp tới (đặt được). Tour luồng cũ / hết lịch không có
     // nextDepartureDate ⇒ ẩn khỏi trang du khách.
-    const items = list(payload).filter((t) => t.nextDepartureDate);
-    items.forEach((t) => previewCache.set(String(t.tourId), t));
+    const items = allItems.filter((t) => t.nextDepartureDate);
     return { items, total: items.length };
   },
   async tourDetail(tourId) {
-    return data(await apiClient.get(`/tours/${tourId}/public-detail`));
+    const locale = getLocale();
+    const detail = data(await apiClient.get(`/tours/${tourId}/public-detail`));
+    recordTourSummary(detail, locale);
+    return detail;
   },
   async availability(tourId) {
     const payload = data(await apiClient.get(`/tours/${tourId}/availability`));
@@ -75,38 +176,52 @@ export const touristService = {
    *    nếu không sẽ thiếu chuyến ở các trang sau. Vì vậy ta tự gọi tuần tự từng trang.
    */
   async myBookings({ page = 0, size = 50, all = false } = {}) {
+    const locale = getLocale();
     if (!all) {
-      return list(data(await apiClient.get(`/bookings/my?page=${page}&size=${size}`)));
+      const items = list(data(await apiClient.get(`/bookings/my?page=${page}&size=${size}`)));
+      return localizeBookingItems(items, locale);
     }
     // Một trang "lớn" nhất có thể (100 — trần của backend).
     const chunk = 100;
     const first = data(await apiClient.get(`/bookings/my?page=0&size=${chunk}`));
     const firstItems = list(first);
     const totalPages = Number(first?.totalPages ?? 0) || 1;
-    if (totalPages <= 1) return firstItems;
+    if (totalPages <= 1) return localizeBookingItems(firstItems, locale);
     const rest = await Promise.all(
       Array.from({ length: totalPages - 1 }, (_, i) =>
         apiClient.get(`/bookings/my?page=${i + 1}&size=${chunk}`).then((r) => list(data(r)))),
     );
-    return [...firstItems, ...rest.flat()];
+    return localizeBookingItems([...firstItems, ...rest.flat()], locale);
   },
   /**
    * Các đơn còn có thể trải nghiệm (đủ điều kiện mở hành trình trong app).
    * ⚠️ Backend lọc chặt hơn `/bookings/my`: loại đơn đã hủy / hết hạn.
    */
   async accessibleBookings() {
-    return list(data(await apiClient.get("/bookings/accessible")));
+    const locale = getLocale();
+    const items = list(data(await apiClient.get("/bookings/accessible")));
+    return localizeBookingItems(items, locale);
   },
   async booking(bookingId) {
-    return data(await apiClient.get(`/bookings/${bookingId}`));
+    const locale = getLocale();
+    const b = data(await apiClient.get(`/bookings/${bookingId}`));
+    if (!b) return b;
+    const [localized] = await localizeBookingItems([b], locale, { includeSchedule: true });
+    return localized;
   },
   /** Đơn đang giữ chỗ (chờ thanh toán, còn hạn), mới nhất trước; có tourId thì chỉ của tour đó. */
   async myPendingBookings(tourId) {
+    const locale = getLocale();
     const query = tourId ? `?tourId=${tourId}` : "";
-    return list(data(await apiClient.get(`/bookings/my/pending${query}`)));
+    const items = list(data(await apiClient.get(`/bookings/my/pending${query}`)));
+    return localizeBookingItems(items, locale);
   },
   async cancelBooking(bookingId, reason) {
-    return data(await apiClient.post(`/bookings/${bookingId}/cancel`, reason ? { reason } : {}));
+    const locale = getLocale();
+    const b = data(await apiClient.post(`/bookings/${bookingId}/cancel`, reason ? { reason } : {}));
+    if (!b) return b;
+    const [localized] = await localizeBookingItems([b], locale, { includeSchedule: true });
+    return localized;
   },
 
   /**
@@ -197,7 +312,9 @@ export const touristService = {
 
   // ── Nhắn tin với nhà tour ───────────────────────────────────────────────────
   async conversations() {
-    return list(data(await apiClient.get("/provider-chat/conversations")));
+    const locale = getLocale();
+    const items = list(data(await apiClient.get("/provider-chat/conversations")));
+    return localizeTourTitleField(items, locale);
   },
   /** Mở (hoặc lấy lại) cuộc trò chuyện với nhà tour của tour đang xem. */
   async startConversation(tourId) {
@@ -304,29 +421,39 @@ export const touristService = {
    * Trả { items, last, total } để hiện nút "Xem thêm bài viết".
    */
   async communityFeed({ tourId, page = 0, size = 10, sort = "createdAt,desc" } = {}) {
+    const locale = getLocale();
     const q = new URLSearchParams({ page: String(page), size: String(size), sort });
     if (sort !== "createdAt,desc") q.append("sort", "createdAt,desc");
     if (tourId) q.set("tourId", String(tourId));
     const payload = data(await apiClient.get(`/community/posts?${q}`));
-    const items = list(payload);
+    const rawItems = list(payload);
+    const items = await localizeTourTitleField(rawItems, locale);
     return {
       items,
-      last: payload?.last ?? items.length < size,
-      total: payload?.totalElements ?? items.length,
+      last: payload?.last ?? rawItems.length < size,
+      total: payload?.totalElements ?? rawItems.length,
     };
   },
   async communityPosts({ tourId, size = 6 } = {}) {
+    const locale = getLocale();
     const q = new URLSearchParams({ page: "0", size: String(size), sort: "createdAt,desc" });
     if (tourId) q.set("tourId", String(tourId));
-    return list(data(await apiClient.get(`/community/posts?${q}`)));
+    const items = list(data(await apiClient.get(`/community/posts?${q}`)));
+    return localizeTourTitleField(items, locale);
   },
   /** Bài viết của tôi (kể cả đang chờ kiểm duyệt). */
   async myCommunityPosts() {
-    return list(data(await apiClient.get("/community/posts/my")));
+    const locale = getLocale();
+    const items = list(data(await apiClient.get("/community/posts/my")));
+    return localizeTourTitleField(items, locale);
   },
   /** Chi tiết một bài viết. */
   async communityPost(id) {
-    return data(await apiClient.get(`/community/posts/${id}`));
+    const locale = getLocale();
+    const post = data(await apiClient.get(`/community/posts/${id}`));
+    if (!post) return post;
+    const [localized] = await localizeTourTitleField([post], locale);
+    return localized;
   },
   /** Bình luận công khai của một bài viết. */
   async communityComments(postId) {
@@ -377,7 +504,9 @@ export const touristService = {
   },
   /** Danh sách lời mời đang chờ tôi xác nhận. */
   async myInvitations() {
-    return list(data(await apiClient.get("/bookings/my-invitations")));
+    const locale = getLocale();
+    const items = list(data(await apiClient.get("/bookings/my-invitations")));
+    return localizeTourTitleField(items, locale);
   },
   /** Chi tiết lời mời theo token (dùng cho link mời trong email). */
   async invitationByToken(token) {

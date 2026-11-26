@@ -1,5 +1,9 @@
 {
   "common.language": "Ngôn ngữ",
+  "common.languageConfirmTitle": "Đổi ngôn ngữ sang {language}?",
+  "common.languageConfirmMessage": "Trang sẽ được tải lại để áp dụng ngôn ngữ mới cho toàn bộ nội dung.",
+  "common.languageConfirmAction": "Xác nhận & tải lại",
+  "common.cancel": "Hủy",
   "nav.explore": "Khám phá",
   "nav.tours": "Tất cả tour",
   "nav.tourRequests": "Tour theo nhu cầu",
@@ -159,5 +163,12 @@
   "notif.newCount": "{count} mới",
   "notif.readAll": "Đọc tất cả",
   "notif.bellEmptyDesc": "Trạng thái đơn, kết quả hoàn tiền và phần thưởng sẽ hiện ở đây.",
-  "notif.viewAll": "Xem tất cả thông báo"
+  "notif.viewAll": "Xem tất cả thông báo",
+  "pagination.showingPage": "Đang xem trang",
+  "pagination.totalPrefix": "Tổng ",
+  "pagination.defaultUnit": "bản ghi",
+  "pagination.firstPage": "Trang đầu",
+  "pagination.prevPage": "Trang trước",
+  "pagination.nextPage": "Trang sau",
+  "pagination.lastPage": "Trang cuối"
 }

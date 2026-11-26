@@ -15,7 +15,7 @@ import { ROUTES } from "@/constants/routes";
 import { touristService } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
 import { longDate, vnd } from "../utils";
-import { useI18n } from "@/i18n";
+import { useI18n, useLocale } from "@/i18n";
 
 const msLeft = (deadline) => Math.max(0, new Date(deadline).getTime() - Date.now());
 
@@ -61,6 +61,7 @@ export function PaymentCountdown({ deadline, onExpire, className = "font-extrabo
  */
 export function usePendingBooking(tourId) {
   const { ready, isLoggedIn, isTourist } = useTouristSession();
+  const locale = useLocale();
   const enabled = ready && isLoggedIn && isTourist;
   const [pending, setPending] = useState(null);
 
@@ -81,7 +82,7 @@ export function usePendingBooking(tourId) {
   }, [enabled, tourId]);
 
   useEffect(() => {
-    // Tải sau khi gắn xong (không gọi setState đồng bộ trong effect).
+    // Tải sau khi gắn xong hoặc khi đổi ngôn ngữ (không gọi setState đồng bộ trong effect).
     const t = setTimeout(reload, 0);
     const onFocus = () => { if (document.visibilityState === "visible") reload(); };
     // Đơn vừa được thanh toán ⇒ tải lại ngay để thanh nhắc "đơn chờ thanh toán" biến mất.
@@ -95,7 +96,7 @@ export function usePendingBooking(tourId) {
       window.removeEventListener("focus", onFocus);
       window.removeEventListener(PAYMENT_COMPLETED_EVENT, onPaid);
     };
-  }, [reload]);
+  }, [reload, locale]);
 
   const clear = useCallback(() => setPending(null), []);
   return { pending, reload, clear };

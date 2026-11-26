@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Ban, CheckCircle2, History, Search } from "lucide-react";
+import { Ban, CheckCircle2, Eye, History, Search } from "lucide-react";
 import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import { moderationService } from "@/features/destination";
 import { formatDateTimeVN } from "@/lib/money";
@@ -184,23 +184,27 @@ export default function ModeratorHistoryPage() {
 
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <div className={`overflow-x-auto rounded-2xl border border-slate-200 bg-white ${loading ? "opacity-60" : ""}`}>
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs text-slate-500">
+          <table className="w-full min-w-[680px] text-left text-sm">
+            <thead className="bg-slate-50 text-xs font-semibold text-slate-600 border-b border-slate-200">
               <tr>
                 <th className="px-4 py-3">{cfg.label}</th>
                 <th className="px-4 py-3">Quyết định</th>
                 <th className="px-4 py-3">Người duyệt</th>
                 <th className="px-4 py-3">Thời điểm</th>
+                <th className="px-4 py-3 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {visible.map((r) => {
                 const badge = STATUS_BADGE[r.status] ?? STATUS_BADGE.DRAFT;
+                const isSelected = selected === r;
                 return (
                   <tr
                     key={r.reviewId ?? cfg.id(r)}
                     onClick={() => open(r)}
-                    className={`cursor-pointer hover:bg-slate-50 ${selected === r ? "bg-blue-50" : ""}`}
+                    className={`cursor-pointer transition-colors ${
+                      isSelected ? "bg-teal-50/60" : "hover:bg-slate-50/70"
+                    }`}
                   >
                     <td className="px-4 py-3 font-semibold text-slate-900">{cfg.name(r) || `#${cfg.id(r)}`}</td>
                     <td className="px-4 py-3">
@@ -209,13 +213,35 @@ export default function ModeratorHistoryPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-slate-600">{r.reviewerName || "—"}</td>
-                    <td className="px-4 py-3 text-slate-500">{formatTime(r.reviewedAt)}</td>
+                    <td className="px-4 py-3 text-slate-500 tabular-nums">{formatTime(r.reviewedAt)}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          open(r);
+                        }}
+                        className={`group/btn inline-flex h-8 min-w-[118px] items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-all cursor-pointer ${
+                          isSelected
+                            ? "border-teal-600 bg-teal-600 text-white shadow-xs"
+                            : "border-slate-200 bg-white text-slate-700 shadow-2xs hover:border-teal-300 hover:bg-teal-50/70 hover:text-teal-800"
+                        }`}
+                      >
+                        <Eye
+                          size={14}
+                          className={`shrink-0 transition-colors ${
+                            isSelected ? "text-white" : "text-slate-400 group-hover/btn:text-teal-700"
+                          }`}
+                        />
+                        <span>{isSelected ? "Đang xem" : "Xem lịch sử"}</span>
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
               {!loading && visible.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={5} className="px-4 py-10 text-center text-slate-500">
                     Chưa có quyết định nào phù hợp.
                   </td>
                 </tr>
@@ -266,7 +292,13 @@ export default function ModeratorHistoryPage() {
               )}
             </>
           ) : (
-            <p className="text-slate-500">Chọn một hồ sơ để xem dòng thời gian duyệt.</p>
+            <div className="py-6 text-center space-y-2">
+              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+                <History size={18} />
+              </div>
+              <p className="font-semibold text-slate-700">Chưa chọn hồ sơ</p>
+              <p className="text-xs text-slate-500">Bấm nút &ldquo;Xem lịch sử&rdquo; ở bảng bên trái để xem chi tiết dòng thời gian duyệt.</p>
+            </div>
           )}
         </aside>
       </div>

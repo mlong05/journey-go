@@ -1,5 +1,9 @@
 {
   "common.language": "言語",
+  "common.languageConfirmTitle": "{language}に切り替えますか？",
+  "common.languageConfirmMessage": "新しい言語を全体に適用するため、ページを再読み込みします。",
+  "common.languageConfirmAction": "確認して再読み込み",
+  "common.cancel": "キャンセル",
   "nav.explore": "探す",
   "nav.tours": "すべてのツアー",
   "nav.tourRequests": "リクエストツアー",
@@ -159,5 +163,12 @@
   "notif.newCount": "新着 {count}",
   "notif.readAll": "すべて既読",
   "notif.bellEmptyDesc": "予約状況、返金結果、報酬がここに表示されます。",
-  "notif.viewAll": "すべてのお知らせを見る"
+  "notif.viewAll": "すべてのお知らせを見る",
+  "pagination.showingPage": "ページ",
+  "pagination.totalPrefix": "合計 ",
+  "pagination.defaultUnit": "件",
+  "pagination.firstPage": "最初のページ",
+  "pagination.prevPage": "前のページ",
+  "pagination.nextPage": "次のページ",
+  "pagination.lastPage": "最後のページ"
 }

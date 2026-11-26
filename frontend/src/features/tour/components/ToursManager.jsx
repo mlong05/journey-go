@@ -568,6 +568,17 @@ export default function ToursManager({
     </div>
   );
 
+  /* ── Mở trang chính của tour (wizard thẩm định / modal chi tiết) ── */
+  const openTourPrimary = (tour) => {
+    const wizard = !!tour.wizardTour;
+    const wizardUrl = wizard && wizardHref ? wizardHref(tour) : null;
+    if (wizardUrl) {
+      router.push(wizardUrl);
+    } else {
+      openDetail(tour.tourId);
+    }
+  };
+
   /* ── Nút hành động trong bảng ──────────────────────────────── */
   const renderRowActions = (tour) => {
     const busy = actionLoadingId === tour.tourId;
@@ -577,9 +588,15 @@ export default function ToursManager({
     const canSubmit = !wizard && SUBMITTABLE_STATUSES.includes(tour.status) && !tour.deleted;
     const canEdit = !wizard && EDITABLE_STATUSES.includes(tour.status) && !tour.deleted;
     const canLegacyModerate = canModerate && !wizard;
+    const isWizardPendingReview = Boolean(wizardUrl && canModerate && tour.status === "PENDING_REVIEW" && !tour.deleted);
+    const hasSecondaryButtons = Boolean(
+      canEdit ||
+      canSubmit ||
+      (canLegacyModerate && tour.status === "PENDING_REVIEW" && !tour.deleted) ||
+      canDelete,
+    );
 
     return (
-      /* Nút "Xem" (con mắt) luôn đứng cuối hàng → các con mắt thẳng một cột; nút khác xếp trước nó. */
       <div className="col-span-12 md:col-span-1 flex items-center justify-start md:justify-end gap-1.5 shrink-0">
         {canEdit && (
           <button
@@ -610,15 +627,15 @@ export default function ToursManager({
           </button>
         )}
 
-        {wizardUrl && canModerate && tour.status === "PENDING_REVIEW" && !tour.deleted && (
+        {isWizardPendingReview && (
           <button
             type="button"
             onClick={() => router.push(wizardUrl)}
-            className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-600 shadow-sm shadow-emerald-600/20 transition-colors cursor-pointer"
-            title="Thẩm định tour"
-            aria-label="Thẩm định tour"
+            className="inline-flex h-8 min-w-[122px] items-center justify-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] px-3 text-xs font-bold text-white border border-emerald-600 shadow-xs shadow-emerald-600/20 transition-all cursor-pointer"
+            title="Mở trang thẩm định tour"
           >
-            <ShieldCheck size={14} />
+            <ShieldCheck size={14} className="shrink-0" />
+            <span>Thẩm định</span>
           </button>
         )}
 
@@ -627,15 +644,15 @@ export default function ToursManager({
             type="button"
             onClick={() => handlePublish(tour)}
             disabled={busy}
-            className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors cursor-pointer disabled:opacity-50"
+            className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-2.5 text-xs font-bold text-white border border-emerald-600 transition-colors cursor-pointer disabled:opacity-50"
             title="Duyệt và xuất bản"
-            aria-label="Duyệt và xuất bản"
           >
             {busy ? (
-              <Loader2 size={14} className="animate-spin" />
+              <Loader2 size={13} className="animate-spin" />
             ) : (
-              <BadgeCheck size={14} />
+              <BadgeCheck size={14} className="shrink-0" />
             )}
+            <span>Duyệt</span>
           </button>
         )}
 
@@ -644,11 +661,11 @@ export default function ToursManager({
             type="button"
             onClick={() => setRejectTarget(tour)}
             disabled={busy}
-            className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors cursor-pointer disabled:opacity-50"
+            className="inline-flex h-8 items-center gap-1 rounded-lg bg-rose-50 hover:bg-rose-100 px-2.5 text-xs font-semibold text-rose-600 border border-rose-200 transition-colors cursor-pointer disabled:opacity-50"
             title="Từ chối tour"
-            aria-label="Từ chối tour"
           >
-            <Ban size={14} />
+            <Ban size={13} className="shrink-0" />
+            <span>Từ chối</span>
           </button>
         )}
 
@@ -682,17 +699,29 @@ export default function ToursManager({
           </button>
         )}
 
-        {/* Tour chờ duyệt đã có nút "Thẩm định" (cùng đích) — không hiện thêm nút xem. */}
-        {!(wizardUrl && canModerate && tour.status === "PENDING_REVIEW" && !tour.deleted) && (
-          <button
-            type="button"
-            onClick={() => (wizardUrl ? router.push(wizardUrl) : openDetail(tour.tourId))}
-            className="p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition-colors cursor-pointer"
-            title="Xem chi tiết"
-            aria-label="Xem chi tiết"
-          >
-            <Eye size={14} />
-          </button>
+        {/* Tour chờ duyệt đã có nút "Thẩm định" (cùng đích) — các trạng thái còn lại hiện nút "Xem chi tiết" đồng bộ độ rộng. */}
+        {!isWizardPendingReview && (
+          hasSecondaryButtons ? (
+            <button
+              type="button"
+              onClick={() => openTourPrimary(tour)}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-white hover:bg-teal-50 text-slate-600 hover:text-teal-700 border border-slate-200 hover:border-teal-300 transition-colors cursor-pointer"
+              title="Xem chi tiết"
+              aria-label="Xem chi tiết"
+            >
+              <Eye size={14} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => openTourPrimary(tour)}
+              className="group/btn inline-flex h-8 min-w-[122px] items-center justify-center gap-1.5 rounded-lg bg-white hover:bg-teal-50/70 active:scale-[0.98] px-3 text-xs font-semibold text-slate-700 hover:text-teal-800 border border-slate-200 hover:border-teal-300 shadow-2xs transition-all cursor-pointer"
+              title="Xem chi tiết tour"
+            >
+              <Eye size={14} className="shrink-0 text-slate-400 transition-colors group-hover/btn:text-teal-700" />
+              <span>Xem chi tiết</span>
+            </button>
+          )
         )}
       </div>
     );
@@ -881,10 +910,16 @@ export default function ToursManager({
             </div>
           ) : (
             <ul className="divide-y divide-slate-100">
-              {pagedItems.map((tour, idx) => (
+              {pagedItems.map((tour, idx) => {
+                const isPendingRow = canModerate && tour.status === "PENDING_REVIEW" && !tour.deleted;
+                return (
                 <li
                   key={tour.tourId}
-                  className="px-4 sm:px-5 py-2.5 hover:bg-slate-50/60 transition-colors"
+                  className={`px-4 sm:px-5 py-3 transition-colors ${
+                    isPendingRow
+                      ? "bg-amber-50/25 hover:bg-amber-50/55"
+                      : "hover:bg-slate-50/70"
+                  }`}
                 >
                   <div className={ROW_GRID}>
                     {/* Số thứ tự (tính theo trang) */}
@@ -895,8 +930,15 @@ export default function ToursManager({
                     {/* Cột 1: Tour */}
                     <div className="col-span-12 md:col-span-1 flex items-center gap-3 min-w-0">
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-bold text-slate-900 truncate" title={tour.title}>
-                          {tour.title}
+                        <h3 className="text-sm font-bold text-slate-900 truncate">
+                          <button
+                            type="button"
+                            onClick={() => openTourPrimary(tour)}
+                            className="max-w-full truncate text-left hover:text-teal-700 transition-colors cursor-pointer"
+                            title={tour.title}
+                          >
+                            {tour.title}
+                          </button>
                         </h3>
                         <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-600">
                           {tour.visibility === "SPECIFIC_USER" ? (
@@ -944,7 +986,8 @@ export default function ToursManager({
                     {renderRowActions(tour)}
                   </div>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </div>

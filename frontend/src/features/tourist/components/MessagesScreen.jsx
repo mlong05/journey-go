@@ -147,16 +147,17 @@ function Thread({ conversation, myId, contextTourId, onBack, onSent }) {
 
   // Tour đang hỏi: tour mở từ trang chi tiết (?tour=) hoặc tour hiện tại của cuộc trò chuyện.
   const tourId = contextTourId || conversation.tourId;
-  const preview = tourId ? getTourPreview(tourId) : null;
-  const knownTitle = preview?.title || (String(tourId) === String(conversation.tourId) ? conversation.tourTitle : null);
+  const preview = tourId ? getTourPreview(tourId, locale) : null;
   const [fetched, setFetched] = useState(null);
   useEffect(() => {
-    if (!tourId || knownTitle) return undefined;
+    if (!tourId || preview?.title) return undefined;
     let alive = true;
-    touristService.tourDetail(tourId).then((d) => { if (alive) setFetched({ id: String(tourId), title: d?.title || d?.tour?.title }); }).catch(() => {});
+    touristService.tourDetail(tourId).then((d) => { if (alive) setFetched({ id: `${locale}:${tourId}`, title: d?.title || d?.tour?.title }); }).catch(() => {});
     return () => { alive = false; };
-  }, [tourId, knownTitle]);
-  const tourTitle = knownTitle || (fetched?.id === String(tourId) ? fetched.title : null);
+  }, [tourId, locale, preview?.title]);
+  const tourTitle = preview?.title
+    || (fetched?.id === `${locale}:${tourId}` ? fetched.title : null)
+    || (String(tourId) === String(conversation.tourId) ? conversation.tourTitle : null);
 
   // Ô nhập tự cao theo nội dung (tối đa ~5 dòng).
   useEffect(() => {
@@ -346,7 +347,7 @@ function Messages() {
 
   const load = useCallback(() => touristService.conversations()
     .then((items) => setState({ loading: false, items, error: "" }))
-    .catch((err) => setState({ loading: false, items: [], error: err?.message || translate(getLocale(), "account.msg.loadError") })), []);
+    .catch((err) => setState({ loading: false, items: [], error: err?.message || translate(locale, "account.msg.loadError") })), [locale]);
   useEffect(() => {
     load();
     const timer = setInterval(load, POLL_MS * 3);

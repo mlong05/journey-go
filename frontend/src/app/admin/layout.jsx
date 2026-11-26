@@ -13,7 +13,7 @@ import {
   Globe2,
   Tags,
   UserCog,
-  Sparkles,
+  Award,
   Medal,
   RotateCcw,
   FileText,
@@ -101,7 +101,7 @@ const ADMIN_NAV_ITEMS = [
     id: "experience-rewards",
     label: "Cấu hình trải nghiệm và điểm thưởng",
     href: "/admin/experience-rewards",
-    icon: Sparkles,
+    icon: Award,
     group: "Cấu hình nền tảng",
     badge: null,
   },
@@ -265,13 +265,14 @@ export default function AdminLayout({ children }) {
     }
   };
 
-  const currentTitle =
-    [...ADMIN_NAV_ITEMS]
-      .sort((a, b) => b.href.length - a.href.length)
-      .find((i) => {
-        const p = i.href.split("#")[0];
-        return p === "/admin" ? pathname === "/admin" : pathname?.startsWith(p);
-      })?.label || "Tổng quan vận hành";
+  const currentItem = [...ADMIN_NAV_ITEMS]
+    .sort((a, b) => b.href.length - a.href.length)
+    .find((i) => {
+      const p = i.href.split("#")[0];
+      return p === "/admin" ? pathname === "/admin" : pathname?.startsWith(p);
+    });
+  const currentTitle = currentItem?.label || "Tổng quan vận hành";
+  const currentGroup = currentItem?.group || "Vận hành";
 
   return (
     <NotificationProvider>
@@ -290,7 +291,7 @@ export default function AdminLayout({ children }) {
           <DashboardHeader
             role="admin"
             user={authData?.user}
-            section="Quản trị"
+            section={currentGroup}
             title={currentTitle}
             onOpenMenu={() => setIsSidebarOpen(true)}
             searchValue={topSearch}

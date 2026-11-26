@@ -192,7 +192,7 @@ function PendingRow({ b, onChange }) {
           {t("trips.pendingHoldTitle")}
           {b.paymentDeadline && <>{t("trips.pendingTimeBefore")}<PaymentCountdown deadline={b.paymentDeadline} onExpire={expire} className="font-extrabold tabular-nums text-amber-700" />{t("trips.pendingTimeAfter")}</>}
         </p>
-        <p className="truncate text-sm text-slate-600">{b.tourTitle} · {longDate(b.experienceDate, locale)} · <span className="font-semibold tabular-nums">{vnd(b.totalAmount)}</span></p>
+        <p className="truncate text-sm text-slate-600">{getTourPreview(b.tourId, locale)?.title || b.tourTitle} · {longDate(b.experienceDate, locale)} · <span className="font-semibold tabular-nums">{vnd(b.totalAmount)}</span></p>
         {error && <p role="alert" className="mt-1 text-xs font-semibold text-rose-700">{error}</p>}
       </div>
       <div className="flex shrink-0 gap-2">
@@ -210,7 +210,7 @@ function PendingRow({ b, onChange }) {
 }
 
 function ActionCenter({ pending, refundNeeded, onChange }) {
-  const t = useT();
+  const { t, locale } = useI18n();
   if (!pending.length && !refundNeeded.length) return null;
   return (
     <section aria-labelledby="trips-actions" className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/60">
@@ -225,7 +225,7 @@ function ActionCenter({ pending, refundNeeded, onChange }) {
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-amber-100 text-amber-700"><Undo2 size={18} /></span>
               <span className="min-w-0 flex-1">
                 <span className="block font-bold text-slate-900">{t("trips.refundNeededTitle")}</span>
-                <span className="block truncate text-sm text-slate-600">{b.tourTitle} · {t("trips.codeLabel", { code: b.bookingCode })} · <span className="font-semibold tabular-nums">{vnd(b.totalAmount)}</span></span>
+                <span className="block truncate text-sm text-slate-600">{getTourPreview(b.tourId, locale)?.title || b.tourTitle} · {t("trips.codeLabel", { code: b.bookingCode })} · <span className="font-semibold tabular-nums">{vnd(b.totalAmount)}</span></span>
               </span>
               <span className="hidden shrink-0 text-sm font-bold text-teal-700 sm:inline">{t("trips.submitRequest")}</span>
               <ChevronRight size={18} className="shrink-0 text-teal-700" />
@@ -243,6 +243,7 @@ function ActionCenter({ pending, refundNeeded, onChange }) {
 function NextTrip({ booking, today, isGuest }) {
   const { t, locale } = useI18n();
   const cover = coverOf(booking);
+  const title = getTourPreview(booking.tourId, locale)?.title || booking.tourTitle;
   const d = daysUntil(booking, today);
   return (
     <TransitionLink href={ROUTES.TRIP_DETAIL(booking.id)} type="forward"
@@ -256,7 +257,7 @@ function NextTrip({ booking, today, isGuest }) {
           {t("trips.nextTripLabel")}
           {isGuest && <span className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] normal-case tracking-normal text-violet-700"><UserRoundPlus size={11} />{t("trips.invitedBadge")}</span>}
         </p>
-        <p className="mt-1 text-xl font-extrabold leading-snug text-slate-900 sm:text-2xl">{booking.tourTitle}</p>
+        <p className="mt-1 text-xl font-extrabold leading-snug text-slate-900 sm:text-2xl">{title}</p>
         <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
           <span className="inline-flex items-center gap-1.5"><CalendarDays size={15} />{longDate(booking.experienceDate, locale)}</span>
           <span className="inline-flex items-center gap-1.5"><Users size={15} />{t("trips.guestsCount", { count: booking.activePassengerCount || booking.passengerCount })}</span>
@@ -283,6 +284,7 @@ function TripCard({ b, refundByBooking, isGuest, past, group }) {
   const refund = refundBadgeFor(b.id, refundByBooking, t);
   const refundState = refundStateOf(latestRefundOf(b.id, refundByBooking));
   const closed = b.status === "CANCELLED" || b.status === "EXPIRED";
+  const title = getTourPreview(b.tourId, locale)?.title || b.tourTitle;
   // ⚠️ "Đặt lại tour" hiện khi:
   //  • đơn ĐÃ xử lý xong hoàn tiền (tránh mua trùng lúc tiền hoàn còn bay),
   //  • đơn đã hủy/hết hạn, HOẶC
@@ -319,7 +321,7 @@ function TripCard({ b, refundByBooking, isGuest, past, group }) {
         {/* Lớp phủ: bấm bất kỳ đâu trên thẻ mở chi tiết; nút "Đặt lại tour" nằm trên lớp này. */}
         <TransitionLink href={ROUTES.TRIP_DETAIL(b.id)} type="forward"
           className="mt-1 line-clamp-1 font-bold text-slate-900 after:absolute after:inset-0 after:rounded-2xl after:content-['']">
-          {b.tourTitle}
+          {title}
         </TransitionLink>
         <p className={`mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[13px] ${past ? "text-slate-400" : "text-slate-500"}`}>
           <span className="inline-flex items-center gap-1"><CalendarDays size={13} />{longDate(b.experienceDate, locale)}</span>
@@ -362,7 +364,7 @@ function EmptyTab({ tab }) {
 /* ─────────────────────────── Trang ─────────────────────────── */
 
 function Trips() {
-  const t = useT();
+  const { t, locale } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -403,7 +405,7 @@ function Trips() {
       setState({ loading: false, items: [], error: err?.message || translate(getLocale(), "trips.errLoadTrips") });
     });
     return () => { alive = false; };
-  }, []);
+  }, [locale]);
 
   // Nạp yêu cầu hoàn tiền để gắn nhãn và phân nhóm (không chặn render).
   useEffect(() => {

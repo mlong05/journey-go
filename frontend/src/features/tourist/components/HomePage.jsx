@@ -15,12 +15,12 @@ import {
 } from "lucide-react";
 import TouristShell from "./TouristShell";
 import TourCard, { TourCardSkeleton, tourCoverTransition } from "./TourCard";
-import { touristService } from "../services/touristService";
+import { touristService, getTourPreview } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
 import { usePurchasedTourIds } from "../hooks/usePurchasedTourIds";
 import { isPlainClick, transitionNavigate } from "../navigation";
 import { ROUTES } from "@/constants/routes";
-import { durationLabel, longDate, normalize, todayIso, vnd } from "../utils";
+import { durationLabel, longDate, normalize, todayIso, tomorrowIso, vnd } from "../utils";
 import { INTL_LOCALE, useI18n, useT } from "@/i18n";
 
 const ORDERS = [
@@ -43,10 +43,11 @@ const isoOf = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
 const dm = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const isMultiDay = (t) => t.tourFormat === "MULTI_DAY" || (!t.durationMinutes && t.durationDays > 1);
 
-/** Ngày khởi hành từ hôm nay trở đi, tăng dần (fallback: ngày gần nhất). */
-function upcoming(t, today) {
-  const list = (t.departureDates || []).map(String).filter((d) => d >= today).sort();
-  return list.length ? list : t.nextDepartureDate ? [String(t.nextDepartureDate)] : [];
+/** Ngày khởi hành từ ngày mai trở đi, tăng dần (ẩn ngày hôm nay và quá khứ). */
+function upcoming(t, minDate) {
+  const list = (t.departureDates || []).map(String).filter((d) => d >= minDate).sort();
+  if (list.length) return list;
+  return t.nextDepartureDate && String(t.nextDepartureDate) >= minDate ? [String(t.nextDepartureDate)] : [];
 }
 
 /* ───────────────────────────── Bộ lọc (cột trái) ───────────────────────────── */
@@ -258,9 +259,12 @@ function UpcomingTrip({ tours }) {
       if (alive) setTrip(next || null);
     }).catch(() => {});
     return () => { alive = false; };
-  }, [isTourist]);
+  }, [isTourist, locale]);
   if (!isTourist || !trip) return null;
-  const cover = tours.find((tour) => tour.tourId === trip.tourId)?.coverImageUrl;
+  const matchedTour = tours.find((tour) => Number(tour.tourId) === Number(trip.tourId));
+  const preview = getTourPreview(trip.tourId, locale);
+  const cover = matchedTour?.coverImageUrl || preview?.coverImageUrl;
+  const tourTitle = matchedTour?.title || preview?.title || trip.tourTitle;
   return (
     <section aria-labelledby="h-trip" className="jg-card-in">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
@@ -277,7 +281,7 @@ function UpcomingTrip({ tours }) {
       <article className="grid items-center gap-4 rounded-3xl border border-slate-200 bg-white p-3 shadow-[0_8px_22px_rgba(16,32,29,0.08)] sm:grid-cols-[180px_minmax(0,1fr)_auto]">
         <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-slate-100">{cover && <img src={cover} alt="" className="h-full w-full object-cover" />}</div>
         <div className="min-w-0">
-          <h3 className="text-lg font-extrabold text-slate-900">{trip.tourTitle}</h3>
+          <h3 className="text-lg font-extrabold text-slate-900">{tourTitle}</h3>
           <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[13.5px] text-slate-500">
             <span className="inline-flex items-center gap-1"><CalendarDays size={14} />{longDate(trip.experienceDate, locale)}</span>
             <span className="inline-flex items-center gap-1"><Users size={14} />{t("home.upcoming.meta", { count: trip.activePassengerCount || trip.passengerCount, code: trip.bookingCode })}</span>
@@ -342,7 +346,7 @@ const EMPTY = { q: "", date: "", regions: [], themes: [], formats: [], prices: [
 export default function HomePage() {
   const { t, locale } = useI18n();
   const { isTourist, user } = useTouristSession();
-  const today = useMemo(() => todayIso(), []);
+  const minBookableDate = useMemo(() => tomorrowIso(), []);
   const [data, setData] = useState({ loading: true, tours: [], regions: [], themes: [], error: "", loadFailed: false });
   const [f, setF] = useState(EMPTY);
   const [bar, setBar] = useState({ q: "", region: "", date: "" });
@@ -402,15 +406,22 @@ export default function HomePage() {
     if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - (window.innerWidth >= 768 ? 156 : 88), behavior: "smooth" });
   }
 
-  /** Tour có thể đặt (bỏ tour đã mua). */
+  /** Tour có thể đặt (bỏ tour đã mua và tour chỉ còn ngày hôm nay hoặc quá khứ). */
   const pool = useMemo(
-    () => data.tours.filter((tour) => !purchasedIds.has(Number(tour.tourId))),
-    [data.tours, purchasedIds],
+    () =>
+      data.tours
+        .filter((tour) => !purchasedIds.has(Number(tour.tourId)))
+        .map((tour) => {
+          const dates = upcoming(tour, minBookableDate);
+          return dates.length ? { ...tour, nextDepartureDate: dates[0] } : null;
+        })
+        .filter(Boolean),
+    [data.tours, purchasedIds, minBookableDate],
   );
 
   const match = (tour, skip) => {
     if (f.q && !normalize(`${tour.title} ${tour.regionName || ""} ${tour.themeName || ""}`).includes(normalize(f.q))) return false;
-    if (skip !== "date" && f.date && !upcoming(tour, today).includes(f.date)) return false;
+    if (skip !== "date" && f.date && !upcoming(tour, minBookableDate).includes(f.date)) return false;
     if (skip !== "regions" && f.regions.length && !f.regions.includes(String(tour.regionId))) return false;
     if (skip !== "themes" && f.themes.length && !f.themes.includes(String(tour.themeId))) return false;
     if (skip !== "formats" && f.formats.length && !f.formats.includes(isMultiDay(tour) ? "MULTI_DAY" : "DAY_TRIP")) return false;
@@ -420,7 +431,7 @@ export default function HomePage() {
 
   const results = useMemo(() => {
     const list = pool.filter((tour) => match(tour));
-    const first = (tour) => upcoming(tour, today)[0] || "9999";
+    const first = (tour) => upcoming(tour, minBookableDate)[0] || "9999";
     const by = {
       DEPARTURE: (a, b) => first(a).localeCompare(first(b)),
       PRICE_ASC: (a, b) => Number(a.price) - Number(b.price),
@@ -428,18 +439,18 @@ export default function HomePage() {
       NEWEST: (a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")),
     };
     return [...list].sort(by[order]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- match đọc f/today
-  }, [pool, f, order, today]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- match đọc f/minBookableDate
+  }, [pool, f, order, minBookableDate]);
 
   // Số đếm mỗi mục tính trên các bộ lọc KHÁC (kiểu "faceted"), để biết chọn thêm thì còn bao nhiêu tour.
-  /* eslint-disable react-hooks/exhaustive-deps -- match đọc f/today */
+  /* eslint-disable react-hooks/exhaustive-deps -- match đọc f/minBookableDate */
   const facets = useMemo(() => {
     const countBy = (skip, keyOf) => {
       const m = new Map();
       pool.filter((tour) => match(tour, skip)).forEach((tour) => [].concat(keyOf(tour)).forEach((k) => k != null && m.set(k, (m.get(k) || 0) + 1)));
       return m;
     };
-    const dates = countBy("date", (tour) => upcoming(tour, today));
+    const dates = countBy("date", (tour) => upcoming(tour, minBookableDate));
     const reg = countBy("regions", (tour) => (tour.regionId != null ? String(tour.regionId) : null));
     const th = countBy("themes", (tour) => (tour.themeId != null ? String(tour.themeId) : null));
     const fm = countBy("formats", (tour) => (isMultiDay(tour) ? "MULTI_DAY" : "DAY_TRIP"));
@@ -455,17 +466,17 @@ export default function HomePage() {
       formats: Object.fromEntries(FORMATS.map(([v]) => [v, fm.get(v) || 0])),
       prices: Object.fromEntries(PRICES.map(([v]) => [v, pr.get(v) || 0])),
     };
-  }, [pool, f, today, data.regions, data.themes, locale]);
+  }, [pool, f, minBookableDate, data.regions, data.themes, locale]);
   /* eslint-enable react-hooks/exhaustive-deps */
 
-  const departures = useMemo(() => results.reduce((n, tour) => n + upcoming(tour, today).length, 0), [results, today]);
+  const departures = useMemo(() => results.reduce((n, tour) => n + upcoming(tour, minBookableDate).length, 0), [results, minBookableDate]);
   const activeCount = (f.q ? 1 : 0) + (f.date ? 1 : 0) + f.regions.length + f.themes.length + f.formats.length + f.prices.length;
   const firstName = String(user?.fullName || "").trim().split(/\s+/).pop();
   const loading = data.loading;
   const resultsKey = JSON.stringify([f, order, view]);
 
   const panel = (
-    <FilterPanel f={f} set={set} reset={reset} activeCount={activeCount} today={today}
+    <FilterPanel f={f} set={set} reset={reset} activeCount={activeCount} today={minBookableDate}
       dateCounts={facets.dates} regionOpts={facets.regions} themeOpts={facets.themes}
       formatCounts={facets.formats} priceCounts={facets.prices} />
   );
@@ -476,7 +487,7 @@ export default function HomePage() {
       <div aria-hidden={!pinned} inert={!pinned}
         className={`fixed inset-x-0 top-16 z-30 hidden border-b border-slate-200 bg-white/98 shadow-[0_10px_24px_rgba(16,32,29,0.10)] backdrop-blur transition duration-300 ease-out md:block ${pinned ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-3 opacity-0"}`}>
         <div className="mx-auto max-w-page px-4 py-2 sm:px-6 lg:px-8">
-          <SearchBar compact bar={bar} setBar={setBar} regions={data.regions} today={today} onSubmit={submitBar} />
+          <SearchBar compact bar={bar} setBar={setBar} regions={data.regions} today={minBookableDate} onSubmit={submitBar} />
         </div>
       </div>
       {/* Banner */}
@@ -507,7 +518,7 @@ export default function HomePage() {
         <div className="min-w-0 space-y-5">
           {/* Thanh tìm kiếm ngang */}
           <div ref={barAnchorRef}>
-            <SearchBar bar={bar} setBar={setBar} regions={data.regions} today={today} onSubmit={submitBar} />
+            <SearchBar bar={bar} setBar={setBar} regions={data.regions} today={minBookableDate} onSubmit={submitBar} />
           </div>
 
           {/* Kết quả + sắp xếp + kiểu xem */}
@@ -550,7 +561,7 @@ export default function HomePage() {
               <div key={resultsKey} className={view === "list" ? "space-y-4" : "grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4"}>
                 {results.slice(0, limit).map((tour, i) => (
                   <div key={tour.tourId} className="jg-card-in min-w-0" style={{ "--i": Math.max(0, i - (limit - PAGE)) }}>
-                    {view === "list" ? <TourRow tour={tour} today={today} /> : <TourCard tour={tour} />}
+                    {view === "list" ? <TourRow tour={tour} today={minBookableDate} /> : <TourCard tour={tour} />}
                   </div>
                 ))}
               </div>

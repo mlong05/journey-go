@@ -12,8 +12,8 @@ import AccountLayout, { refreshAccountSummary } from "./AccountLayout";
 import { touristService, getTourPreview } from "../services/touristService";
 import { patchSessionUser, todayIso, longDate } from "../utils";
 import { LimitedField } from "@/components/ui/LimitedField";
-import { useT, useI18n, translate, getLocale, INTL_LOCALE, LOCALES, setLocale } from "@/i18n";
-import { syncLocaleToServer } from "@/i18n/sync";
+import { useT, useI18n, translate, getLocale, INTL_LOCALE, LOCALES } from "@/i18n";
+import LanguageConfirmModal from "@/components/common/LanguageConfirmModal";
 import "../profile-passport.css";
 
 const input = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 aria-[invalid=true]:border-rose-400";
@@ -187,8 +187,9 @@ function TripCard({ trip, today }) {
     );
   }
   const { booking, upcoming } = trip;
-  const preview = getTourPreview(booking.tourId);
+  const preview = getTourPreview(booking.tourId, locale);
   const cover = preview?.coverImageUrl;
+  const tourTitle = preview?.title || booking.tourTitle;
   const days = Math.round((new Date(`${booking.experienceDate}T00:00:00`) - new Date(`${today}T00:00:00`)) / 86_400_000);
   const countdown = days <= 0 ? t("trips.countdownToday") : days === 1 ? t("trips.countdownTomorrow") : t("trips.countdownDays", { count: days });
 
@@ -202,7 +203,7 @@ function TripCard({ trip, today }) {
       </div>
       <div className="p-5">
         <p className="text-sm font-semibold text-teal-700">{upcoming ? t("trips.nextTripLabel") : t("account.profile.tripLastLabel")}</p>
-        <h2 id="trip-card-title" className="mt-0.5 line-clamp-2 text-lg font-extrabold leading-snug text-slate-900">{booking.tourTitle}</h2>
+        <h2 id="trip-card-title" className="mt-0.5 line-clamp-2 text-lg font-extrabold leading-snug text-slate-900">{tourTitle}</h2>
         <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-500"><CalendarDays size={15} />{longDate(booking.experienceDate, locale)}</p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href={ROUTES.TRIP_DETAIL(booking.id)}
@@ -400,13 +401,13 @@ function PasswordForm({ user, onDone, onClose }) {
   );
 }
 
-/** Chọn ngôn ngữ hiển thị — lưu vào tài khoản để web và app dùng chung. */
+/** Chọn ngôn ngữ hiển thị — mở popup xác nhận trước khi lưu và tải lại trang. */
 function LanguagePicker() {
   const { t, locale } = useI18n();
+  const [pendingLocale, setPendingLocale] = useState(null);
   const pick = (code) => {
     if (code === locale) return;
-    setLocale(code);
-    syncLocaleToServer(code);
+    setPendingLocale(code);
   };
   return (
     <div>
@@ -422,6 +423,7 @@ function LanguagePicker() {
           );
         })}
       </div>
+      <LanguageConfirmModal targetCode={pendingLocale} onClose={() => setPendingLocale(null)} />
     </div>
   );
 }
@@ -508,6 +510,7 @@ export default function AccountProfileScreen() {
 }
 
 function ProfileContent() {
+  const { locale } = useI18n();
   const [user, setUser] = useState(null);
   const [error, setError] = useState("");
   const [data, setData] = useState({ bookings: null, badges: [], points: null });
@@ -518,14 +521,23 @@ function ProfileContent() {
 
   useEffect(() => {
     touristService.me().then(setUser).catch((e) => setError(e?.message || translate(getLocale(), "account.profile.loadError")));
-    // Danh sách tour công khai chỉ để có ảnh bìa + vùng miền của tour (getTourPreview).
     Promise.all([
-      touristService.myBookings({ all: true }).catch(() => []),
       touristService.myBadges().catch(() => []),
       touristService.myPoints().catch(() => null),
-      touristService.publishedTours().catch(() => null),
-    ]).then(([bookings, badges, points]) => setData({ bookings, badges, points: points?.currentBalance ?? null }));
+    ]).then(([badges, points]) => setData((d) => ({ ...d, badges, points: points?.currentBalance ?? null })));
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    // Danh sách tour công khai để có ảnh bìa, vùng miền và tiêu đề đã dịch (getTourPreview).
+    Promise.all([
+      touristService.publishedTours({ size: 200 }).catch(() => null),
+      touristService.myBookings({ all: true }).catch(() => []),
+    ]).then(([, bookings]) => {
+      if (alive) setData((d) => ({ ...d, bookings }));
+    });
+    return () => { alive = false; };
+  }, [locale]);
 
   const { stats, trip, cover: tripCover } = useMemo(() => {
     const bookings = data.bookings;

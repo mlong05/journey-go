@@ -51,7 +51,7 @@ function TripDetail({ bookingId }) {
 
   const load = useCallback(() => touristService.booking(bookingId)
     .then((b) => { setBooking(b); setLoadedAt(Date.now()); })
-    .catch((err) => setError(err?.message || translate(getLocale(), "trips.errNotFound"))), [bookingId]);
+    .catch((err) => setError(err?.message || translate(locale, "trips.errNotFound"))), [bookingId, locale]);
   const onExpire = useCallback(() => { setTimeUp(true); load(); }, [load]);
   useEffect(() => { load(); }, [load]);
 

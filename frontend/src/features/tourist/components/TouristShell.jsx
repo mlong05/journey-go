@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LogOut, LayoutDashboard, ChevronDown, UserRound, MessageCircle, Gift, Sparkles, ScrollText } from "lucide-react";
+import { Menu, X, LogOut, LayoutDashboard, ChevronDown, UserRound, MessageCircle, Gift, Sparkles, Compass } from "lucide-react";
 import BrandLogo from "@/components/brand/BrandLogo";
 import { LogoutModal, useLogout } from "@/features/auth";
 import { AiGuideFloatingWidget } from "@/features/aiguide";
@@ -21,8 +21,6 @@ import { useT } from "@/i18n";
 
 const NAV = [
   { href: ROUTES.HOME, labelKey: "nav.explore", match: (p) => p === "/" },
-  { href: ROUTES.TOURS, label: "Tất cả tour", labelKey: "nav.tours", match: (p) => p === "/tours" },
-  { href: ROUTES.ACCOUNT_TOUR_REQUESTS, label: "Tour theo nhu cầu", labelKey: "nav.tourRequests", match: (p) => p.startsWith("/account/requests"), touristOnly: true },
   { href: ROUTES.COMMUNITY, labelKey: "nav.community", match: (p) => p.startsWith("/community") },
   { href: ROUTES.TRIPS, labelKey: "nav.myTrips", match: (p) => p.startsWith("/trips"), touristOnly: true },
   { href: ROUTES.PARTNER_PROGRAM, labelKey: "nav.forPartners", match: (p) => p.startsWith("/partner"), hideForTourist: true },
@@ -37,7 +35,7 @@ const initials = (name) =>
  */
 const TOURIST_MENU = [
   [ROUTES.ACCOUNT, "nav.myAccount", UserRound],
-  [ROUTES.ACCOUNT_TOUR_REQUESTS, "nav.tourRequests", ScrollText],
+  [ROUTES.ACCOUNT_TOUR_REQUESTS, "nav.tourRequests", Compass],
   [ROUTES.ACCOUNT_AI_GUIDE, "merge.nav.aiGuide", Sparkles],
   [ROUTES.ACCOUNT_MESSAGES, "nav.messages", MessageCircle, "unread"],
   [ROUTES.ACCOUNT_REWARDS, "nav.rewards", Gift],
@@ -259,9 +257,12 @@ export default function TouristShell({ children, desktopFixed = false }) {
     <div className="font-jakarta flex min-h-screen w-full min-w-0 flex-col overflow-x-clip bg-[#f4f7f6] text-slate-900 antialiased">
       <TouristNotificationProvider>
         <TouristHeader />
+        {/* Đơn đang giữ chỗ chưa thanh toán: nhắc ở mọi trang (kể cả Trang chủ) để khách quay lại đúng đơn */}
+        <PendingBookingBar />
         {/* Vùng nội dung có tên riêng ⇒ trượt khi chuyển trang, header & footer đứng yên */}
         <main className="flex-1" style={{ viewTransitionName: "jg-page" }}>{children}</main>
         {desktopFixed ? <div className="lg:hidden"><TouristFooter /></div> : <TouristFooter />}
+        <AiGuideFloatingWidget />
       </TouristNotificationProvider>
     </div>
   );

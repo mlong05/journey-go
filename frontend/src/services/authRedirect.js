@@ -35,15 +35,15 @@ export function readCallbackUrl() {
 
 /**
  * Trang đích sau khi đăng nhập.
- * - Admin / moderator / đối tác: chỉ quay lại trang trong khu của mình.
- * - Du khách: quay lại mọi trang công khai, trừ khu quản trị.
+ * - Admin / Moderator / Đối tác: luôn vào thẳng trang Tổng quan của vai trò (`/admin`, `/moderator`, `/provider`).
+ * - Du khách: quay lại trang trước đó nếu có `callbackUrl` hợp lệ (trừ khu quản trị), mặc định về `/`.
  */
 export function resolvePostLoginPath(role, callbackUrl = readCallbackUrl()) {
   const roleKey = String(role || "").toUpperCase();
   const home = ROLE_HOME[roleKey] || "/";
+  if (ROLE_HOME[roleKey]) return home;
   const target = safeInternalPath(callbackUrl);
   if (!target) return home;
-  if (ROLE_HOME[roleKey]) return inArea(target, home) ? target : home;
   return Object.values(ROLE_HOME).some((p) => inArea(target, p)) ? home : target;
 }
 

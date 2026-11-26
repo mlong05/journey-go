@@ -4,13 +4,18 @@ import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
+  CalendarClock,
   CheckCircle2,
   ChevronRight,
   Coins,
   Compass,
+  FileEdit,
+  GitCompareArrows,
   Inbox,
   MapPin,
   Navigation,
+  QrCode,
+  Receipt,
   Send,
   ShieldCheck,
   Trophy,
@@ -27,20 +32,20 @@ import DestinationCheckInChart from "./DestinationCheckInChart";
 
 /**
  * Trang Tổng quan Đối tác — /provider
- * Số liệu: GET /api/v1/dashboard/provider (theo khoảng thời gian) + GET /api/v1/tours/my
  *
- * Bố cục (cuộn dọc):
- *   Header 1 hàng (tên đối tác | tab thời gian)
- *   Dải 4 ô số liệu (kèm % so với kỳ trước)
- *   [Diễn biến theo thời gian — kỳ này vs kỳ trước (8/12)] | [Check-in theo điểm đến (4/12)]
- *   [Tour / Điểm đến — 2 tab, danh sách tự cuộn (7/12)] | [Kết quả thẩm định gần đây + Nhiệm vụ (5/12)]
- * Màn nhỏ: các khối xếp dọc.
+ * Nguyên tắc UX:
+ *   • Mặc định (isComparing = false): Gọn sạch, chỉ hiển thị số liệu và biểu đồ của kỳ đang chọn
+ *     (Hôm nay · Tuần này · Tháng này · Quý này · Năm nay) trên hàng 4 ô KPI gốc + 2 khung biểu đồ (8/12 + 4/12).
+ *   • Khi bấm nút "So sánh" (isComparing = true): Mở chế độ đối chiếu trực tiếp 2 biểu đồ đặt cạnh nhau
+ *     (ví dụ Tháng này ↔ Tháng trước, Tuần này ↔ Tuần trước) kèm huy hiệu ▲/▼ % trên KPI và bảng Tour.
  */
 
 const RANGE_OPTIONS = [
-  { id: "today", label: "Hôm nay", previous: "hôm qua" },
-  { id: "week", label: "7 ngày", previous: "7 ngày trước" },
-  { id: "month", label: "Tháng này", previous: "cùng kỳ tháng trước" },
+  { id: "today", label: "Hôm nay", prevShort: "Hôm qua" },
+  { id: "week", label: "Tuần này", prevShort: "Tuần trước" },
+  { id: "month", label: "Tháng này", prevShort: "Tháng trước" },
+  { id: "quarter", label: "Quý này", prevShort: "Quý trước" },
+  { id: "year", label: "Năm nay", prevShort: "Năm trước" },
 ];
 
 const DEST_STATUS = {
@@ -50,7 +55,14 @@ const DEST_STATUS = {
   DRAFT: { label: "Bản nháp", cls: "bg-slate-100 text-slate-700 border-slate-200", dot: "bg-slate-400" },
 };
 
-/** Bộ lọc tab Tour — "Cần sửa" gồm cả bị từ chối và yêu cầu chỉnh sửa. */
+const BOOKING_STATUS_META = {
+  CONFIRMED: { label: "Đã xác nhận", cls: "bg-emerald-50 text-emerald-700 border-emerald-200/80", dot: "bg-emerald-500" },
+  COMPLETED: { label: "Hoàn thành", cls: "bg-sky-50 text-sky-700 border-sky-200/80", dot: "bg-sky-500" },
+  PENDING_PAYMENT: { label: "Chờ thanh toán", cls: "bg-amber-50 text-amber-700 border-amber-200/80", dot: "bg-amber-500" },
+  CANCELLED: { label: "Đã hủy", cls: "bg-rose-50 text-rose-700 border-rose-200/80", dot: "bg-rose-500" },
+  EXPIRED: { label: "Quá hạn", cls: "bg-slate-100 text-slate-600 border-slate-200", dot: "bg-slate-400" },
+};
+
 const TOUR_FILTERS = [
   { id: "all", label: "Tất cả", match: () => true },
   { id: "published", label: "Mở bán", match: (s) => s === "PUBLISHED" },
@@ -64,10 +76,12 @@ const DEST_FILTERS = [
   { id: "published", label: "Hoạt động", match: (s) => s === "PUBLISHED" },
   { id: "pending", label: "Chờ duyệt", match: (s) => s === "PENDING" },
   { id: "rejected", label: "Cần sửa", match: (s) => s === "REJECTED" },
+  { id: "draft", label: "Bản nháp", match: (s) => s === "DRAFT" },
 ];
 
 const UPDATE_ACTION = {
   APPROVED: { label: "đã được duyệt", icon: CheckCircle2, cls: "bg-emerald-50 text-emerald-600" },
+  CHANGES_REQUESTED: { label: "cần chỉnh sửa theo góp ý", icon: FileEdit, cls: "bg-amber-50 text-amber-600" },
   REJECTED: { label: "bị từ chối", icon: XCircle, cls: "bg-rose-50 text-rose-600" },
   SUBMITTED: { label: "đã gửi thẩm định", icon: Send, cls: "bg-sky-50 text-sky-600" },
 };
@@ -81,13 +95,12 @@ const TONE = {
 
 const fmtNumber = (n) => Number(n || 0).toLocaleString("vi-VN");
 
-/**
- * Badge so với kỳ trước: ▲/▼ kèm %. Kỳ trước bằng 0 mà kỳ này có số liệu ⇒ "Mới";
- * cả hai bằng 0 ⇒ không hiện.
- */
 function changeBadge(current, previous) {
-  const pct = percentChange(current, previous);
-  if (pct === null) return Number(current) > 0 ? { text: "Mới", positive: true } : null;
+  const cur = Number(current) || 0;
+  const prev = Number(previous) || 0;
+  if (cur === 0 && prev === 0) return null;
+  const pct = percentChange(cur, prev);
+  if (pct === null) return cur > 0 ? { text: "Mới", positive: true } : null;
   return {
     text: `${pct >= 0 ? "▲" : "▼"} ${Math.abs(pct).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`,
     positive: pct >= 0,
@@ -112,7 +125,11 @@ export default function ProviderOverviewPage() {
   const authData = useAuthSession();
 
   const [timeRange, setTimeRange] = useState("month");
-  const [listTab, setListTab] = useState("tours"); // "tours" | "destinations"
+  const [isComparing, setIsComparing] = useState(false);
+  const [compareScope, setCompareScope] = useState("same_span"); // "same_span" | "full_prev"
+  const [compareMode, setCompareMode] = useState("prev_1"); // "prev_1" | "prev_2" | "prev_4" | "prev_7" | "yoy"
+  const [forecastEnabled, setForecastEnabled] = useState(false);
+  const [listTab, setListTab] = useState("tours"); // "tours" | "destinations" | "bookings"
   const [tourFilter, setTourFilter] = useState("all");
   const [destFilter, setDestFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
@@ -120,16 +137,18 @@ export default function ProviderOverviewPage() {
   const [stats, setStats] = useState(null);
   const [myTours, setMyTours] = useState([]);
 
-  // Thời gian thực: booking mới, đối soát, kết quả duyệt → tải ngầm lại số liệu
   const [reloadKey, setReloadKey] = useState(0);
-  const lastRange = React.useRef(timeRange);
+  const effectiveScope = isComparing ? compareScope : "same_span";
+  const effectiveCompareMode = isComparing ? compareMode : "prev_1";
+  const effectiveForecast = forecastEnabled && ["week", "month", "quarter"].includes(timeRange);
+  const lastQueryKey = React.useRef(`${timeRange}:${effectiveScope}:${effectiveCompareMode}:${effectiveForecast}`);
   useQueueRefresh(["bookings", "settlements", "my-content"], () => setReloadKey((k) => k + 1));
 
   useEffect(() => {
     let isSubscribed = true;
-    // Chỉ hiện trạng thái đang tải khi đổi khoảng thời gian, không hiện khi tải ngầm
-    const silent = lastRange.current === timeRange && reloadKey > 0;
-    lastRange.current = timeRange;
+    const queryKey = `${timeRange}:${effectiveScope}:${effectiveCompareMode}:${effectiveForecast}`;
+    const silent = lastQueryKey.current === queryKey && reloadKey > 0;
+    lastQueryKey.current = queryKey;
     queueMicrotask(() => {
       if (isSubscribed && !silent) setIsLoading(true);
     });
@@ -137,7 +156,7 @@ export default function ProviderOverviewPage() {
     async function loadData() {
       try {
         const [dashboard, tours] = await Promise.all([
-          dashboardService.getProvider(timeRange),
+          dashboardService.getProvider(timeRange, effectiveScope, effectiveCompareMode, effectiveForecast),
           tourService.getMy().catch(() => []),
         ]);
         if (!isSubscribed) return;
@@ -156,17 +175,29 @@ export default function ProviderOverviewPage() {
     return () => {
       isSubscribed = false;
     };
-  }, [timeRange, reloadKey]);
+  }, [timeRange, effectiveScope, effectiveCompareMode, effectiveForecast, reloadKey]);
 
   const providerName = authData?.user?.fullName || authData?.user?.name || "Đối tác cung cấp nội dung";
   const range = RANGE_OPTIONS.find((r) => r.id === timeRange) ?? RANGE_OPTIONS[2];
+  const prevShortLabel = stats?.previousTitle || range.prevShort;
 
   const destStats = stats?.destinations ?? { total: 0, published: 0, pending: 0, rejected: 0, draft: 0 };
   const checkIns = stats?.checkIns ?? { current: 0, previous: 0, allTime: 0 };
-  const revenue = stats?.revenue ?? { current: 0, previous: 0, allTime: 0, currentBookings: 0 };
+  const revenue = stats?.revenue ?? { current: 0, previous: 0, allTime: 0, currentBookings: 0, previousBookings: 0 };
   const missions = stats?.missions ?? { tasks: 0, answered: 0, correct: 0 };
+  const tourPerformance = useMemo(() => stats?.tourPerformance ?? [], [stats]);
   const destinations = useMemo(() => stats?.destinationRows ?? [], [stats]);
+  const recentBookings = useMemo(() => stats?.recentBookings ?? [], [stats]);
+  const upcomingDepartures = useMemo(() => stats?.upcomingDepartures ?? [], [stats]);
   const updates = stats?.moderationUpdates ?? [];
+
+  const perfByTourId = useMemo(() => {
+    const map = new Map();
+    for (const p of tourPerformance) {
+      if (p?.tourId != null) map.set(p.tourId, p);
+    }
+    return map;
+  }, [tourPerformance]);
 
   const correctRate = missions.answered > 0 ? (missions.correct / missions.answered) * 100 : null;
   const loadingValue = isLoading && !stats;
@@ -183,20 +214,34 @@ export default function ProviderOverviewPage() {
     return counts;
   }, [destinations]);
 
-  const filteredTours = myTours.filter(
-    (t) => (TOUR_FILTERS.find((f) => f.id === tourFilter) ?? TOUR_FILTERS[0]).match(t.status),
-  );
+  const filteredTours = useMemo(() => {
+    const list = myTours.filter(
+      (t) => (TOUR_FILTERS.find((f) => f.id === tourFilter) ?? TOUR_FILTERS[0]).match(t.status),
+    );
+    return [...list].sort((a, b) => {
+      const pa = perfByTourId.get(a.tourId ?? a.id);
+      const pb = perfByTourId.get(b.tourId ?? b.id);
+      const ra = Number(pa?.currentRevenue) || 0;
+      const rb = Number(pb?.currentRevenue) || 0;
+      if (rb !== ra) return rb - ra;
+      return (Number(pb?.allTimeRevenue) || 0) - (Number(pa?.allTimeRevenue) || 0);
+    });
+  }, [myTours, tourFilter, perfByTourId]);
+
   const filteredDests = destinations.filter(
     (d) => (DEST_FILTERS.find((f) => f.id === destFilter) ?? DEST_FILTERS[0]).match(d.status),
   );
 
+  // ── Hàng 4 ô KPI gốc: Chỉ bật badge/hint kỳ trước khi người dùng bấm nút "So sánh" ──
   const kpis = [
     {
       id: "revenue",
       label: `Doanh thu tour · ${range.label}`,
       value: `${fmtNumber(revenue.current)} ₫`,
-      badge: changeBadge(revenue.current, revenue.previous),
-      hint: `${fmtNumber(revenue.currentBookings)} đơn · Tổng ${fmtNumber(revenue.allTime)} ₫`,
+      badge: isComparing ? changeBadge(revenue.current, revenue.previous) : null,
+      hint: isComparing
+        ? `${fmtNumber(revenue.currentBookings)} đơn (${prevShortLabel.toLowerCase()}: ${fmtNumber(revenue.previous)} ₫)`
+        : `${fmtNumber(revenue.currentBookings)} đơn · Tổng ${fmtNumber(revenue.allTime)} ₫`,
       icon: Coins,
       tone: "amber",
     },
@@ -204,8 +249,10 @@ export default function ProviderOverviewPage() {
       id: "checkins",
       label: `Lượt check-in · ${range.label}`,
       value: fmtNumber(checkIns.current),
-      badge: changeBadge(checkIns.current, checkIns.previous),
-      hint: `Tổng ${fmtNumber(checkIns.allTime)} lượt`,
+      badge: isComparing ? changeBadge(checkIns.current, checkIns.previous) : null,
+      hint: isComparing
+        ? `${prevShortLabel}: ${fmtNumber(checkIns.previous)} lượt · Tổng ${fmtNumber(checkIns.allTime)} lượt`
+        : `Tổng ${fmtNumber(checkIns.allTime)} lượt`,
       icon: Users,
       tone: "emerald",
     },
@@ -233,26 +280,50 @@ export default function ProviderOverviewPage() {
   const setActiveFilter = listTab === "tours" ? setTourFilter : setDestFilter;
 
   return (
-    // Cuộn dọc cả trang; danh sách tour / điểm đến và kết quả thẩm định vẫn cuộn riêng trong thẻ.
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto [scrollbar-width:thin]">
-      {/* ── Header 1 hàng ─────────────────────────────────────────────────── */}
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto pb-2 [scrollbar-width:thin]">
+      {/* ── Header 1 hàng: Tên đối tác | [5 kỳ thời gian] + [Nút So sánh] ──────────── */}
       <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="min-w-0 truncate text-lg font-bold tracking-tight text-slate-900 sm:text-xl" title={providerName}>
           {providerName}
         </h1>
-        <div className="flex w-fit shrink-0 items-center gap-0.5 rounded-lg bg-slate-100 p-1">
-          {RANGE_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setTimeRange(opt.id)}
-              className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-                timeRange === opt.id ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-fit max-w-full shrink-0 items-center gap-0.5 overflow-x-auto rounded-lg bg-slate-100 p-1">
+            {RANGE_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => {
+                  setTimeRange(opt.id);
+                  setCompareMode("prev_1");
+                }}
+                className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  timeRange === opt.id ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsComparing((v) => !v)}
+            aria-pressed={isComparing}
+            title={
+              isComparing
+                ? "Tắt chế độ so sánh"
+                : `So sánh ${range.label.toLowerCase()} với ${prevShortLabel.toLowerCase()}`
+            }
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              isComparing
+                ? "border-emerald-700 bg-emerald-700 text-white shadow-xs hover:bg-emerald-800"
+                : "border-slate-200 bg-white text-slate-700 shadow-2xs hover:border-emerald-600/40 hover:bg-emerald-50/50 hover:text-emerald-800"
+            }`}
+          >
+            <GitCompareArrows size={14} />
+            <span>{isComparing ? `Đang so sánh · ${prevShortLabel}` : "So sánh"}</span>
+          </button>
         </div>
       </div>
 
@@ -263,7 +334,7 @@ export default function ProviderOverviewPage() {
         </div>
       )}
 
-      {/* ── Dải 4 ô số liệu ──────────────────────────────────────────────── */}
+      {/* ── Dải 4 ô số liệu gốc (giữ nguyên cấu trúc 4 cột) ───────────────────────── */}
       <section
         aria-label="Chỉ số tổng quan"
         className="grid shrink-0 grid-cols-1 gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 shadow-xs sm:grid-cols-2 xl:grid-cols-4"
@@ -293,7 +364,7 @@ export default function ProviderOverviewPage() {
                       className={`shrink-0 rounded-full px-1.5 text-[10.5px] font-bold ${
                         k.badge.positive ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
                       }`}
-                      title={`So với ${range.previous}`}
+                      title={`So với ${range.prevShort.toLowerCase()}`}
                     >
                       {k.badge.text}
                     </span>
@@ -308,32 +379,57 @@ export default function ProviderOverviewPage() {
         })}
       </section>
 
-      {/* ── Biểu đồ: diễn biến kỳ này vs kỳ trước | check-in theo điểm đến ── */}
+      {/* ── Khu vực Biểu đồ: Mặc định 8/12 + 4/12; khi bật So sánh mở rộng 12/12 cho 2 biểu đồ cạnh nhau ── */}
       <section aria-label="Biểu đồ" className="grid shrink-0 grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className="min-w-0 xl:col-span-8">
-          <ProviderTrendChart series={stats?.series} unit={stats?.seriesUnit} rangeLabel={range.label}
-            previousLabel={range.previous} loading={loadingValue} />
+        <div className={`min-w-0 ${isComparing ? "xl:col-span-12" : "xl:col-span-8"}`}>
+          <ProviderTrendChart
+            series={stats?.series}
+            rangeId={timeRange}
+            unit={stats?.seriesUnit}
+            rangeLabel={range.label}
+            prevShortLabel={prevShortLabel}
+            currentSpan={stats?.currentLabel}
+            previousSpan={stats?.previousLabel}
+            compareEnabled={isComparing}
+            compareScope={compareScope}
+            compareMode={stats?.compareMode || compareMode}
+            onChangeCompareScope={setCompareScope}
+            onChangeCompareMode={setCompareMode}
+            onExitCompare={() => setIsComparing(false)}
+            forecast={stats?.forecast}
+            forecastEnabled={effectiveForecast}
+            onToggleForecast={() => setForecastEnabled((v) => !v)}
+            loading={loadingValue}
+          />
         </div>
-        <div className="flex min-w-0 xl:col-span-4 [&>section]:flex-1">
-          <DestinationCheckInChart destinations={destinations} loading={loadingValue} />
+        <div className={`flex min-w-0 [&>section]:flex-1 ${isComparing ? "xl:col-span-12" : "xl:col-span-4"}`}>
+          <DestinationCheckInChart
+            tourPerformance={tourPerformance}
+            destinations={destinations}
+            rangeLabel={range.label}
+            prevShortLabel={prevShortLabel}
+            compareEnabled={isComparing}
+            loading={loadingValue}
+          />
         </div>
       </section>
 
-      {/* ── Hai cột ──────────────────────────────────────────────────────── */}
+      {/* ── Hai cột danh mục & vận hành ──────────────────────────────────────────── */}
       <section className="grid shrink-0 grid-cols-1 gap-4 xl:h-[560px] xl:grid-cols-12 xl:grid-rows-[minmax(0,1fr)]">
-        {/* Cột trái: Tour / Điểm đến */}
+        {/* Cột trái (7/12): Tour | Điểm dừng | Đơn gần đây */}
         <div className="flex h-[520px] min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs xl:col-span-7 xl:h-auto xl:min-h-0">
           <div className="flex shrink-0 flex-col gap-2.5 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex w-fit shrink-0 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
+            <div className="flex w-fit max-w-full shrink-0 gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-1">
               {[
                 { id: "tours", label: "Tour", count: myTours.length, icon: Compass },
-                { id: "destinations", label: "Điểm đến", count: destStats.total, icon: MapPin },
+                { id: "destinations", label: "Điểm dừng", count: destStats.total, icon: MapPin },
+                { id: "bookings", label: "Đơn gần đây", count: recentBookings.length, icon: Receipt },
               ].map((t) => (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => setListTab(t.id)}
-                  className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+                  className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
                     listTab === t.id ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
@@ -347,18 +443,20 @@ export default function ProviderOverviewPage() {
             </div>
 
             <div className="flex min-w-0 items-center gap-2">
-              <select
-                value={activeFilter}
-                onChange={(e) => setActiveFilter(e.target.value)}
-                className="h-8 min-w-0 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 focus:outline-none"
-                aria-label="Lọc theo trạng thái"
-              >
-                {filters.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.label} ({counts[f.id] ?? 0})
-                  </option>
-                ))}
-              </select>
+              {listTab !== "bookings" && (
+                <select
+                  value={activeFilter}
+                  onChange={(e) => setActiveFilter(e.target.value)}
+                  className="h-8 min-w-0 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 focus:outline-none"
+                  aria-label="Lọc theo trạng thái"
+                >
+                  {filters.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.label} ({counts[f.id] ?? 0})
+                    </option>
+                  ))}
+                </select>
+              )}
               {listTab === "tours" && (
                 <Link
                   href="/provider/tours"
@@ -367,10 +465,17 @@ export default function ProviderOverviewPage() {
                   Quản lý tour <ChevronRight size={13} />
                 </Link>
               )}
+              {listTab === "bookings" && (
+                <Link
+                  href="/provider/bookings"
+                  className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-xs font-bold text-slate-600 hover:text-slate-900"
+                >
+                  Tất cả đơn đặt <ChevronRight size={13} />
+                </Link>
+              )}
             </div>
           </div>
 
-          {/* Vùng danh sách — cuộn RIÊNG bên trong */}
           <div className="min-h-0 flex-1 overflow-auto [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
             {listTab === "tours" ? (
               filteredTours.length === 0 ? (
@@ -385,31 +490,59 @@ export default function ProviderOverviewPage() {
                   }
                 />
               ) : (
-                <table className="w-full min-w-[520px] border-collapse text-left text-xs">
+                <table className="w-full min-w-[560px] border-collapse text-left text-xs">
                   <thead className="sticky top-0 z-10">
                     <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500">
                       <th className="px-4 py-2.5">Tên tour</th>
-                      <th className="px-3 py-2.5 text-right">Điểm đến</th>
-                      <th className="px-3 py-2.5 text-right">Thời lượng</th>
+                      <th className="px-2.5 py-2.5 text-right">Điểm dừng</th>
+                      <th className="px-2.5 py-2.5 text-right">Thời lượng</th>
+                      <th className="px-3 py-2.5 text-right">Doanh thu ({range.label})</th>
                       <th className="px-4 py-2.5">Trạng thái</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredTours.map((t) => {
+                      const tid = t.tourId ?? t.id;
+                      const perf = perfByTourId.get(tid);
                       const meta = TOUR_STATUS_META[t.status] ?? TOUR_STATUS_META.DRAFT;
                       const title = t.title || "Tour chưa đặt tên";
+                      const stopCount =
+                        perf?.stopCount ??
+                        (t.wizardTour ? t.stopCount : t.destinationCount || t.destinations?.length || 0) ??
+                        0;
+                      const curRev = Number(perf?.currentRevenue) || 0;
+                      const prevRev = Number(perf?.previousRevenue) || 0;
+                      const revDelta = isComparing ? changeBadge(curRev, prevRev) : null;
+
                       return (
-                        <tr key={t.tourId ?? t.id} className="hover:bg-slate-50/70">
+                        <tr key={tid} className="hover:bg-slate-50/70">
                           <td className="max-w-0 px-4 py-2.5">
                             <p className="truncate text-[13px] font-semibold text-slate-900" title={title}>
                               {title}
                             </p>
                           </td>
-                          <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-slate-600">
-                            {t.destinations?.length ?? t.destinationCount ?? 0} điểm
+                          <td className="whitespace-nowrap px-2.5 py-2.5 text-right tabular-nums text-slate-600">
+                            {stopCount} điểm
                           </td>
-                          <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-slate-600">
+                          <td className="whitespace-nowrap px-2.5 py-2.5 text-right tabular-nums text-slate-600">
                             {t.durationDays ? `${t.durationDays} ngày` : "—"}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">
+                            <div className="inline-flex items-center justify-end gap-1.5">
+                              <span className={curRev > 0 ? "font-bold text-slate-900" : "text-slate-400"}>
+                                {fmtNumber(curRev)} ₫
+                              </span>
+                              {revDelta && (
+                                <span
+                                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                                    revDelta.positive ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+                                  }`}
+                                  title={`${range.prevShort}: ${fmtNumber(prevRev)} ₫`}
+                                >
+                                  {revDelta.text}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="whitespace-nowrap px-4 py-2.5">
                             <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-bold ${meta.cls}`}>
@@ -423,60 +556,122 @@ export default function ProviderOverviewPage() {
                   </tbody>
                 </table>
               )
-            ) : filteredDests.length === 0 ? (
+            ) : listTab === "destinations" ? (
+              filteredDests.length === 0 ? (
+                <EmptyState
+                  icon={MapPin}
+                  text={
+                    isLoading
+                      ? "Đang tải điểm dừng…"
+                      : destinations.length === 0
+                        ? "Chưa có điểm dừng hoặc điểm đến nào."
+                        : "Không có điểm dừng nào ở trạng thái này."
+                  }
+                />
+              ) : (
+                <table className="w-full min-w-[540px] border-collapse text-left text-xs">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500">
+                      <th className="px-4 py-2.5">Điểm dừng / Điểm đến</th>
+                      <th className="px-3 py-2.5 text-right">Check-in</th>
+                      <th className="px-3 py-2.5 text-center">Định vị</th>
+                      <th className="px-4 py-2.5">Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredDests.map((d) => {
+                      const status = DEST_STATUS[d.status] ?? DEST_STATUS.DRAFT;
+                      const hasGps = d.latitude != null && d.longitude != null;
+                      const name = d.name || "Điểm dừng chưa đặt tên";
+                      const address = d.address || "Chưa cập nhật mô tả";
+                      return (
+                        <tr key={`${d.source || "DEST"}-${d.id}`} className="hover:bg-slate-50/70">
+                          <td className="max-w-0 px-4 py-2.5">
+                            <p className="truncate text-[13px] font-semibold text-slate-900" title={name}>
+                              {name}
+                            </p>
+                            <p className="truncate text-[11px] text-slate-500" title={address}>
+                              {address}
+                            </p>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5 text-right font-bold tabular-nums text-slate-900">
+                            {fmtNumber(d.checkIns)}
+                          </td>
+                          <td className="px-3 py-2.5 text-center">
+                            <div className="inline-flex items-center justify-center gap-1">
+                              <span
+                                className={`inline-flex h-6 w-6 items-center justify-center rounded-md ${
+                                  hasGps ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400"
+                                }`}
+                                title={hasGps ? `GPS: ${d.latitude}, ${d.longitude}` : "Chưa có tọa độ GPS"}
+                              >
+                                <Navigation size={12} />
+                              </span>
+                              {d.hasQr && (
+                                <span
+                                  className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-sky-50 text-sky-600"
+                                  title="Đã sinh mã QR check-in tại cổng"
+                                >
+                                  <QrCode size={12} />
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-2.5">
+                            <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-bold ${status.cls}`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
+                              {status.label}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )
+            ) : recentBookings.length === 0 ? (
               <EmptyState
-                icon={MapPin}
-                text={
-                  isLoading
-                    ? "Đang tải điểm đến…"
-                    : destinations.length === 0
-                      ? "Chưa có điểm đến di tích nào."
-                      : "Không có điểm đến nào ở trạng thái này."
-                }
+                icon={Receipt}
+                text={isLoading ? "Đang tải đơn đặt…" : "Chưa có đơn đặt tour nào."}
               />
             ) : (
-              <table className="w-full min-w-[520px] border-collapse text-left text-xs">
+              <table className="w-full min-w-[560px] border-collapse text-left text-xs">
                 <thead className="sticky top-0 z-10">
                   <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500">
-                    <th className="px-4 py-2.5">Điểm đến</th>
-                    <th className="px-3 py-2.5 text-right">Check-in</th>
-                    <th className="px-3 py-2.5 text-center">GPS</th>
+                    <th className="px-4 py-2.5">Mã đơn &amp; Khách hàng</th>
+                    <th className="px-3 py-2.5">Tour &amp; Ngày đi</th>
+                    <th className="px-2.5 py-2.5 text-right">Khách</th>
+                    <th className="px-3 py-2.5 text-right">Tổng tiền</th>
                     <th className="px-4 py-2.5">Trạng thái</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredDests.map((d) => {
-                    const status = DEST_STATUS[d.status] ?? DEST_STATUS.DRAFT;
-                    const hasGps = d.latitude != null && d.longitude != null;
-                    const name = d.name || "Điểm đến chưa đặt tên";
-                    const address = d.address || "Chưa cập nhật địa chỉ";
+                  {recentBookings.map((b) => {
+                    const bMeta = BOOKING_STATUS_META[b.status] ?? BOOKING_STATUS_META.PENDING_PAYMENT;
                     return (
-                      <tr key={d.id} className="hover:bg-slate-50/70">
-                        <td className="max-w-0 px-4 py-2.5">
-                          <p className="truncate text-[13px] font-semibold text-slate-900" title={name}>
-                            {name}
+                      <tr key={b.bookingId} className="hover:bg-slate-50/70">
+                        <td className="whitespace-nowrap px-4 py-2.5">
+                          <p className="font-mono text-xs font-bold text-slate-900">{b.bookingCode}</p>
+                          <p className="truncate text-[11px] text-slate-500">{b.touristName}</p>
+                        </td>
+                        <td className="max-w-0 px-3 py-2.5">
+                          <p className="truncate text-xs font-semibold text-slate-800" title={b.tourTitle}>
+                            {b.tourTitle}
                           </p>
-                          <p className="truncate text-[11px] text-slate-500" title={address}>
-                            {address}
+                          <p className="text-[11px] text-slate-400">
+                            Đi ngày {b.experienceDate ? formatDateVN(b.experienceDate) : "—"}
                           </p>
+                        </td>
+                        <td className="whitespace-nowrap px-2.5 py-2.5 text-right tabular-nums text-slate-700">
+                          {fmtNumber(b.slotCount)}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2.5 text-right font-bold tabular-nums text-slate-900">
-                          {fmtNumber(d.checkIns)}
-                        </td>
-                        <td className="px-3 py-2.5 text-center">
-                          <span
-                            className={`inline-flex h-6 w-6 items-center justify-center rounded-md ${
-                              hasGps ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400"
-                            }`}
-                            title={hasGps ? `${d.latitude}, ${d.longitude}` : "Chưa có tọa độ"}
-                          >
-                            <Navigation size={12} />
-                          </span>
+                          {fmtNumber(b.totalAmount)} ₫
                         </td>
                         <td className="whitespace-nowrap px-4 py-2.5">
-                          <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-bold ${status.cls}`}>
-                            <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
-                            {status.label}
+                          <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-bold ${bMeta.cls}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${bMeta.dot}`} />
+                            {bMeta.label}
                           </span>
                         </td>
                       </tr>
@@ -488,10 +683,52 @@ export default function ProviderOverviewPage() {
           </div>
         </div>
 
-        {/* Cột phải */}
+        {/* Cột phải (5/12) */}
         <div className="flex min-w-0 flex-col gap-4 xl:col-span-5 xl:min-h-0">
+          {upcomingDepartures.length > 0 && (
+            <div className="shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                    <CalendarClock size={16} />
+                  </span>
+                  <div className="min-w-0">
+                    <h2 className="truncate text-sm font-bold text-slate-900">Đoàn sắp khởi hành</h2>
+                    <p className="truncate text-[11px] text-slate-500">Đơn đã xác nhận trong 14 ngày tới</p>
+                  </div>
+                </div>
+                <Link
+                  href="/provider/bookings"
+                  className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                >
+                  Chi tiết <ChevronRight size={13} />
+                </Link>
+              </div>
+              <ul className="max-h-[128px] divide-y divide-slate-100 overflow-y-auto [scrollbar-width:thin]">
+                {upcomingDepartures.slice(0, 4).map((dep) => (
+                  <li
+                    key={`${dep.tourId}-${dep.experienceDate}`}
+                    className="flex items-center justify-between gap-3 px-4 py-2 text-xs"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold text-slate-900" title={dep.tourTitle}>
+                        {dep.tourTitle}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Khởi hành: <strong className="font-semibold text-emerald-700">{formatDateVN(dep.experienceDate)}</strong>
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-bold tabular-nums text-emerald-800">
+                      {fmtNumber(dep.guestCount)} khách ({fmtNumber(dep.bookingCount)} đơn)
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Kết quả thẩm định gần đây */}
-          <div className="flex h-[360px] min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs xl:h-auto xl:min-h-0 xl:flex-1">
+          <div className="flex h-[320px] min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs xl:h-auto xl:min-h-0 xl:flex-1">
             <div className="flex shrink-0 items-center gap-2.5 border-b border-slate-100 px-4 py-3">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
                 <ShieldCheck size={16} />
@@ -541,13 +778,13 @@ export default function ProviderOverviewPage() {
             </div>
           </div>
 
-          {/* Nhiệm vụ & đố vui */}
+          {/* Nhiệm vụ & đố vui di sản */}
           <div className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-xs">
             <div className="flex items-center gap-2.5">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
                 <Trophy size={16} />
               </span>
-              <h2 className="min-w-0 truncate text-sm font-bold text-slate-900">Nhiệm vụ & đố vui di sản</h2>
+              <h2 className="min-w-0 truncate text-sm font-bold text-slate-900">Nhiệm vụ &amp; đố vui di sản</h2>
             </div>
             <dl className="mt-3 grid grid-cols-3 gap-2">
               <MiniStat label="Nhiệm vụ" value={fmtNumber(missions.tasks)} />

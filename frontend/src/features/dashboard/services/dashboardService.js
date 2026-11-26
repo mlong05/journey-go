@@ -62,8 +62,19 @@ export async function getAdminOperationBadges() {
   return result || {};
 }
 
-export async function getProviderDashboard(range = "month") {
-  return unwrap(await apiClient.get(`${ENDPOINTS.PROVIDER}?range=${encodeURIComponent(range)}`));
+export async function getProviderDashboard(
+  range = "month",
+  compareScope = "same_span",
+  compareMode = "prev_1",
+  forecast = false,
+) {
+  const params = new URLSearchParams({
+    range,
+    compareScope,
+    compareMode,
+    forecast: forecast ? "true" : "false",
+  });
+  return unwrap(await apiClient.get(`${ENDPOINTS.PROVIDER}?${params.toString()}`));
 }
 
 export async function getModeratorDashboard() {

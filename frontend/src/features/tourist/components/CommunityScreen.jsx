@@ -340,7 +340,7 @@ function ComposerModal({ open, onClose, onCreated }) {
 /** Trang /community — bảng tin 2 cột: bài viết + cột phải (chia sẻ, tour được nhắc nhiều, quy tắc). */
 export default function CommunityScreen() {
   const router = useRouter();
-  const t = useT();
+  const { t, locale } = useI18n();
   const { user, isTourist } = useTouristSession();
   const toLogin = () => router.push(`${ROUTES.LOGIN}?callbackUrl=${encodeURIComponent(ROUTES.COMMUNITY)}`);
   const [feed, setFeed] = useState({ loading: true, items: [], last: true, total: 0, error: "", page: 0, more: false });
@@ -363,12 +363,12 @@ export default function CommunityScreen() {
       setStats({ posts: total, tours: [...byTour.values()].sort((a, b) => b.count - a.count).slice(0, 5), cover });
     }).catch(() => {});
     return () => { alive = false; };
-  }, []);
+  }, [locale]);
 
   // Chỉ gọi API rồi ghi kết quả; trạng thái "đang tải" bật ở chỗ người dùng thao tác (đổi sắp xếp / lọc / xem thêm).
   const fetchPage = useCallback((page) => touristService.communityFeed({ page, size: PAGE_SIZE, sort, tourId: tourFilter || undefined })
     .then(({ items, last, total }) => setFeed((f) => ({ loading: false, more: false, error: "", page, last, total, items: page === 0 ? items : [...f.items, ...items.filter((p) => !f.items.some((x) => x.id === p.id))] })))
-    .catch((err) => setFeed((f) => ({ ...f, loading: false, more: false, error: err?.message || translate(getLocale(), "community.errorLoadPosts") }))), [sort, tourFilter]);
+    .catch((err) => setFeed((f) => ({ ...f, loading: false, more: false, error: err?.message || translate(locale, "community.errorLoadPosts") }))), [sort, tourFilter, locale]);
   useEffect(() => { fetchPage(0); }, [fetchPage]);
 
   const changeSort = (k) => { if (k === sort) return; setFeed((f) => ({ ...f, loading: true })); setSort(k); };

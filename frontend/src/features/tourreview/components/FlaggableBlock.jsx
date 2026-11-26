@@ -31,13 +31,13 @@ export default function FlaggableBlock({ anchor, label, children }) {
   // Nút luôn hiện ở góc phải; khối chừa sẵn cột bên phải (pr-12) nên nút không bao giờ đè lên nội dung.
   return (
     <div id={anchorId(anchor)}
-      className={`group relative rounded-xl p-3 transition-colors scroll-mt-24 ${!readOnly ? "pr-12" : ""} ${flagged ? "border-2 border-orange-400 bg-orange-50/40" : "border border-slate-100 hover:border-slate-200 hover:bg-slate-50/60"}`}>
+      className={`group relative rounded-xl p-3 transition-colors scroll-mt-24 ${!readOnly ? "pr-12" : ""} ${flagged ? "border-2 border-orange-400 bg-orange-50/40" : "border border-slate-200/80 bg-white hover:border-slate-300"}`}>
       {!readOnly && (
         <button type="button" onClick={() => setEditing((v) => !v)} aria-expanded={editing}
           aria-label={flagged ? `${mine.length} ghi chú — thêm ghi chú cho: ${label}` : `Gắn cờ / ghi chú cho: ${label}`}
-          title={flagged ? `${mine.length} ghi chú · bấm để thêm` : "Gắn cờ / Ghi chú"}
-          className={`absolute top-2.5 right-2.5 z-10 inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-lg px-1.5 text-[11px] font-bold transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/50 ${flagged ? "bg-orange-500 text-white hover:bg-orange-600" : editing ? "border border-orange-300 bg-orange-50 text-orange-600" : "border border-slate-200 bg-white text-slate-400 hover:border-orange-300 hover:text-orange-600"}`}>
-          <Flag size={14} />{flagged && <span className="tabular-nums">{mine.length}</span>}
+          title={flagged ? `${mine.length} ghi chú · bấm để thêm (${label})` : `Gắn cờ / Ghi chú: ${label}`}
+          className={`absolute top-2.5 right-2.5 z-10 inline-flex h-7 min-w-7 items-center justify-center gap-1 rounded-lg px-1.5 text-[11px] font-bold transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/50 ${flagged ? "bg-orange-500 text-white hover:bg-orange-600 shadow-xs" : editing ? "border border-orange-300 bg-orange-50 text-orange-600" : "border border-slate-200 bg-slate-50/80 text-slate-400 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-600"}`}>
+          <Flag size={13} />{flagged && <span className="tabular-nums">{mine.length}</span>}
         </button>
       )}
       {children}

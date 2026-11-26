@@ -2,10 +2,10 @@
 
 import React from "react";
 import {
-  CheckCircle2, Circle, Trash2, ListChecks, PenLine, Image as ImageIcon, ArrowDownUp, SlidersHorizontal,
+  CheckCircle2, Circle, Trash2, ListChecks, PenLine, Image as ImageIcon, ArrowDownUp,
   ChevronUp, ChevronDown, Plus, Link2,
 } from "lucide-react";
-import { TextInput, TextArea, PointsBadge, SingleImage, NumberInput } from "../FormKit";
+import { TextInput, TextArea, PointsBadge, SingleImage } from "../FormKit";
 import { LimitedField } from "@/components/ui/LimitedField";
 import { LIMITS } from "../../constants";
 
@@ -20,7 +20,6 @@ export const QUIZ_TYPES = [
   { key: "MULTIPLE_CHOICE", label: "Chọn đáp án", Icon: ListChecks, hint: "4 đáp án chữ, 1 đáp án đúng." },
   { key: "IMAGE_CHOICE", label: "Chọn ảnh", Icon: ImageIcon, hint: "4 ảnh đáp án, 1 ảnh đúng. Hợp với câu \"đâu là…?\"." },
   { key: "ORDERING", label: "Xếp thứ tự", Icon: ArrowDownUp, hint: "3–5 mục, nhập theo thứ tự ĐÚNG — app tự xáo trộn cho khách sắp xếp lại." },
-  { key: "NUMBER", label: "Đoán số", Icon: SlidersHorizontal, hint: "Khách kéo thanh trượt để đoán (năm, số đếm…). Đúng khi lệch không quá sai số." },
   { key: "MATCHING", label: "Nối cột", Icon: Link2, hint: "3–5 cặp đúng (cột A có thể kèm ảnh, cột B là chữ) — app tự xáo cột B, đúng toàn bộ mới có điểm." },
 ];
 
@@ -28,7 +27,6 @@ const ORDERING_MIN = 3;
 const ORDERING_MAX = 5;
 const MATCHING_MIN = 3;
 const MATCHING_MAX = 5;
-const NUMBER_RANGE_MAX = 1000;
 
 const emptyAnswers = () => Array.from({ length: 4 }, (_, i) => ({ content: "", correct: i === 0, imageUrl: "", matchText: "" }));
 
@@ -38,13 +36,9 @@ export const emptyQuestion = () => ({
   answers: emptyAnswers(),
   referenceAnswer: "",
   explanation: "",
-  numberMin: null,
-  numberMax: null,
-  numberCorrect: null,
-  numberTolerance: 0,
 });
 
-const KNOWN_TYPES = ["MULTIPLE_CHOICE", "TEXT", "IMAGE_CHOICE", "ORDERING", "NUMBER", "MATCHING"];
+const KNOWN_TYPES = ["MULTIPLE_CHOICE", "TEXT", "IMAGE_CHOICE", "ORDERING", "MATCHING"];
 
 /** Chuẩn hóa câu hỏi từ server: tối thiểu 4 dòng đáp án (giữ lại để đổi qua lại giữa các dạng). */
 export const normalizeQuestion = (q) => {
@@ -61,10 +55,6 @@ export const normalizeQuestion = (q) => {
     answers: answers.slice(0, ORDERING_MAX),
     referenceAnswer: q?.referenceAnswer || "",
     explanation: q?.explanation || "",
-    numberMin: q?.numberMin ?? null,
-    numberMax: q?.numberMax ?? null,
-    numberCorrect: q?.numberCorrect ?? null,
-    numberTolerance: q?.numberTolerance ?? 0,
   };
 };
 
@@ -74,11 +64,6 @@ export const questionBody = (q) => {
   switch (q.type) {
     case "TEXT":
       return { ...base, answers: [], referenceAnswer: q.referenceAnswer || null };
-    case "NUMBER":
-      return {
-        ...base, answers: [], referenceAnswer: null,
-        numberMin: q.numberMin, numberMax: q.numberMax, numberCorrect: q.numberCorrect, numberTolerance: q.numberTolerance ?? 0,
-      };
     case "ORDERING":
       return {
         ...base, referenceAnswer: null,
@@ -116,14 +101,6 @@ export function quizError(q) {
   if (!q.content?.trim()) return "Vui lòng nhập nội dung câu hỏi.";
   const four = q.answers.slice(0, 4);
   switch (q.type) {
-    case "NUMBER": {
-      const { numberMin: min, numberMax: max, numberCorrect: correct } = q;
-      if (min == null || max == null || min >= max) return "Khoảng thanh trượt cần có giá trị nhỏ nhất < lớn nhất.";
-      if (max - min > NUMBER_RANGE_MAX) return `Khoảng thanh trượt tối đa ${NUMBER_RANGE_MAX} đơn vị.`;
-      if (correct == null || correct < min || correct > max) return "Đáp án đúng phải nằm trong khoảng thanh trượt.";
-      if ((q.numberTolerance ?? 0) < 0) return "Sai số không được âm.";
-      return null;
-    }
     case "ORDERING": {
       const filled = q.answers.filter((a) => a.content?.trim());
       if (filled.length < ORDERING_MIN) return `Câu xếp thứ tự cần ít nhất ${ORDERING_MIN} mục.`;
@@ -159,9 +136,6 @@ const LETTERS = ["A", "B", "C", "D", "E"];
 /** Dòng tóm tắt đáp án của câu quiz (danh sách câu hỏi đã lưu). */
 export function quizSummary(q) {
   switch (q.type) {
-    case "NUMBER":
-      return `Đoán số ${q.numberMin ?? "?"}–${q.numberMax ?? "?"} · Đáp án ${q.numberCorrect ?? "?"}`
-        + `${q.numberTolerance ? ` (±${q.numberTolerance})` : ""}`;
     case "ORDERING":
       return `Xếp thứ tự: ${q.answers.filter((a) => a.content?.trim()).map((a) => a.content.trim()).join(" → ") || "—"}`;
     case "MATCHING": {
@@ -181,7 +155,7 @@ export function quizSummary(q) {
 
 /**
  * Soạn một câu hỏi.
- * - quizTypes: câu đố văn hóa của điểm đến — chọn 1 trong 4 dạng (chọn đáp án, chọn ảnh, xếp thứ tự, đoán số)
+ * - quizTypes: câu đố văn hóa của điểm đến — chọn 1 trong 4 dạng (chọn đáp án, chọn ảnh, xếp thứ tự, nối cột)
  * - Tự luận (khi allowTypes): khách nhập câu trả lời; đối tác ghi đáp án gợi ý nếu muốn.
  * - fixedType ("MULTIPLE_CHOICE" | "TEXT"): dạng do loại nhiệm vụ quyết định, không cho đổi.
  *   Dạng nhập chữ khi đó bắt buộc "Đáp án đúng" (nhiều đáp án chấp nhận cách nhau bằng dấu ;).
@@ -241,7 +215,7 @@ export default function QuestionEditor({
       )}
 
       <TextInput value={q.content} limit={LIMITS.TEXT.QUESTION} disabled={readOnly}
-        placeholder={isText ? "Nội dung câu hỏi tự luận" : type === "ORDERING" ? "Vd: Xếp các sự kiện theo thời gian" : type === "NUMBER" ? "Vd: Dinh được khánh thành năm nào?" : type === "MATCHING" ? "Vd: Nối tên địa danh với đặc trưng tương ứng" : "Nội dung câu hỏi"}
+        placeholder={isText ? "Nội dung câu hỏi tự luận" : type === "ORDERING" ? "Vd: Xếp các sự kiện theo thời gian" : type === "MATCHING" ? "Vd: Nối tên địa danh với đặc trưng tương ứng" : "Nội dung câu hỏi"}
         onChange={(e) => onChange({ ...q, content: e.target.value })} />
 
       {isText && fixedType ? (
@@ -264,25 +238,6 @@ export default function QuestionEditor({
           <TextArea rows={2} value={q.referenceAnswer || ""} limit={LIMITS.TEXT.REFERENCE_ANSWER} disabled={readOnly}
             placeholder="Đáp án gợi ý (không bắt buộc)"
             onChange={(e) => onChange({ ...q, referenceAnswer: e.target.value })} />
-        </div>
-      ) : type === "NUMBER" ? (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[
-            ["numberMin", "Nhỏ nhất", "1950"],
-            ["numberMax", "Lớn nhất", "1980"],
-            ["numberCorrect", "Đáp án đúng", "1966"],
-            ["numberTolerance", "Sai số cho phép (±)", "0"],
-          ].map(([field, fieldLabel, placeholder]) => (
-            <label key={field} className="space-y-1">
-              <span className="text-[11px] font-bold text-slate-700">{fieldLabel}</span>
-              <NumberInput value={q[field] ?? ""} disabled={readOnly} placeholder={placeholder}
-                min={field === "numberTolerance" ? 0 : undefined}
-                onChange={(v) => onChange({ ...q, [field]: v === "" || v == null ? null : Number(v) })} />
-            </label>
-          ))}
-          <p className="col-span-full text-[11px] text-slate-500">
-            Đếm số (vd. số cột) thì đặt sai số 0. Đoán năm có thể cho ±1–2 năm.
-          </p>
         </div>
       ) : type === "ORDERING" ? (
         <div className="space-y-1.5">

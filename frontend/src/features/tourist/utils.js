@@ -57,6 +57,13 @@ export const todayIso = () => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
+/** Ngày mai theo giờ địa phương, dạng yyyy-MM-dd (mốc mở đặt tour tối thiểu). */
+export const tomorrowIso = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
 /** Bỏ dấu tiếng Việt để tìm kiếm không dấu. */
 export const normalize = (s) =>
   String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/gi, "d").toLowerCase();

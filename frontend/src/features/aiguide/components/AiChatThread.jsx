@@ -103,6 +103,7 @@ export default function AiChatThread({
   handoffLoading = false,
   onRequestHumanSupport = null,
   onReturnToAi = null,
+  userName = "",
   maxLength = 1000,
   compact = false,
 }) {
@@ -281,10 +282,12 @@ export default function AiChatThread({
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-6 text-center">
             <div className="mb-3 grid h-11 w-11 place-items-center rounded-2xl bg-teal-50 text-teal-700 ring-1 ring-teal-200/70">
-              <Sparkles size={20} />
+              <Bot size={22} />
             </div>
             <p className="text-sm font-bold text-slate-800">
-              {t("aiguide.welcome.title")}
+              {userName
+                ? t("aiguide.welcome.titleNamed", { name: userName })
+                : t("aiguide.welcome.title")}
             </p>
             <p className="mt-1 max-w-sm text-xs leading-relaxed text-slate-500">
               {t("aiguide.welcome.subtitle")}

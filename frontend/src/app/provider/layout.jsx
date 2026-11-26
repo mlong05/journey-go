@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Route,
-  Sparkles,
+  ClipboardList,
   Users,
   Headphones,
   Wallet,
@@ -14,8 +14,9 @@ import {
 import { useRequireLogin } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
 import { Sidebar, DashboardHeader, NotificationBell } from "@/components/layout";
-import { NotificationProvider } from "@/context/NotificationContext";
+import { NotificationProvider, useQueueRefresh } from "@/context/NotificationContext";
 import NotificationToaster from "@/components/notifications/NotificationToaster";
+import { providerChatService } from "@/features/providerchat/services/providerChatService";
 
 /**
  * Danh mục điều hướng Sidebar của Đối tác — nhóm theo luồng nghiệp vụ.
@@ -42,7 +43,7 @@ const PROVIDER_NAV_ITEMS = [
     id: "tour-requests",
     label: "Yêu cầu tour theo nhu cầu",
     href: "/provider/requests",
-    icon: Sparkles,
+    icon: ClipboardList,
     group: "Vận hành",
     badge: null,
   },
@@ -80,31 +81,46 @@ const PROVIDER_NAV_ITEMS = [
   },
 ];
 
-
-export default function ProviderLayout({ children }) {
+function ProviderLayoutInner({ children }) {
   const pathname = usePathname();
   const authData = useRequireLogin();
   const { performLogout, logoutModal } = useLogout();
-
-  // Khóa triệt để thanh cuộn của window/body để loại bỏ hoàn toàn thanh cuộn ngoài cùng của cả trang
-  useEffect(() => {
-    const prevHtmlOverflow = document.documentElement.style.overflow;
-    const prevBodyOverflow = document.body.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.documentElement.style.overflow = prevHtmlOverflow;
-      document.body.style.overflow = prevBodyOverflow;
-    };
-  }, []);
-
-  // State điều khiển drawer trên mobile/tablet & trạng thái co giãn của side rail
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarWide, setIsSidebarWide] = useState(true);
+  const [unreadChat, setUnreadChat] = useState(0);
 
-  // State thông báo duyệt bài
+  const loadUnread = useCallback(async () => {
+    try {
+      const list = await providerChatService.listProviderConversations();
+      const count = (list || []).reduce((sum, c) => sum + Number(c?.unreadCount || 0), 0);
+      setUnreadChat(count);
+    } catch {
+      // Bỏ qua lỗi phụ khi chưa đăng nhập xong
+    }
+  }, []);
 
-  // Dynamic danh sách thông báo duyệt bài (sẵn sàng gắn API)
+  useEffect(() => {
+    queueMicrotask(() => loadUnread());
+  }, [loadUnread, pathname]);
+
+  useQueueRefresh(["provider-chat", "bookings"], () => loadUnread());
+
+  const navItemsWithBadges = useMemo(
+    () =>
+      PROVIDER_NAV_ITEMS.map((item) => {
+        if (item.id === "support" && unreadChat > 0) {
+          return {
+            ...item,
+            badge: {
+              text: unreadChat > 99 ? "99+" : String(unreadChat),
+              color: "bg-emerald-700 text-white ring-emerald-800/20",
+            },
+          };
+        }
+        return item;
+      }),
+    [unreadChat],
+  );
 
   // Trang Quản lý Tour & Thông tin đối tác: khóa khung 100vh, cố định header & filter,
   // chỉ phần nội dung tự cuộn (trang Thông tin đối tác còn cuộn riêng cho khối lịch sử).
@@ -117,67 +133,84 @@ export default function ProviderLayout({ children }) {
     pathname?.startsWith("/provider/partner-info") ||
     pathname?.startsWith("/provider/finance");
 
-  const currentTitle =
-    [...PROVIDER_NAV_ITEMS]
-      .sort((a, b) => b.href.length - a.href.length)
-      .find((i) => {
-        const p = i.href.split("#")[0];
-        return p === "/provider" ? pathname === "/provider" : pathname?.startsWith(p);
-      })?.label || "Tổng quan";
+  const currentItem = [...PROVIDER_NAV_ITEMS]
+    .sort((a, b) => b.href.length - a.href.length)
+    .find((i) => {
+      const p = i.href.split("#")[0];
+      return p === "/provider" ? pathname === "/provider" : pathname?.startsWith(p);
+    });
+  const currentTitle = currentItem?.label || "Tổng quan";
+  const currentGroup = currentItem?.group || "Vận hành";
+
+  return (
+    <div className="fixed inset-0 h-screen h-[100dvh] w-screen max-w-full max-h-full overflow-hidden flex bg-[#f6f9f7] m-0 p-0 font-sans antialiased text-slate-800">
+      <Sidebar
+        role="provider"
+        navItems={navItemsWithBadges}
+        onLogout={performLogout}
+        isOpenMobile={isSidebarOpen}
+        onCloseMobile={() => setIsSidebarOpen(false)}
+        isWide={isSidebarWide}
+        onToggleWide={() => setIsSidebarWide((prev) => !prev)}
+      />
+
+      <div className="flex-1 min-w-0 w-full h-full max-h-full flex flex-col overflow-hidden">
+        <DashboardHeader
+          role="provider"
+          user={authData?.user}
+          section={currentGroup}
+          title={currentTitle}
+          onOpenMenu={() => setIsSidebarOpen(true)}
+        >
+          <NotificationBell hint="Kết quả thẩm định điểm đến và tour của bạn sẽ hiện ở đây." />
+        </DashboardHeader>
+
+        {/* ── NỘI DUNG TRANG CHÍNH: Nền xanh sage rất dịu đặc trưng của Không gian Đối tác ── */}
+        <main
+          className={
+            isScrollLockedPage
+              ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-3 sm:p-4 lg:p-5 bg-[#f6f9f7]"
+              : "flex-1 min-h-0 h-full w-full overflow-y-auto overflow-x-hidden p-3 sm:p-4 lg:p-5 bg-[#f6f9f7] [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
+          }
+        >
+          <div
+            key={pathname}
+            className={`jg-page-enter ${
+              isScrollLockedPage
+                ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col overflow-hidden"
+                : "w-full max-w-[1600px] mx-auto space-y-6 pb-8"
+            }`}
+          >
+            {children}
+          </div>
+        </main>
+      </div>
+
+      <LogoutModal
+        isOpen={logoutModal.isOpen}
+        status={logoutModal.status}
+        message={logoutModal.message}
+      />
+    </div>
+  );
+}
+
+export default function ProviderLayout({ children }) {
+  // Khóa triệt để thanh cuộn của window/body để loại bỏ hoàn toàn thanh cuộn ngoài cùng của cả trang
+  useEffect(() => {
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+    };
+  }, []);
 
   return (
     <NotificationProvider>
-      <div className="fixed inset-0 h-screen h-[100dvh] w-screen max-w-full max-h-full overflow-hidden flex bg-slate-50 m-0 p-0 font-sans antialiased text-slate-800">
-        <Sidebar
-          role="provider"
-          navItems={PROVIDER_NAV_ITEMS}
-          onLogout={performLogout}
-          isOpenMobile={isSidebarOpen}
-          onCloseMobile={() => setIsSidebarOpen(false)}
-          isWide={isSidebarWide}
-          onToggleWide={() => setIsSidebarWide((prev) => !prev)}
-        />
-
-        <div className="flex-1 min-w-0 w-full h-full max-h-full flex flex-col overflow-hidden">
-          <DashboardHeader
-            role="provider"
-            user={authData?.user}
-            section="Đối tác"
-            title={currentTitle}
-            onOpenMenu={() => setIsSidebarOpen(true)}
-          >
-            <NotificationBell hint="Kết quả thẩm định điểm đến và tour của bạn sẽ hiện ở đây." />
-          </DashboardHeader>
-
-          {/* ── NỘI DUNG TRANG CHÍNH: Cố định toàn khung với các trang danh sách, cho phép con tự cuộn ── */}
-          <main
-            className={
-              isScrollLockedPage
-                ? "flex-1 min-h-0 h-full w-full overflow-hidden flex flex-col p-3 sm:p-4 lg:p-5 bg-slate-50"
-                : "flex-1 min-h-0 h-full w-full overflow-y-auto overflow-x-hidden p-3 sm:p-4 lg:p-5 bg-slate-50 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
-            }
-          >
-            {/* key theo đường dẫn: mỗi lần chuyển trang chạy lại hiệu ứng hiện dần */}
-            <div
-              key={pathname}
-              className={`jg-page-enter ${
-                isScrollLockedPage
-                  ? "w-full max-w-[1600px] mx-auto flex-1 min-h-0 flex flex-col overflow-hidden"
-                  : "w-full max-w-[1600px] mx-auto space-y-6 pb-8"
-              }`}
-            >
-              {children}
-            </div>
-          </main>
-        </div>
-
-        {/* Modal đăng xuất cao cấp tích hợp */}
-        <LogoutModal
-          isOpen={logoutModal.isOpen}
-          status={logoutModal.status}
-          message={logoutModal.message}
-        />
-      </div>
+      <ProviderLayoutInner>{children}</ProviderLayoutInner>
       <NotificationToaster />
     </NotificationProvider>
   );

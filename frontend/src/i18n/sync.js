@@ -50,12 +50,12 @@ export function applyAccountLocale(code) {
  * để đồng bộ với app di động (chỉ cho đúng tài khoản đó).
  */
 export function syncLocaleToServer(code) {
-  if (typeof window === "undefined") return;
-  if (isDashboardPath(window.location.pathname)) return;
-  if (!hasTouristSession()) return;
+  if (typeof window === "undefined") return Promise.resolve();
+  if (isDashboardPath(window.location.pathname)) return Promise.resolve();
+  if (!hasTouristSession()) return Promise.resolve();
   const next = normalizeLocale(code);
   patchStoredPreferredLanguage(next);
-  apiClient.patch("/auth/me/language", { preferredLanguage: next }, { silentAuth: true }).catch(() => {
+  return apiClient.patch("/auth/me/language", { preferredLanguage: next }, { silentAuth: true }).catch(() => {
     // Mất mạng / phiên hết hạn: vẫn giữ ngôn ngữ vừa chọn ở localStorage
   });
 }

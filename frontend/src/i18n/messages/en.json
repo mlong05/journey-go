@@ -1,5 +1,9 @@
 {
   "common.language": "Language",
+  "common.languageConfirmTitle": "Switch language to {language}?",
+  "common.languageConfirmMessage": "The page will reload to apply the new language across all content.",
+  "common.languageConfirmAction": "Confirm & reload",
+  "common.cancel": "Cancel",
   "nav.explore": "Explore",
   "nav.tours": "All Tours",
   "nav.tourRequests": "Custom Tour Requests",
@@ -186,5 +190,12 @@
   "notif.newCount": "{count} new",
   "notif.readAll": "Read all",
   "notif.bellEmptyDesc": "Booking status, refund results and rewards will show up here.",
-  "notif.viewAll": "View all notifications"
+  "notif.viewAll": "View all notifications",
+  "pagination.showingPage": "Showing page",
+  "pagination.totalPrefix": "Total: ",
+  "pagination.defaultUnit": "records",
+  "pagination.firstPage": "First page",
+  "pagination.prevPage": "Previous page",
+  "pagination.nextPage": "Next page",
+  "pagination.lastPage": "Last page"
 }
