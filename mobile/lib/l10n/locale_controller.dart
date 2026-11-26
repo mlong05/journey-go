@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/services/catalog_service.dart';
 import 'app_localizations.dart';
 
 export 'app_localizations.dart';
@@ -114,9 +115,17 @@ class LocaleController extends ValueNotifier<Locale> {
     }
   }
 
+  /// Tăng bộ đếm mỗi khi người dùng xác nhận đổi ngôn ngữ để `MaterialApp` tải lại toàn bộ trang.
+  final ValueNotifier<int> reloadTick = ValueNotifier<int>(0);
+
+  void triggerAppReload() {
+    reloadTick.value++;
+  }
+
   Future<void> setLocale(Locale locale, {bool syncServer = true}) async {
     if (!AppLocalizations.supportedLocales.contains(locale)) return;
     value = locale;
+    CatalogService().clearCache();
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_prefsKey, locale.languageCode);
@@ -126,9 +135,11 @@ class LocaleController extends ValueNotifier<Locale> {
     if (syncServer) {
       final hook = onUserLocaleChanged;
       if (hook != null) {
-        hook(locale.languageCode).catchError((Object e) {
+        try {
+          await hook(locale.languageCode);
+        } catch (e) {
           debugPrint('LocaleController sync server lỗi: $e');
-        });
+        }
       }
     }
   }

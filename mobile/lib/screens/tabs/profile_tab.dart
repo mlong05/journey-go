@@ -1167,8 +1167,8 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
             icon: Icons.auto_awesome_rounded,
             iconColor: AppCultureColors.heritageJade,
             iconBg: AppCultureColors.jadeLight,
-            title: 'Tour theo nhu cầu',
-            subtitle: 'Đăng yêu cầu & đặt tour thiết kế riêng cho bạn',
+            title: l10n.tourRequestsTitle,
+            subtitle: l10n.tourRequestsSubtitle,
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const TourRequestsScreen()),
@@ -1292,7 +1292,8 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
                       selected: lang.locale == controller.value,
                       onTap: () {
                         Navigator.of(ctx).pop();
-                        controller.setLocale(lang.locale);
+                        if (lang.locale == controller.value) return;
+                        _confirmLanguageChange(lang);
                       },
                     ),
                   ],
@@ -1303,6 +1304,49 @@ class _ProfileTabState extends State<ProfileTab> with RefreshOnTabReturn {
         );
       },
     );
+  }
+
+  /// Popup xác nhận trước khi đổi ngôn ngữ và tải lại toàn bộ ứng dụng.
+  Future<void> _confirmLanguageChange(AppLanguage lang) async {
+    final l10n = context.l10n;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          l10n.languageConfirmTitle(lang.nativeName),
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          l10n.languageConfirmMessage,
+          style: const TextStyle(
+            fontSize: 14,
+            height: 1.45,
+            color: AppCultureColors.textMuted,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dlgCtx).pop(false),
+            child: Text(l10n.commonCancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppCultureColors.heritageJade,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () => Navigator.of(dlgCtx).pop(true),
+            child: Text(l10n.languageConfirmAction),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final controller = LocaleController.instance;
+    await controller.setLocale(lang.locale);
+    controller.triggerAppReload();
   }
 
   Widget _languageOption(

@@ -22,6 +22,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonCancel => 'Cancel';
 
   @override
+  String get commonRefresh => 'Refresh';
+
+  @override
   String get languageTitle => 'Language';
 
   @override
@@ -33,6 +36,31 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get languageSheetNote =>
       'Some screens, tour content and forum posts may still appear in Vietnamese.';
+
+  @override
+  String languageConfirmTitle(String language) {
+    return 'Switch language to $language?';
+  }
+
+  @override
+  String get languageConfirmMessage =>
+      'The app will reload to apply the new language across all screens.';
+
+  @override
+  String get languageConfirmAction => 'Confirm & reload';
+
+  @override
+  String get tourRequestsTitle => 'Custom Tour Requests';
+
+  @override
+  String get tourRequestsSubtitle =>
+      'Request & book a tailor-made tour just for you';
+
+  @override
+  String get tourRequestsMyTitle => 'My Custom Tour Requests';
+
+  @override
+  String get tourRequestsNewButton => 'New request';
 
   @override
   String get profileHeader => 'Traveler profile';

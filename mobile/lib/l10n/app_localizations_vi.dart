@@ -22,6 +22,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get commonCancel => 'Hủy bỏ';
 
   @override
+  String get commonRefresh => 'Làm mới';
+
+  @override
   String get languageTitle => 'Ngôn ngữ';
 
   @override
@@ -33,6 +36,31 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get languageSheetNote =>
       'Một số màn hình và nội dung tour, diễn đàn có thể vẫn hiển thị bằng tiếng Việt.';
+
+  @override
+  String languageConfirmTitle(String language) {
+    return 'Đổi ngôn ngữ sang $language?';
+  }
+
+  @override
+  String get languageConfirmMessage =>
+      'Ứng dụng sẽ tải lại giao diện để áp dụng ngôn ngữ mới cho toàn bộ màn hình.';
+
+  @override
+  String get languageConfirmAction => 'Xác nhận & tải lại';
+
+  @override
+  String get tourRequestsTitle => 'Tour theo nhu cầu';
+
+  @override
+  String get tourRequestsSubtitle =>
+      'Đăng yêu cầu & đặt tour thiết kế riêng cho bạn';
+
+  @override
+  String get tourRequestsMyTitle => 'Tour theo nhu cầu của tôi';
+
+  @override
+  String get tourRequestsNewButton => 'Yêu cầu mới';
 
   @override
   String get profileHeader => 'Hồ sơ du khách';

@@ -210,15 +210,22 @@ class _JourneyGoTouristAppState extends State<JourneyGoTouristApp> with WidgetsB
 
   @override
   Widget build(BuildContext context) {
-    // Đổi ngôn ngữ ở màn Tài khoản ⇒ dựng lại MaterialApp với locale mới, không cần mở lại app.
-    return ValueListenableBuilder<Locale>(
-      valueListenable: LocaleController.instance,
-      builder: (context, locale, _) => _buildApp(locale),
+    // Đổi ngôn ngữ ở màn Tài khoản ⇒ dựng lại MaterialApp và tải lại toàn bộ trang với locale mới.
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        LocaleController.instance,
+        LocaleController.instance.reloadTick,
+      ]),
+      builder: (context, _) => _buildApp(
+        LocaleController.instance.value,
+        LocaleController.instance.reloadTick.value,
+      ),
     );
   }
 
-  Widget _buildApp(Locale locale) {
+  Widget _buildApp(Locale locale, int reloadTick) {
     return MaterialApp(
+      key: ValueKey('app_${locale.languageCode}_$reloadTick'),
       onGenerateTitle: (context) => context.l10n.appTitle,
       locale: locale,
       supportedLocales: AppLocalizations.supportedLocales,

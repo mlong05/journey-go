@@ -3,6 +3,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/models/gamification_model.dart' show formatThousands;
 import '../../core/models/tour_request_model.dart';
 import '../../core/services/tour_request_service.dart';
+import '../../l10n/locale_controller.dart';
 import 'create_tour_request_screen.dart';
 import 'tour_detail_opener.dart';
 
@@ -104,10 +105,11 @@ class _TourRequestsScreenState extends State<TourRequestsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Scaffold(
       backgroundColor: AppCultureColors.background,
       appBar: AppBar(
-        title: const Text('Tour theo nhu cầu của tôi'),
+        title: Text(l10n.tourRequestsMyTitle),
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: AppCultureColors.textDark,
@@ -115,7 +117,7 @@ class _TourRequestsScreenState extends State<TourRequestsScreen> {
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             onPressed: _fetchRequests,
-            tooltip: 'Làm mới',
+            tooltip: l10n.commonRefresh,
           ),
         ],
       ),
@@ -124,7 +126,7 @@ class _TourRequestsScreenState extends State<TourRequestsScreen> {
         backgroundColor: AppCultureColors.heritageJade,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
-        label: const Text('Yêu cầu mới', style: TextStyle(fontWeight: FontWeight.bold)),
+        label: Text(l10n.tourRequestsNewButton, style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: _buildBody(),
     );

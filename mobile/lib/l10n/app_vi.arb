@@ -4,10 +4,25 @@
   "reloginSuccess": "Đã đăng nhập lại. Bạn có thể tiếp tục thao tác.",
   "commonClose": "Đóng",
   "commonCancel": "Hủy bỏ",
+  "commonRefresh": "Làm mới",
   "languageTitle": "Ngôn ngữ",
   "languageSubtitle": "Ứng dụng hiển thị bằng tiếng Việt",
   "languageSheetTitle": "Chọn ngôn ngữ",
   "languageSheetNote": "Một số màn hình và nội dung tour, diễn đàn có thể vẫn hiển thị bằng tiếng Việt.",
+  "languageConfirmTitle": "Đổi ngôn ngữ sang {language}?",
+  "@languageConfirmTitle": {
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "languageConfirmMessage": "Ứng dụng sẽ tải lại giao diện để áp dụng ngôn ngữ mới cho toàn bộ màn hình.",
+  "languageConfirmAction": "Xác nhận & tải lại",
+  "tourRequestsTitle": "Tour theo nhu cầu",
+  "tourRequestsSubtitle": "Đăng yêu cầu & đặt tour thiết kế riêng cho bạn",
+  "tourRequestsMyTitle": "Tour theo nhu cầu của tôi",
+  "tourRequestsNewButton": "Yêu cầu mới",
   "profileHeader": "Hồ sơ du khách",
   "profileNotifications": "Thông báo",
   "profileEdit": "Sửa hồ sơ",

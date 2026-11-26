@@ -124,6 +124,12 @@ abstract class AppLocalizations {
   /// **'Hủy bỏ'**
   String get commonCancel;
 
+  /// No description provided for @commonRefresh.
+  ///
+  /// In vi, this message translates to:
+  /// **'Làm mới'**
+  String get commonRefresh;
+
   /// No description provided for @languageTitle.
   ///
   /// In vi, this message translates to:
@@ -147,6 +153,48 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Một số màn hình và nội dung tour, diễn đàn có thể vẫn hiển thị bằng tiếng Việt.'**
   String get languageSheetNote;
+
+  /// No description provided for @languageConfirmTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đổi ngôn ngữ sang {language}?'**
+  String languageConfirmTitle(String language);
+
+  /// No description provided for @languageConfirmMessage.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ứng dụng sẽ tải lại giao diện để áp dụng ngôn ngữ mới cho toàn bộ màn hình.'**
+  String get languageConfirmMessage;
+
+  /// No description provided for @languageConfirmAction.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xác nhận & tải lại'**
+  String get languageConfirmAction;
+
+  /// No description provided for @tourRequestsTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tour theo nhu cầu'**
+  String get tourRequestsTitle;
+
+  /// No description provided for @tourRequestsSubtitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đăng yêu cầu & đặt tour thiết kế riêng cho bạn'**
+  String get tourRequestsSubtitle;
+
+  /// No description provided for @tourRequestsMyTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tour theo nhu cầu của tôi'**
+  String get tourRequestsMyTitle;
+
+  /// No description provided for @tourRequestsNewButton.
+  ///
+  /// In vi, this message translates to:
+  /// **'Yêu cầu mới'**
+  String get tourRequestsNewButton;
 
   /// No description provided for @profileHeader.
   ///

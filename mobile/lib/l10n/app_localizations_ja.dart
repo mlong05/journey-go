@@ -21,6 +21,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get commonCancel => 'キャンセル';
 
   @override
+  String get commonRefresh => '更新';
+
+  @override
   String get languageTitle => '言語';
 
   @override
@@ -31,6 +34,29 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get languageSheetNote => '一部の画面やツアー内容、フォーラムの投稿はベトナム語のまま表示される場合があります。';
+
+  @override
+  String languageConfirmTitle(String language) {
+    return '$languageに切り替えますか？';
+  }
+
+  @override
+  String get languageConfirmMessage => '新しい言語をすべての画面に適用するため、アプリを再読み込みします。';
+
+  @override
+  String get languageConfirmAction => '確認して再読み込み';
+
+  @override
+  String get tourRequestsTitle => 'リクエストツアー';
+
+  @override
+  String get tourRequestsSubtitle => 'ご希望に合わせた専用ツアーを作成・予約';
+
+  @override
+  String get tourRequestsMyTitle => 'マイリクエストツアー';
+
+  @override
+  String get tourRequestsNewButton => '新規リクエスト';
 
   @override
   String get profileHeader => '旅行者プロフィール';

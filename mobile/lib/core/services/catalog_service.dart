@@ -1,3 +1,4 @@
+import '../../l10n/locale_controller.dart';
 import 'api_client.dart';
 
 /// Vùng miền hoặc chủ đề du lịch (danh mục do Admin quản lý).
@@ -27,23 +28,38 @@ class CatalogItem {
   }
 }
 
-/// Đọc danh mục vùng miền / chủ đề (GET công khai). Giữ trong bộ nhớ vì hiếm khi đổi.
+/// Đọc danh mục vùng miền / chủ đề (GET công khai). Cache theo từng ngôn ngữ đang chọn.
 class CatalogService {
   static final CatalogService _instance = CatalogService._internal();
   factory CatalogService() => _instance;
   CatalogService._internal();
 
   List<CatalogItem>? _regions;
+  String? _regionsLang;
   List<CatalogItem>? _themes;
+  String? _themesLang;
+
+  void clearCache() {
+    _regions = null;
+    _regionsLang = null;
+    _themes = null;
+    _themesLang = null;
+  }
 
   Future<List<CatalogItem>> getRegions({bool refresh = false}) async {
-    if (!refresh && _regions != null) return _regions!;
-    return _regions = await _load('/regions');
+    final lang = acceptLanguage;
+    if (!refresh && _regions != null && _regionsLang == lang) return _regions!;
+    final loaded = await _load('/regions');
+    _regionsLang = lang;
+    return _regions = loaded;
   }
 
   Future<List<CatalogItem>> getThemes({bool refresh = false}) async {
-    if (!refresh && _themes != null) return _themes!;
-    return _themes = await _load('/themes');
+    final lang = acceptLanguage;
+    if (!refresh && _themes != null && _themesLang == lang) return _themes!;
+    final loaded = await _load('/themes');
+    _themesLang = lang;
+    return _themes = loaded;
   }
 
   static Future<List<CatalogItem>> _load(String path) async {
