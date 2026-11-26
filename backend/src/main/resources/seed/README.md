@@ -1,4 +1,4 @@
-# 🌱 SEED — Dữ liệu DEMO của JourneyGo
+﻿# 🌱 SEED — Dữ liệu DEMO của JourneyGo
 
 Thư mục này chứa **toàn bộ dữ liệu demo** của hệ thống. Dữ liệu demo **KHÔNG tự chạy**
 khi Backend khởi động — phải chạy thủ công khi cần.
@@ -23,10 +23,30 @@ khi Backend khởi động — phải chạy thủ công khi cần.
 | 03 | `03_demo_real_tours.sql` | 5 tour thật (dữ liệu tham quan có thật, ảnh Wikimedia Commons) |
 | 04 | `04_demo_transactions.sql` | 9 giao dịch mẫu `JGSAMPLE*` để test booking / thanh toán / hoàn tiền |
 | 05 | `05_demo_settlement_2026.sql` | **5 đối tác × 10 tháng (2026-01 → 2026-10)**, mỗi tháng 5–10 giao dịch thành công, có voucher (PLATFORM & PARTNER) + refund đã hoàn thành. **KHÔNG tạo đợt tất toán.** |
+| 10 | `10_demo_history_common.sql` | Nen tang du lieu demo lich su 2024-2026: 60 tai khoan tourist demo (`demo.tourist01..60@demo.journeygo.local`), diem den, trai nghiem, helper functions `demo_season_factor` / `demo_year_factor` / `demo_revenue_period` |
+| 11 | `11_demo_history_catalog.sql` | Catalog tour + slot lich su cho 7 doi tac (2024-01 -> 2026-12), gia 3 nhom ADULT/CHILD/TODDLER, lich khoi hanh |
+| 12 | `12_demo_history_bookings_2024.sql` | Booking lich su 2024 cho `provider@journeygo.com` + payment VNPAY SUCCESS + provider_revenue ELIGIBLE |
+| 13 | `13_demo_history_bookings_2025.sql` | Booking lich su 2025 cho `provider@journeygo.com` |
+| 14 | `14_demo_history_bookings_2026.sql` | Booking lich su 2026 cho `provider@journeygo.com` |
+| 15 | `15_demo_history_refunds.sql` | Refund requests cho cac booking lich su (PENDING_REVIEW / REFUNDED / REJECTED) theo `PersonalRefundPolicy` 3 bac |
+| 16 | `16_demo_history_bookings_all_providers.sql` | Booking lich su cho **6 doi tac con lai** (profile 2-7), 1.500 booking moi doi tac, rai deu 2024-01 -> 2026-11. **KHONG tao dot tat toan** |
+| 25 | `25_demo_backfill_gap_months.sql` | Backfill cac thang bi TRONG cua profile 2 va 3 (do bug phan bo quota cua script 16). 1 booking / slot => mat do khop voi cac thang da co du lieu |
+| 26 | `26_demo_repair_encoding_and_images.sql` | Sua mojibake `???` (do pipe PowerShell lam mat byte UTF-8) + tro lai anh cua 2 host chet |
+| 27 | `27_demo_repoint_images_to_unsplash.sql` | Tro toan bo anh demo sang 37 URL Unsplash da verify HTTP 200 (Wikimedia chan hotlink) |
+| 28 | `28_demo_fill_missing_images.sql` | Dien anh con trong cho destinations / users avatar+cover / tour draft |
+| 29 | `29_demo_repair_remaining_text.sql` | Sua nhot text con lai (bank_account_name, notifications title/body, checkpoint note) |
+
+> **Luu y:** cac script 10-16 va 25 chi tao `provider_revenues` o trang thai `ELIGIBLE`.
+> **Dot tat toan (settlement) PHAI duoc tao qua API chinh thuc cua Admin**
+> (`POST /api/v1/settlements` + `POST /api/v1/settlements/{id}/approve`).
 
 > 📁 Script dọn dữ liệu nằm ở `seed/manual/90_cleanup_demo_data.sql` — **KHÔNG tự chạy**
 > (Java Seed Runner chỉ quét `classpath*:seed/*.sql`, không quét thư mục con).
 > Phải chạy thủ công bằng `psql` khi cần revert.
+
+> 📁 Các script dọn dữ liệu test API nằm ở `seed/manual/91_cleanup_api_test_data.sql`
+> (dọn dữ liệu test API lưu hành) và `seed/manual/92_restore_settlement_sample.sql`
+> (khôi phục mẫu tất toán). Cả hai **KHÔNG tự chạy** — chạy tay bằng `psql` khi cần.
 
 ---
 
