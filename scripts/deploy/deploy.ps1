@@ -71,13 +71,34 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Ok "Docker + Compose sẵn sàng."
 
-# Docker daemon có chạy không?
-$daemonUp = $false
-try {
-    docker info --format "{{.ServerVersion}}" 2>$null | Out-Null
-    $daemonUp = ($LASTEXITCODE -eq 0)
-} catch { $daemonUp = $false }
-if (-not $daemonUp) {
+# Docker daemon có chạy không? Nếu chưa, thử bật Docker Desktop và chờ.
+function Test-DockerEngine {
+    try {
+        docker info --format "{{.ServerVersion}}" 2>$null | Out-Null
+        return ($LASTEXITCODE -eq 0)
+    } catch { return $false }
+}
+
+function Start-DockerEngine([int]$TimeoutSec = 240) {
+    if (Test-DockerEngine) { return $true }
+    Write-Host "    Docker Engine không phản hồi - thử khởi động Docker Desktop..."
+    $exe = @(
+        "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+    ) + @(Get-ChildItem "C:\Users" -Directory -ErrorAction SilentlyContinue |
+        ForEach-Object { Join-Path $_.FullName "AppData\Local\Programs\DockerDesktop\Docker Desktop.exe" }) |
+        Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($exe -and -not (Get-Process "Docker Desktop" -ErrorAction SilentlyContinue)) {
+        Start-Process -FilePath $exe | Out-Null
+    }
+    $limit = (Get-Date).AddSeconds($TimeoutSec)
+    while ((Get-Date) -lt $limit) {
+        Start-Sleep -Seconds 5
+        if (Test-DockerEngine) { return $true }
+    }
+    return $false
+}
+
+if (-not (Start-DockerEngine)) {
     Write-Err "Docker Engine không phản hồi. Hãy khởi động Docker Desktop rồi chạy lại."
     exit 1
 }
@@ -116,6 +137,16 @@ if (-not $SkipBuild) {
     docker compose -f $compose build --pull 2>&1 | Out-Host
     $buildExit = $LASTEXITCODE
     $ErrorActionPreference = "Continue"
+    # Docker Desktop có thể crash giữa chừng (thiếu RAM khi build) ⇒ bật lại và build lại 1 lần.
+    if ($buildExit -ne 0 -and -not (Test-DockerEngine)) {
+        Write-Host "    Docker Engine bị ngắt trong lúc build - khởi động lại và thử build lần 2..."
+        if (Start-DockerEngine) {
+            $ErrorActionPreference = "SilentlyContinue"
+            docker compose -f $compose build 2>&1 | Out-Host
+            $buildExit = $LASTEXITCODE
+            $ErrorActionPreference = "Continue"
+        }
+    }
     if ($buildExit -ne 0) {
         Write-Err "Build thất bại ⇒ stack cũ vẫn đang chạy, không có thay đổi nào."
         exit 1
