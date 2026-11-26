@@ -15,23 +15,11 @@ void main() {
         'artifacts': [
           {'name': 'Xe tăng 390', 'imageUrl': 'https://img/tank.jpg'},
         ],
-        'thenNow': [
-          {
-            'thenImageUrl': 'https://img/1975.jpg',
-            'nowImageUrl': 'https://img/now.jpg',
-            'thenLabel': '1975',
-            'credit': 'Tư liệu',
-          },
-          {'thenImageUrl': 'https://img/only-then.jpg'}, // thiếu ảnh nay ⇒ bỏ qua
-        ],
       });
 
       expect(culture.isEmpty, isFalse);
       expect(culture.culturalImages, ['https://img/1.jpg', 'https://img/2.jpg']);
       expect(culture.artifacts.single.name, 'Xe tăng 390');
-      expect(culture.thenNow.length, 1);
-      expect(culture.thenNow.single.thenLabel, '1975');
-      expect(culture.thenNow.single.credit, 'Tư liệu');
     });
 
     test('không có nội dung thì isEmpty = true', () {

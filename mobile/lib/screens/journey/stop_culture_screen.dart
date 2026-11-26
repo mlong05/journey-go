@@ -9,7 +9,6 @@ import '../common/ink.dart';
 import '../common/photo.dart';
 import '../chat/ai_guide_chat_screen.dart';
 import '../culture/cultural_stories.dart';
-import '../culture/then_now_slider.dart' show ThenNowSlider;
 import '../../l10n/locale_controller.dart';
 
 /// Đánh dấu du khách đã đọc phần văn hoá của một trạm (lưu trên máy, chỉ để hiện nhãn "Mới").
@@ -244,22 +243,6 @@ class _StopCultureScreenState extends State<StopCultureScreen> {
             const SizedBox(height: 22),
             _SectionTitle(label: appL10n.scImages, trailing: appL10n.scImageCount(c.culturalImages.length)),
             _gallery(c.culturalImages),
-          ],
-          if (c.thenNow.isNotEmpty) ...[
-            const SizedBox(height: 28),
-            _SectionTitle(label: appL10n.scThenNowTitle),
-            for (final pair in c.thenNow) ...[
-              ThenNowSlider(pair: pair, aspectRatio: 4 / 3),
-              if (pair.caption != null) ...[
-                const SizedBox(height: 8),
-                Text(pair.caption!, style: AppType.reading(size: 15)),
-              ],
-              if (pair.credit != null) ...[
-                const SizedBox(height: 4),
-                Text(appL10n.scThenNowCredit(pair.credit!), style: const TextStyle(fontSize: 12, color: AppInk.muted)),
-              ],
-              const SizedBox(height: 18),
-            ],
           ],
           if (c.artifacts.isNotEmpty) ...[
             const SizedBox(height: 28),

@@ -231,20 +231,6 @@ public class TourSubmissionValidator {
                 }
             }
 
-            for (int t = 0; t < stop.getThenNow().size(); t++) {
-                TourStopThenNow pair = stop.getThenNow().get(t);
-                String path = "thenNow[" + t + "]";
-                if (isBlank(pair.getThenImageUrl()) || isBlank(pair.getNowImageUrl())) {
-                    issues.add(TourValidationIssue.stop(i, path, "Cặp ảnh xưa và nay cần đủ ảnh tư liệu và ảnh hiện tại"));
-                }
-                if (isBlank(pair.getThenLabel())) {
-                    issues.add(TourValidationIssue.stop(i, path + ".thenLabel", "Vui lòng nhập thời điểm của ảnh tư liệu (vd. 1975)"));
-                }
-                if (isBlank(pair.getCredit())) {
-                    issues.add(TourValidationIssue.stop(i, path + ".credit", "Vui lòng ghi nguồn / bản quyền của ảnh tư liệu"));
-                }
-            }
-
             int quizCount = stop.getQuizQuestions().size();
             if (quizCount < QUIZ_MIN || quizCount > QUIZ_MAX) {
                 issues.add(TourValidationIssue.stop(i, "quiz", "Câu đố văn hóa cần từ " + QUIZ_MIN + " đến " + QUIZ_MAX + " câu"));

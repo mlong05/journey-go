@@ -208,26 +208,6 @@ function StoryCard({ stop: s, panel = true }) {
             ))}
           </div>
         )}
-        {s.thenNow?.length > 0 && (
-          <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Ảnh xưa và nay ({s.thenNow.length})</p>
-            {s.thenNow.map((t) => (
-              <div key={t.id} className="flex items-start gap-2 text-xs text-slate-700">
-                {[t.thenImageUrl, t.nowImageUrl].map((u, k) => (u
-                  // eslint-disable-next-line @next/next/no-img-element
-                  ? <img key={k} src={u} alt={k === 0 ? "Ảnh xưa" : "Ảnh nay"} className="h-14 w-20 rounded-lg object-cover border border-slate-200" />
-                  : <div key={k} className="h-14 w-20 rounded-lg bg-slate-100" />))}
-                <span>
-                  <b>{t.thenLabel || "?"} → nay</b>{t.caption ? ` — ${t.caption}` : ""}
-                  <br />
-                  <span className={t.credit ? "text-slate-500" : "text-rose-600 font-semibold"}>
-                    Nguồn: {t.credit || "chưa ghi nguồn"}
-                  </span>
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
