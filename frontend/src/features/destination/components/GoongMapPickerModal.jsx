@@ -481,7 +481,7 @@ export default function GoongMapPickerModal({
         </div>
 
         {/* Tìm kiếm địa chỉ (Goong Autocomplete) */}
-        <div className="shrink-0 px-6 py-3 bg-slate-50 border-b border-slate-200/80 relative z-10">
+        <div className="shrink-0 px-6 py-3 bg-slate-50 border-b border-slate-200/80 relative z-30">
           {/* Không dùng <form>: hộp thoại này nằm trong form của trang gọi, submit sẽ kích hoạt form ngoài */}
           <div className="relative flex items-center gap-2">
             <div className="relative flex-1">
@@ -570,7 +570,7 @@ export default function GoongMapPickerModal({
           )}
 
           {refInfo && !loadError && (
-            <div className={`absolute top-3 left-3 z-10 max-w-[calc(100%-180px)] rounded-xl border shadow-md backdrop-blur-xs px-3 py-2 text-[11px] ${refInfo.tone}`}>
+            <div className={`absolute bottom-10 left-3 z-10 max-w-[calc(100%-180px)] rounded-xl border shadow-md backdrop-blur-xs px-3 py-2 text-[11px] ${refInfo.tone}`}>
               <p className="font-bold inline-flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: REFERENCE_COLOR }} />
                 {ref.label}{ref.radius > 0 ? ` · bán kính ${ref.radius} m` : ""}
