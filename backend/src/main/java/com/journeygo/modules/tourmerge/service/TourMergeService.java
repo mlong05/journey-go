@@ -17,6 +17,8 @@ import com.journeygo.modules.tourmerge.dto.request.ConfirmTourMergeRequest;
 import com.journeygo.modules.tourmerge.dto.request.CreateTourMergeRequest;
 import com.journeygo.modules.tourmerge.dto.request.ReviewTourMergeRequest;
 import com.journeygo.modules.tourmerge.dto.request.ValidateTourMergeRequest;
+import com.journeygo.modules.tourmerge.dto.response.MergeCandidateSlotResponse;
+import com.journeygo.modules.tourmerge.dto.response.MergeableOwnSlotResponse;
 import com.journeygo.modules.tourmerge.dto.response.MergedPassengerManifestResponse;
 import com.journeygo.modules.tourmerge.dto.response.MergedPassengerManifestResponse.MergedPassengerItem;
 import com.journeygo.modules.tourmerge.dto.response.TourMergeResponse;
@@ -24,6 +26,7 @@ import com.journeygo.modules.tourmerge.dto.response.TourMergeValidationResponse;
 import com.journeygo.modules.tourmerge.entity.TourMerge;
 import com.journeygo.modules.tourmerge.entity.enums.TourMergeStatus;
 import com.journeygo.modules.tourmerge.repository.TourMergeRepository;
+import com.journeygo.modules.tourmerge.support.DepartureTimeParser;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +37,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -61,12 +67,106 @@ public class TourMergeService {
             RefundStatus.REFUND_PROCESSING,
             RefundStatus.REFUNDED);
 
+    private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
     private final TourMergeRepository tourMergeRepository;
     private final TourSlotRepository tourSlotRepository;
     private final TourMergeValidationService validationService;
     private final BookingPassengerRepository bookingPassengerRepository;
     private final ProviderProfileRepository providerProfileRepository;
     private final UserRepository userRepository;
+
+    @Transactional(readOnly = true)
+    public List<MergeableOwnSlotResponse> listEligibleOwnSlots(Long providerId) {
+        LocalDate today = LocalDate.now(VIETNAM_ZONE);
+        List<TourSlot> slots = tourMergeRepository.findEligibleOwnSlots(
+                providerId, today, TourMergeStatus.ACTIVE_STATUSES);
+
+        return slots.stream()
+                .map(slot -> {
+                    Tour tour = slot.getTour();
+                    return MergeableOwnSlotResponse.builder()
+                            .slotId(slot.getId())
+                            .tourId(tour != null ? tour.getTourId() : null)
+                            .tourTitle(tour != null ? tour.getTitle() : null)
+                            .departureDate(slot.getSlotDate())
+                            .departureTimeRaw(tour != null ? tour.getDepartureTime() : null)
+                            .parsedDepartureTime(DepartureTimeParser.parse(
+                                    tour != null ? tour.getDepartureTime() : null).orElse(null))
+                            .meetingPoint(tour != null ? tour.getMeetingPoint() : null)
+                            .capacity(slot.getCapacity())
+                            .bookedCount(slot.getBookedCount() != null ? slot.getBookedCount() : 0)
+                            .build();
+                })
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<MergeCandidateSlotResponse> listCandidateSlots(Long mySlotId, Long currentProviderId) {
+        TourSlot mySlot = loadSlotOrThrow(mySlotId, "Slot của bạn");
+        Long myOwnerId = extractOwnerId(mySlot);
+        if (!Objects.equals(currentProviderId, myOwnerId)) {
+            throw new AppException(ErrorCode.TOUR_MERGE_FORBIDDEN,
+                    "Bạn không sở hữu slot này");
+        }
+        Long myTourId = mySlot.getTour() != null ? mySlot.getTour().getTourId() : null;
+        if (myTourId == null) {
+            return List.of();
+        }
+
+        List<TourSlot> rawCandidates = tourMergeRepository.findOpenUnmergedCandidateSlots(
+                mySlot.getSlotDate(), mySlot.getId(), myTourId, TourMergeStatus.ACTIVE_STATUSES);
+        if (rawCandidates.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Long> ownerIds = new HashSet<>();
+        for (TourSlot candidate : rawCandidates) {
+            Long ownerId = extractOwnerId(candidate);
+            if (ownerId != null) {
+                ownerIds.add(ownerId);
+            }
+        }
+        Map<Long, String> providerNames = loadProviderNames(ownerIds);
+
+        List<MergeCandidateSlotResponse> matches = new ArrayList<>();
+        for (TourSlot candidate : rawCandidates) {
+            TourMergeValidationService.ValidationResult result =
+                    validationService.evaluate(mySlot, candidate, null, null);
+            if (!result.valid()) {
+                continue;
+            }
+            Tour candidateTour = candidate.getTour();
+            Long ownerId = extractOwnerId(candidate);
+            long timeDiff = DepartureTimeParser.minutesDiff(
+                    result.hostDepartureTime(), result.guestDepartureTime());
+
+            matches.add(MergeCandidateSlotResponse.builder()
+                    .slotId(candidate.getId())
+                    .tourId(candidateTour.getTourId())
+                    .tourTitle(candidateTour.getTitle())
+                    .providerId(ownerId)
+                    .providerName(providerNames.getOrDefault(ownerId,
+                            candidateTour.getCreatedBy() != null ? candidateTour.getCreatedBy().getFullName() : null))
+                    .sameProvider(Objects.equals(ownerId, currentProviderId))
+                    .departureDate(candidate.getSlotDate())
+                    .departureTimeRaw(candidateTour.getDepartureTime())
+                    .parsedDepartureTime(result.guestDepartureTime())
+                    .meetingPoint(candidateTour.getMeetingPoint())
+                    .capacity(candidate.getCapacity())
+                    .bookedCount(candidate.getBookedCount() != null ? candidate.getBookedCount() : 0)
+                    .timeDiffMinutes(timeDiff)
+                    .matchedPrefixStops(result.matchedPrefixStops())
+                    .build());
+        }
+
+        matches.sort(Comparator
+                .comparing(MergeCandidateSlotResponse::sameProvider)
+                .thenComparing((MergeCandidateSlotResponse c) -> c.matchedPrefixStops().size(), Comparator.reverseOrder())
+                .thenComparingLong(MergeCandidateSlotResponse::timeDiffMinutes)
+                .thenComparing(MergeCandidateSlotResponse::slotId));
+        return matches;
+    }
 
     @Transactional(readOnly = true)
     public TourMergeValidationResponse validateMerge(ValidateTourMergeRequest request, Long currentProviderId) {

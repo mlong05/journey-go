@@ -5,6 +5,8 @@ import com.journeygo.common.dto.PageResponse;
 import com.journeygo.modules.tourmerge.dto.request.ConfirmTourMergeRequest;
 import com.journeygo.modules.tourmerge.dto.request.CreateTourMergeRequest;
 import com.journeygo.modules.tourmerge.dto.request.ValidateTourMergeRequest;
+import com.journeygo.modules.tourmerge.dto.response.MergeCandidateSlotResponse;
+import com.journeygo.modules.tourmerge.dto.response.MergeableOwnSlotResponse;
 import com.journeygo.modules.tourmerge.dto.response.MergedPassengerManifestResponse;
 import com.journeygo.modules.tourmerge.dto.response.TourMergeResponse;
 import com.journeygo.modules.tourmerge.dto.response.TourMergeValidationResponse;
@@ -34,6 +36,25 @@ import org.springframework.web.bind.annotation.*;
 public class ProviderTourMergeController {
 
     private final TourMergeService tourMergeService;
+
+    @GetMapping("/my-slots")
+    @PreAuthorize("hasRole('CONTENT_PROVIDER')")
+    @Operation(summary = "Danh sách slot mở bán của tôi chưa tham gia ghép đoàn")
+    public ResponseEntity<ApiResponse<java.util.List<MergeableOwnSlotResponse>>> mySlots(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách slot khả dụng thành công",
+                tourMergeService.listEligibleOwnSlots(principal.getId())));
+    }
+
+    @GetMapping("/candidates")
+    @PreAuthorize("hasRole('CONTENT_PROVIDER')")
+    @Operation(summary = "Gợi ý các slot đối tác đủ điều kiện ghép với slot đã chọn")
+    public ResponseEntity<ApiResponse<java.util.List<MergeCandidateSlotResponse>>> candidates(
+            @RequestParam Long slotId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách slot gợi ý ghép thành công",
+                tourMergeService.listCandidateSlots(slotId, principal.getId())));
+    }
 
     @PostMapping("/validate")
     @PreAuthorize("hasRole('CONTENT_PROVIDER')")

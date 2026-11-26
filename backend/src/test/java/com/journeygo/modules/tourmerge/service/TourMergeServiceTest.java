@@ -16,6 +16,7 @@ import com.journeygo.modules.tourmerge.dto.request.CancelTourMergeRequest;
 import com.journeygo.modules.tourmerge.dto.request.ConfirmTourMergeRequest;
 import com.journeygo.modules.tourmerge.dto.request.CreateTourMergeRequest;
 import com.journeygo.modules.tourmerge.dto.request.ReviewTourMergeRequest;
+import com.journeygo.modules.tourmerge.dto.response.TourMergeValidationResponse.MatchedPrefixStop;
 import com.journeygo.modules.tourmerge.entity.TourMerge;
 import com.journeygo.modules.tourmerge.entity.enums.TourMergeStatus;
 import com.journeygo.modules.tourmerge.repository.TourMergeRepository;
@@ -197,5 +198,61 @@ class TourMergeServiceTest {
         assertEquals("Công ty A", manifestForGuest.passengers().get(0).providerName());
         assertEquals("va***@gmail.com", manifestForGuest.passengers().get(0).email());
         assertEquals("thib@gmail.com", manifestForGuest.passengers().get(1).email());
+    }
+
+    @Test
+    void listEligibleOwnSlots_returnsFormattedSlots() {
+        TourSlot mySlot = slot(10L, 100L, 1L, 5);
+        mySlot.getTour().setDepartureTime("08:00 sáng");
+        mySlot.getTour().setMeetingPoint("Bến Ninh Kiều");
+
+        when(tourMergeRepository.findEligibleOwnSlots(eq(1L), any(LocalDate.class), eq(TourMergeStatus.ACTIVE_STATUSES)))
+                .thenReturn(List.of(mySlot));
+
+        var result = service.listEligibleOwnSlots(1L);
+        assertEquals(1, result.size());
+        assertEquals(10L, result.get(0).slotId());
+        assertEquals(LocalTime.of(8, 0), result.get(0).parsedDepartureTime());
+        assertEquals("Bến Ninh Kiều", result.get(0).meetingPoint());
+    }
+
+    @Test
+    void listCandidateSlots_filtersValidAndSortsBestMatchFirst() {
+        TourSlot mySlot = slot(10L, 100L, 1L, 5);
+        TourSlot invalidCandidate = slot(20L, 200L, 2L, 4);
+        TourSlot validCandidate = slot(30L, 300L, 3L, 6);
+        validCandidate.getTour().setDepartureTime("08:15 sáng");
+
+        when(tourSlotRepository.findById(10L)).thenReturn(Optional.of(mySlot));
+        when(tourMergeRepository.findOpenUnmergedCandidateSlots(eq(date), eq(10L), eq(100L), eq(TourMergeStatus.ACTIVE_STATUSES)))
+                .thenReturn(List.of(invalidCandidate, validCandidate));
+        when(providerProfileRepository.findByUserIds(anyList())).thenReturn(List.of(
+                ProviderProfile.builder().user(invalidCandidate.getTour().getCreatedBy()).providerName("Đối tác X").build(),
+                ProviderProfile.builder().user(validCandidate.getTour().getCreatedBy()).providerName("Đối tác Y").build()
+        ));
+
+        when(validationService.evaluate(mySlot, invalidCandidate, null, null))
+                .thenReturn(new TourMergeValidationService.ValidationResult(
+                        false, List.of(), LocalTime.of(8, 0), null, 5, 4, 9, List.of()));
+        when(validationService.evaluate(mySlot, validCandidate, null, null))
+                .thenReturn(new TourMergeValidationService.ValidationResult(
+                        true, List.of(), LocalTime.of(8, 0), LocalTime.of(8, 15), 5, 6, 11,
+                        List.of(MatchedPrefixStop.builder().orderIndex(1).stopName("Bến Ninh Kiều").matchType("GPS").build())));
+
+        var result = service.listCandidateSlots(10L, 1L);
+        assertEquals(1, result.size());
+        assertEquals(30L, result.get(0).slotId());
+        assertEquals("Đối tác Y", result.get(0).providerName());
+        assertEquals(15L, result.get(0).timeDiffMinutes());
+        assertFalse(result.get(0).sameProvider());
+    }
+
+    @Test
+    void listCandidateSlots_throwsForbiddenWhenNotOwner() {
+        TourSlot otherSlot = slot(10L, 100L, 99L, 5);
+        when(tourSlotRepository.findById(10L)).thenReturn(Optional.of(otherSlot));
+
+        AppException ex = assertThrows(AppException.class, () -> service.listCandidateSlots(10L, 1L));
+        assertEquals(ErrorCode.TOUR_MERGE_FORBIDDEN, ex.getErrorCode());
     }
 }

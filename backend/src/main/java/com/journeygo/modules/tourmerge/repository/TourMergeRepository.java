@@ -1,5 +1,6 @@
 package com.journeygo.modules.tourmerge.repository;
 
+import com.journeygo.modules.tour.entity.TourSlot;
 import com.journeygo.modules.tourmerge.entity.TourMerge;
 import com.journeygo.modules.tourmerge.entity.enums.TourMergeStatus;
 import jakarta.persistence.LockModeType;
@@ -11,6 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -86,4 +88,45 @@ public interface TourMergeRepository extends JpaRepository<TourMerge, Long> {
     Page<TourMerge> findByStatusOrderByCreatedAtDesc(TourMergeStatus status, Pageable pageable);
 
     Page<TourMerge> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    @Query("""
+            SELECT s FROM TourSlot s
+            JOIN FETCH s.tour t
+            WHERE t.createdBy.id = :providerId
+              AND t.deleted = false
+              AND t.status = com.journeygo.modules.tour.entity.enums.TourStatus.PUBLISHED
+              AND s.status = com.journeygo.modules.tour.entity.TourSlotStatus.OPEN
+              AND s.slotDate >= :today
+              AND NOT EXISTS (
+                  SELECT m.id FROM TourMerge m
+                  WHERE (m.hostSlot.id = s.id OR m.guestSlot.id = s.id)
+                    AND m.status IN :activeStatuses
+              )
+            ORDER BY s.slotDate ASC, t.title ASC
+            """)
+    List<TourSlot> findEligibleOwnSlots(@Param("providerId") Long providerId,
+                                        @Param("today") LocalDate today,
+                                        @Param("activeStatuses") List<TourMergeStatus> activeStatuses);
+
+    @Query("""
+            SELECT s FROM TourSlot s
+            JOIN FETCH s.tour t
+            JOIN FETCH t.createdBy u
+            WHERE s.slotDate = :slotDate
+              AND s.id <> :mySlotId
+              AND t.tourId <> :myTourId
+              AND t.deleted = false
+              AND t.status = com.journeygo.modules.tour.entity.enums.TourStatus.PUBLISHED
+              AND s.status = com.journeygo.modules.tour.entity.TourSlotStatus.OPEN
+              AND NOT EXISTS (
+                  SELECT m.id FROM TourMerge m
+                  WHERE (m.hostSlot.id = s.id OR m.guestSlot.id = s.id)
+                    AND m.status IN :activeStatuses
+              )
+            ORDER BY t.title ASC
+            """)
+    List<TourSlot> findOpenUnmergedCandidateSlots(@Param("slotDate") LocalDate slotDate,
+                                                  @Param("mySlotId") Long mySlotId,
+                                                  @Param("myTourId") Long myTourId,
+                                                  @Param("activeStatuses") List<TourMergeStatus> activeStatuses);
 }

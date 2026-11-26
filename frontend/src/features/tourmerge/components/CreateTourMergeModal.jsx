@@ -1,11 +1,28 @@
 "use client";
 
-import { useState } from "react";
-import { CheckCircle2, AlertCircle, Loader2, ShieldCheck, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+  ShieldCheck,
+  Sparkles,
+  X,
+} from "lucide-react";
 import tourMergeService from "../services/tourMergeService";
 import { extractErrorMessage, formatTime } from "../constants";
 
 export default function CreateTourMergeModal({ onClose, onCreated }) {
+  const [myRole, setMyRole] = useState("HOST"); // "HOST" | "GUEST"
+
+  const [ownSlots, setOwnSlots] = useState([]);
+  const [loadingOwnSlots, setLoadingOwnSlots] = useState(true);
+  const [selectedOwnSlotId, setSelectedOwnSlotId] = useState("");
+
+  const [candidates, setCandidates] = useState([]);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [selectedCandidateId, setSelectedCandidateId] = useState("");
+
   const [form, setForm] = useState({
     hostSlotId: "",
     guestSlotId: "",
@@ -20,17 +37,105 @@ export default function CreateTourMergeModal({ onClose, onCreated }) {
   const [validation, setValidation] = useState(null);
   const [error, setError] = useState(null);
 
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await tourMergeService.listEligibleOwnSlots();
+        if (active) {
+          setOwnSlots(Array.isArray(res) ? res : []);
+        }
+      } catch (err) {
+        if (active) setError(extractErrorMessage(err));
+      } finally {
+        if (active) setLoadingOwnSlots(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const selectedOwnSlot =
+    ownSlots.find((s) => String(s.slotId) === String(selectedOwnSlotId)) || null;
+  const selectedCandidate =
+    candidates.find((c) => String(c.slotId) === String(selectedCandidateId)) ||
+    null;
+
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
-    if (key === "hostSlotId" || key === "guestSlotId" || key === "mergedCapacity") {
+    if (
+      key === "hostSlotId" ||
+      key === "guestSlotId" ||
+      key === "mergedCapacity"
+    ) {
       setValidation(null);
     }
     setError(null);
   };
 
+  const applySelectionToForm = (ownSlot, candidateSlot, role) => {
+    const host = role === "HOST" ? ownSlot : candidateSlot;
+    const guest = role === "HOST" ? candidateSlot : ownSlot;
+
+    const hostTime = formatTime(host?.parsedDepartureTime);
+    const totalBooked =
+      (ownSlot?.bookedCount ?? 0) + (candidateSlot?.bookedCount ?? 0);
+    const hostCap = host?.capacity ?? 0;
+    const suggestedCap = Math.max(hostCap, totalBooked, 1);
+
+    setForm((prev) => ({
+      ...prev,
+      hostSlotId: host?.slotId ? String(host.slotId) : "",
+      guestSlotId: guest?.slotId ? String(guest.slotId) : "",
+      mergedDepartureTime:
+        hostTime !== "--:--" ? hostTime : prev.mergedDepartureTime,
+      mergedMeetingPoint:
+        host?.meetingPoint || prev.mergedMeetingPoint,
+      mergedCapacity:
+        ownSlot && candidateSlot ? String(suggestedCap) : prev.mergedCapacity,
+    }));
+    setValidation(null);
+    setError(null);
+  };
+
+  const handleSelectOwnSlot = async (slotId) => {
+    setSelectedOwnSlotId(slotId);
+    setSelectedCandidateId("");
+    setCandidates([]);
+    setValidation(null);
+    setError(null);
+
+    const own = ownSlots.find((s) => String(s.slotId) === String(slotId)) || null;
+    applySelectionToForm(own, null, myRole);
+
+    if (!slotId) return;
+    setLoadingCandidates(true);
+    try {
+      const res = await tourMergeService.listCandidateSlots(slotId);
+      setCandidates(Array.isArray(res) ? res : []);
+    } catch (err) {
+      setError(extractErrorMessage(err));
+    } finally {
+      setLoadingCandidates(false);
+    }
+  };
+
+  const handleSelectCandidate = (candidateId) => {
+    setSelectedCandidateId(candidateId);
+    const candidate =
+      candidates.find((c) => String(c.slotId) === String(candidateId)) || null;
+    applySelectionToForm(selectedOwnSlot, candidate, myRole);
+  };
+
+  const handleRoleChange = (nextRole) => {
+    setMyRole(nextRole);
+    applySelectionToForm(selectedOwnSlot, selectedCandidate, nextRole);
+  };
+
   const handleValidate = async () => {
     if (!form.hostSlotId || !form.guestSlotId) {
-      setError("Vui lòng nhập đầy đủ Host Slot ID và Guest Slot ID để kiểm tra.");
+      setError("Vui lòng chọn đầy đủ lịch khởi hành của bạn và đối tác để kiểm tra.");
       return;
     }
     setValidating(true);
@@ -79,7 +184,7 @@ export default function CreateTourMergeModal({ onClose, onCreated }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
       <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-4">
           <div>
             <h2 className="text-base font-bold text-slate-900">
               Tạo yêu cầu ghép tour B2B (1-1)
@@ -105,33 +210,127 @@ export default function CreateTourMergeModal({ onClose, onCreated }) {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-xl p-3.5">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Host Slot ID (Đoàn chính) *
+                1. Chọn lịch khởi hành của bạn *
               </label>
-              <input
-                type="number"
-                min="1"
-                value={form.hostSlotId}
-                onChange={(e) => updateField("hostSlotId", e.target.value)}
-                placeholder="VD: 101"
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
+              {loadingOwnSlots ? (
+                <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
+                  <Loader2 size={14} className="animate-spin" />
+                  Đang tải các slot mở bán của bạn...
+                </div>
+              ) : ownSlots.length === 0 ? (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  Hiện chưa có slot OPEN nào sắp tới (chưa tham gia ghép) để chọn.
+                </p>
+              ) : (
+                <select
+                  value={selectedOwnSlotId}
+                  onChange={(e) => handleSelectOwnSlot(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="">-- Chọn tour và ngày khởi hành --</option>
+                  {ownSlots.map((s) => (
+                    <option key={s.slotId} value={s.slotId}>
+                      #{s.slotId} • {s.tourTitle} ({s.departureDate} •{" "}
+                      {s.departureTimeRaw || formatTime(s.parsedDepartureTime)} •{" "}
+                      {s.bookedCount}/{s.capacity} khách)
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
+
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Guest Slot ID (Đoàn ghép cùng) *
+                Vai trò của bạn trong đoàn ghép
               </label>
-              <input
-                type="number"
-                min="1"
-                value={form.guestSlotId}
-                onChange={(e) => updateField("guestSlotId", e.target.value)}
-                placeholder="VD: 205"
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  {
+                    value: "HOST",
+                    title: "Tôi làm Đoàn chủ (HOST)",
+                    desc: "Dẫn đoàn chung & đón khách",
+                  },
+                  {
+                    value: "GUEST",
+                    title: "Tôi làm Đoàn ghép (GUEST)",
+                    desc: "Gửi khách đi ghép xe đối tác",
+                  },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => handleRoleChange(opt.value)}
+                    className={`text-left px-3 py-2 rounded-lg border text-xs transition-colors cursor-pointer ${
+                      myRole === opt.value
+                        ? "bg-emerald-50 border-emerald-400 text-emerald-900"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <p className="font-semibold">{opt.title}</p>
+                    <p className="text-[11px] opacity-80">{opt.desc}</p>
+                  </button>
+                ))}
+              </div>
             </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                2. Chọn slot đối tác đủ điều kiện ghép *
+              </label>
+              {!selectedOwnSlotId ? (
+                <p className="text-xs text-slate-500 py-1">
+                  Hãy chọn lịch khởi hành của bạn ở bước 1 để hệ thống gợi ý đối tác phù hợp.
+                </p>
+              ) : loadingCandidates ? (
+                <div className="flex items-center gap-2 text-xs text-slate-500 py-2">
+                  <Loader2 size={14} className="animate-spin" />
+                  Đang tìm các tour đối tác trùng ngày, lệch giờ ≤ 30p và trùng chặng đầu...
+                </div>
+              ) : candidates.length === 0 ? (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  Chưa tìm thấy slot đối tác nào cùng ngày, lệch giờ ≤ 30 phút và trùng điểm đầu với slot này.
+                </p>
+              ) : (
+                <select
+                  value={selectedCandidateId}
+                  onChange={(e) => handleSelectCandidate(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="">-- Chọn tour đối tác ({candidates.length} gợi ý phù hợp) --</option>
+                  {candidates.map((c) => (
+                    <option key={c.slotId} value={c.slotId}>
+                      #{c.slotId} • {c.providerName || `Provider #${c.providerId}`} —{" "}
+                      {c.tourTitle} ({c.departureTimeRaw || formatTime(c.parsedDepartureTime)} •{" "}
+                      Trùng {c.matchedPrefixStops?.length ?? 0} điểm đầu • {c.bookedCount} khách)
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {selectedCandidate && (
+              <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-900 space-y-1">
+                <div className="flex items-center gap-1.5 font-semibold">
+                  <Sparkles size={13} className="text-emerald-600" />
+                  <span>
+                    Host #{form.hostSlotId} ↔ Guest #{form.guestSlotId} • Trùng{" "}
+                    {selectedCandidate.matchedPrefixStops?.length ?? 0} điểm đầu (lệch{" "}
+                    {selectedCandidate.timeDiffMinutes} phút)
+                  </span>
+                </div>
+                {selectedCandidate.matchedPrefixStops?.length > 0 && (
+                  <p className="text-emerald-800">
+                    Chặng chung:{" "}
+                    {selectedCandidate.matchedPrefixStops
+                      .map((s) => `#${s.orderIndex} ${s.stopName}`)
+                      .join(" → ")}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -155,7 +354,9 @@ export default function CreateTourMergeModal({ onClose, onCreated }) {
               <input
                 type="time"
                 value={form.mergedDepartureTime}
-                onChange={(e) => updateField("mergedDepartureTime", e.target.value)}
+                onChange={(e) =>
+                  updateField("mergedDepartureTime", e.target.value)
+                }
                 className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
@@ -249,7 +450,9 @@ export default function CreateTourMergeModal({ onClose, onCreated }) {
             <input
               type="text"
               value={form.mergedMeetingPoint}
-              onChange={(e) => updateField("mergedMeetingPoint", e.target.value)}
+              onChange={(e) =>
+                updateField("mergedMeetingPoint", e.target.value)
+              }
               placeholder="VD: Cổng chính Bến Ninh Kiều, Cần Thơ"
               className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />

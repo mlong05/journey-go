@@ -10,6 +10,18 @@ const unwrap = (res) =>
  *  - Cancel (Provider/Moderator): /api/v1/tour-merges/{mergeId}/cancel
  */
 export const tourMergeService = {
+  async listEligibleOwnSlots() {
+    return unwrap(await apiClient.get("/provider/tour-merges/my-slots"));
+  },
+
+  async listCandidateSlots(slotId) {
+    return unwrap(
+      await apiClient.get(
+        `/provider/tour-merges/candidates?slotId=${encodeURIComponent(slotId)}`
+      )
+    );
+  },
+
   async validateMerge({ hostSlotId, guestSlotId, mergedCapacity }) {
     const body = {
       hostSlotId: Number(hostSlotId),
