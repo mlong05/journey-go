@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tên ứng dụng hiển thị trên launcher Android. -->
+    <string name="app_name">JourneyGo</string>
+</resources>
