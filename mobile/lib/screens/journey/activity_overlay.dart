@@ -18,6 +18,9 @@ class OverlayPayload {
   /// Ô nổi gửi về app chính khi du khách bấm "Ẩn" (để không tự mở lại cho hoạt động này).
   static const String dismissedMessage = 'activity_overlay_dismissed';
 
+  /// Khoá SharedPreferences: mốc kết thúc của lượt đếm mà du khách đã bấm "Ẩn" trên ô nổi.
+  static const String dismissedEndsAtKey = 'activity_overlay_dismissed_ends_at';
+
   /// Kích thước ô nổi (dp).
   static const int compactWidth = 250;
   static const int compactHeight = 68;
@@ -147,8 +150,20 @@ class _OverlayTimerState extends State<_OverlayTimer> {
   }
 
   Future<void> _hide() async {
-    await FlutterOverlayWindow.shareData(OverlayPayload.dismissedMessage);
-    await FlutterOverlayWindow.closeOverlay();
+    // Ghi lại "đã ẩn lượt đếm này" vào bộ nhớ máy: tin nhắn gửi sang app chính có thể không tới
+    // (app đang chạy nền), nên app chính sẽ đọc lại cờ này trước khi mở ô nổi lần sau.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final endsAt = (_data?['endsAt'] as num?)?.toInt();
+      if (endsAt != null) await prefs.setInt(OverlayPayload.dismissedEndsAtKey, endsAt);
+    } catch (_) {}
+    // Đóng ô nổi TRƯỚC và không phụ thuộc shareData (trước đây shareData lỗi/treo ⇒ ô không bao giờ đóng).
+    unawaited(
+      FlutterOverlayWindow.shareData(OverlayPayload.dismissedMessage).timeout(const Duration(seconds: 1)).catchError((_) {}),
+    );
+    try {
+      await FlutterOverlayWindow.closeOverlay();
+    } catch (_) {}
   }
 
   @override

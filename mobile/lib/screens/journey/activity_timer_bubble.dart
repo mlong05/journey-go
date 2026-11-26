@@ -237,6 +237,13 @@ class ActiveActivityTimer {
     if (!_overlaySupported || a == null || _overlayDismissed) return;
     try {
       if (!await FlutterOverlayWindow.isPermissionGranted()) return;
+      // Ô nổi (engine riêng) ghi cờ "đã ẩn" vào bộ nhớ máy ⇒ đọc lại để biết du khách đã ẩn lượt này chưa
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      if (prefs.getInt(OverlayPayload.dismissedEndsAtKey) == a.endsAt.millisecondsSinceEpoch) {
+        _overlayDismissed = true;
+        return;
+      }
       final payload = jsonEncode(OverlayPayload.build(
         endsAt: a.endsAt,
         totalSeconds: a.totalSeconds,
@@ -248,12 +255,14 @@ class ActiveActivityTimer {
         hide: appL10n.ovHide,
         cancel: appL10n.ovCancel,
       ));
-      final prefs = await SharedPreferences.getInstance();
       await prefs.setString(OverlayPayload.prefsKey, payload);
       if (!await FlutterOverlayWindow.isActive()) {
+        // showOverlay nhận PIXEL (khác resizeOverlay nhận dp) ⇒ đổi dp → px, nếu không ô chỉ còn ~90 dp,
+        // chữ bị ép mất và tràn ngang ("OVERFLOWED").
+        final dpr = WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
         await FlutterOverlayWindow.showOverlay(
-          width: OverlayPayload.compactWidth,
-          height: OverlayPayload.compactHeight,
+          width: (OverlayPayload.compactWidth * dpr).round(),
+          height: (OverlayPayload.compactHeight * dpr).round(),
           alignment: OverlayAlignment.topRight,
           enableDrag: true,
           positionGravity: PositionGravity.auto,
