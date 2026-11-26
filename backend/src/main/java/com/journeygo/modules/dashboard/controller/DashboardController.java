@@ -41,9 +41,10 @@ public class DashboardController {
 
     @GetMapping("/admin/operations")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Trang tổng quan vận hành theo khung so sánh")
+    @Operation(summary = "Trang tổng quan vận hành theo khung so sánh "
+            + "(range: today | weekly | monthly | yearly | custom)")
     public ResponseEntity<ApiResponse<OperationsOverviewResponse>> operations(
-            @RequestParam(defaultValue = "rolling") String range,
+            @RequestParam(defaultValue = "today") String range,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
             @RequestParam(required = false) Long regionId) {
@@ -70,21 +71,36 @@ public class DashboardController {
 
     @GetMapping("/provider")
     @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN')")
-    @Operation(summary = "Số liệu tổng quan của đối tác đang đăng nhập (range: today|week|month|quarter|year; compareScope: same_span|full_prev; compareMode: prev_1|prev_2|prev_4|prev_7|yoy; forecast: true|false)")
+    @Operation(summary = "Số liệu tổng quan của đối tác đang đăng nhập "
+            + "(range: today | week | month | custom)")
     public ResponseEntity<ApiResponse<ProviderDashboardResponse>> provider(
             @RequestParam(defaultValue = "month") String range,
-            @RequestParam(defaultValue = "same_span") String compareScope,
-            @RequestParam(defaultValue = "prev_1") String compareMode,
-            @RequestParam(defaultValue = "false") boolean forecast,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) Long tourId,
+            @RequestParam(required = false) Long regionId,
             @AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.success("Lấy số liệu tổng quan thành công",
-                dashboardService.provider(principal.getId(), range, compareScope, compareMode, forecast)));
+                dashboardService.provider(principal.getId(), range, from, to, tourId, regionId)));
+    }
+
+    @GetMapping("/provider/tours")
+    @PreAuthorize("hasAnyRole('CONTENT_PROVIDER', 'ADMIN')")
+    @Operation(summary = "Danh sách tour rút gọn của đối tác (cho bộ lọc trang Tổng quan)")
+    public ResponseEntity<ApiResponse<java.util.List<ProviderDashboardResponse.TourOption>>> providerTours(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tour thành công",
+                dashboardService.providerTourOptions(principal.getId())));
     }
 
     @GetMapping("/moderator")
     @PreAuthorize("hasAnyRole('CONTENT_MODERATOR', 'ADMIN')")
     @Operation(summary = "Số liệu bàn làm việc kiểm duyệt")
-    public ResponseEntity<ApiResponse<ModeratorDashboardResponse>> moderator() {
-        return ResponseEntity.ok(ApiResponse.success("Lấy số liệu tổng quan thành công", dashboardService.moderator()));
+    public ResponseEntity<ApiResponse<ModeratorDashboardResponse>> moderator(
+            @RequestParam(required = false) String range,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy số liệu tổng quan thành công",
+                dashboardService.moderator(range, from, to)));
     }
 }

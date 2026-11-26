@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  AlertTriangle,
   ArrowUpRight,
   CheckCircle2,
   ChevronRight,
@@ -10,9 +11,9 @@ import {
   Flag,
   Gauge,
   Inbox,
-  MessageSquare,
   PieChart,
   RefreshCw,
+  ShieldAlert,
 } from "lucide-react";
 import { SURFACE } from "../admin/dashboard.tokens";
 import { PageHeader, Panel } from "@/components/dashboard/DashboardUI";
@@ -21,9 +22,11 @@ import { dashboardService } from "@/features/dashboard";
 import { communityModerationService } from "@/features/community/services/communityModerationService";
 import { useQueueRefresh } from "@/context/NotificationContext";
 import { formatDateTimeVN } from "@/lib/money";
+import QueueAgeChart, { SLA_OVERDUE_HOURS, SLA_WARN_HOURS } from "./overview/QueueAgeChart";
+import ModeratorRangeFilter from "./overview/ModeratorRangeFilter";
 
 /**
- * Bàn làm việc tổng quan của Kiểm duyệt viên — /moderator
+ * Trang Tổng quan của Kiểm duyệt viên — /moderator
  *
  * Nguồn dữ liệu (đều là API sẵn có):
  *  • `GET /dashboard/moderator`               → số đếm toàn hệ thống + hiệu suất 30 ngày
@@ -32,7 +35,8 @@ import { formatDateTimeVN } from "@/lib/money";
  *  • `GET /community/moderation/reports`      → báo cáo bài viết chờ xử lý
  *  • `GET /community/moderation/comment-reports` → báo cáo bình luận chờ xử lý
  *
- * Bố cục khóa khung (không cuộn trang): dải 4 ô số liệu → [Hàng chờ cần xử lý | Hiệu suất + Cơ cấu].
+ * Bố cục khóa khung (không cuộn trang): dải 6 ô số liệu →
+ * [Hàng chờ cần xử lý | Tình trạng hàng chờ (SLA) + Cơ cấu + Lý do từ chối].
  * Chỉ danh sách trong "Hàng chờ cần xử lý" có thanh cuộn.
  * Mọi chữ dài đều `truncate` + `title` để không tràn khung.
  */
@@ -40,9 +44,7 @@ import { formatDateTimeVN } from "@/lib/money";
 /** Số bài / báo cáo tải về cho mỗi tab (danh sách tự cuộn bên trong). */
 const ROWS_PER_TAB = 30;
 
-/** Ngưỡng hạn xử lý (giờ) tính từ lúc gửi duyệt. */
-const SLA_WARN_HOURS = 24;
-const SLA_OVERDUE_HOURS = 48;
+/** Ngưỡng hạn xử lý (giờ) tính từ lúc gửi duyệt — dùng chung với biểu đồ SLA. */
 
 const REPORT_REASONS = {
   SPAM: "Spam hoặc quảng cáo",
@@ -53,17 +55,34 @@ const REPORT_REASONS = {
   OTHER: "Lý do khác",
 };
 
+/** Nhãn tiếng Việt cho mã lý do từ chối (backend trả về mã enum). */
+const REJECTION_REASONS = {
+  INACCURATE_INFORMATION: "Thông tin chưa chính xác",
+  INCOMPLETE_INFORMATION: "Thông tin chưa đầy đủ",
+  INAPPROPRIATE_DESTINATION: "Điểm đến không phù hợp",
+  INAPPROPRIATE_TOUR: "Tour không phù hợp",
+  DUPLICATE_DESTINATION: "Điểm đến bị trùng lặp",
+  DUPLICATE_TOUR: "Tour bị trùng lặp",
+  INVALID_PRICE_OR_DATES: "Giá hoặc ngày khởi hành không hợp lệ",
+  INVALID_ITINERARY: "Lịch trình hoặc điểm đến chưa hợp lệ",
+  OTHER: "Lý do khác",
+};
+
 const TONE_TEXT = {
   amber: "text-amber-600",
   rose: "text-rose-600",
   emerald: "text-emerald-600",
   sky: "text-sky-600",
+  indigo: "text-indigo-600",
+  violet: "text-violet-600",
 };
 const TONE_CHIP = {
   amber: "bg-amber-50 text-amber-600",
   rose: "bg-rose-50 text-rose-600",
   emerald: "bg-emerald-50 text-emerald-600",
   sky: "bg-sky-50 text-sky-600",
+  indigo: "bg-indigo-50 text-indigo-600",
+  violet: "bg-violet-50 text-violet-600",
 };
 
 /* ───────────────────────────── Helpers ───────────────────────────── */
@@ -131,6 +150,10 @@ export default function ModeratorDashboardPage() {
   const [updatedAt, setUpdatedAt] = useState(null);
   const [tab, setTab] = useState("tours");
 
+  // Khoảng thời gian đang xem — mặc định "Tất cả".
+  const [range, setRange] = useState("all");
+  const [customRange, setCustomRange] = useState({ from: "", to: "" });
+
   // Thời gian thực: hồ sơ mới gửi duyệt hoặc moderator khác vừa xử lý → tải ngầm lại
   const [reloadKey, setReloadKey] = useState(0);
   useQueueRefresh(["tour-review", "post-review", "post-report"], () =>
@@ -144,7 +167,10 @@ export default function ModeratorDashboardPage() {
       const empty = { items: [], total: 0 };
       const [tourRes, statsRes, postRes, reportRes, commentRes] = await Promise.allSettled([
         moderationService.getTourQueue({ size: 100 }),
-        dashboardService.getModerator(),
+        dashboardService.getModerator(range, {
+          from: customRange.from,
+          to: customRange.to,
+        }),
         communityModerationService.getPendingPosts({ size: ROWS_PER_TAB }),
         communityModerationService.getReports({ status: "PENDING", size: ROWS_PER_TAB }),
         communityModerationService.getCommentReports({ status: "PENDING", size: ROWS_PER_TAB }),
@@ -170,14 +196,10 @@ export default function ModeratorDashboardPage() {
     return () => {
       alive = false;
     };
-  }, [reloadKey]);
+  }, [reloadKey, range, customRange]);
 
   /* ── Số liệu tổng hợp ─────────────────────────────────────────────── */
   const sortedTours = useMemo(() => [...tours].sort(byOldest("submittedAt")), [tours]);
-  const overdueTours = useMemo(
-    () => tours.filter((t) => (hoursSince(t?.submittedAt) ?? 0) >= SLA_OVERDUE_HOURS).length,
-    [tours],
-  );
 
   const tourCount = stats?.pending?.tours ?? tours.length;
   const postCount = stats?.pendingPosts ?? posts.total;
@@ -187,6 +209,22 @@ export default function ModeratorDashboardPage() {
   const decidedToday = stats?.decidedToday ?? 0;
   const approvedToday = stats?.approvedToday ?? 0;
   const rejectedToday = Math.max(0, decidedToday - approvedToday);
+
+  // ── Số liệu trong khoảng thời gian đang chọn ─────────────────────────
+  const queueAge = stats?.queueAge ?? null;
+  const decidedInRange = stats?.reviewedInRange ?? 0;
+  const approvedInRange = stats?.approvedInRange ?? 0;
+  const rejectedInRange = stats?.rejectedInRange ?? 0;
+  const avgHoursInRange = stats?.avgReviewHoursInRange ?? null;
+  const rangeLabel = stats?.rangeLabel || "Tất cả";
+  // Tỷ lệ duyệt = duyệt / (duyệt + từ chối) trong khoảng.
+  const approvalRate =
+    decidedInRange > 0 ? (approvedInRange / decidedInRange) * 100 : null;
+  // Hàng chờ tổng cộng — gồm mọi loại mục đang chờ.
+  const queueTotal =
+    queueAge?.total ?? tourCount + postCount + reportCount;
+  const overdueCount = queueAge?.overdue ?? 0;
+  const topReasons = stats?.topRejectionReasons ?? [];
 
   const reportRows = useMemo(
     () =>
@@ -201,33 +239,30 @@ export default function ModeratorDashboardPage() {
 
   const kpis = [
     {
-      id: "tours",
-      label: "Tour chờ duyệt",
-      value: tourCount,
-      icon: Clock,
-      tone: "amber",
+      id: "queue",
+      label: "Hàng chờ tổng cộng",
+      value: queueTotal,
+      icon: Inbox,
+      tone: "indigo",
       href: "/moderator/tours",
-      hint: overdueTours > 0 ? `${overdueTours} quá ${SLA_OVERDUE_HOURS}h` : null,
-      hintCls: "text-rose-600 font-semibold",
-    },
-    {
-      id: "posts",
-      label: "Bài chờ duyệt",
-      value: postCount,
-      icon: MessageSquare,
-      tone: "sky",
-      href: "/moderator/community",
-      hint: null,
-    },
-    {
-      id: "reports",
-      label: "Báo cáo chờ xử lý",
-      value: reportCount,
-      icon: Flag,
-      tone: "rose",
-      href: "/moderator/community",
-      hint: reportCount > 0 ? `${postReportCount} bài · ${commentReportCount} b.luận` : null,
+      hint:
+        queueTotal > 0
+          ? `${tourCount} tour · ${postCount + reportCount} việc khác`
+          : "Hàng chờ đang trống",
       hintCls: "text-slate-500",
+    },
+    {
+      id: "overdue",
+      label: `Quá hạn (>${SLA_OVERDUE_HOURS}h)`,
+      value: overdueCount,
+      icon: AlertTriangle,
+      tone: "rose",
+      href: "/moderator/tours",
+      hint:
+        overdueCount > 0
+          ? `${((overdueCount / Math.max(1, queueTotal)) * 100).toFixed(0)}% hàng chờ đã vi phạm SLA`
+          : "Chưa có việc quá hạn",
+      hintCls: overdueCount > 0 ? "text-rose-600 font-semibold" : "text-slate-500",
     },
     {
       id: "today",
@@ -237,6 +272,39 @@ export default function ModeratorDashboardPage() {
       tone: "emerald",
       href: "/moderator/history",
       hint: decidedToday > 0 ? `${approvedToday} duyệt · ${rejectedToday} từ chối` : null,
+      hintCls: "text-slate-500",
+    },
+    {
+      id: "approval",
+      label: "Tỷ lệ duyệt",
+      value: approvalRate === null ? "—" : `${approvalRate.toFixed(1)}%`,
+      icon: Gauge,
+      tone: "sky",
+      href: "/moderator/history",
+      hint:
+        decidedInRange > 0
+          ? `${approvedInRange} duyệt / ${rejectedInRange} từ chối · ${rangeLabel.toLowerCase()}`
+          : `Chưa có hồ sơ nào trong ${rangeLabel.toLowerCase()}`,
+      hintCls: "text-slate-500",
+    },
+    {
+      id: "avg",
+      label: "Thời gian xử lý TB",
+      value: formatAvgReview(avgHoursInRange),
+      icon: Clock,
+      tone: "violet",
+      href: "/moderator/history",
+      hint: `${decidedInRange} hồ sơ trong ${rangeLabel.toLowerCase()}`,
+      hintCls: "text-slate-500",
+    },
+    {
+      id: "reports",
+      label: "Báo cáo chờ xử lý",
+      value: reportCount,
+      icon: Flag,
+      tone: "amber",
+      href: "/moderator/community",
+      hint: reportCount > 0 ? `${postReportCount} bài · ${commentReportCount} b.luận` : null,
       hintCls: "text-slate-500",
     },
   ];
@@ -263,11 +331,14 @@ export default function ModeratorDashboardPage() {
 
   return (
     // Màn xl+: vừa khít khung, chỉ danh sách hàng chờ cuộn. Màn nhỏ: các khối xếp dọc, cho cuộn.
+    // ⚠️ Cột phụ bên phải có 3 khối (Tình trạng hàng chờ · Cơ cấu · Lý do từ chối) — trước đây
+    // xếp chồng trong `xl:overflow-hidden` nên 2 khối dưới bị CẮT mất. Nay cột phụ CUỘN
+    // RIÊNG (overflow-y-auto) ⇒ mọi nội dung hiện đủ, không bị cắt.
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto xl:overflow-hidden">
       <div className="shrink-0">
       <PageHeader
-        title="Bàn làm việc tổng quan"
-        description="Theo dõi hàng chờ thẩm định tour, bài cộng đồng và báo cáo vi phạm."
+        title="Tổng quan"
+        description="Áp lực hàng chờ thẩm định, SLA đang vi phạm và hiệu suất xử lý của bạn."
       >
         {updatedAt && (
           <span className="text-xs text-slate-500 whitespace-nowrap">
@@ -287,14 +358,30 @@ export default function ModeratorDashboardPage() {
       </PageHeader>
       </div>
 
+      {/* ── Bộ lọc khoảng thời gian ─────────────────────────────────────── */}
+      <div className="shrink-0">
+        <ModeratorRangeFilter
+          range={range}
+          onRangeChange={(next) => {
+            setRange(next);
+            if (next !== "custom") setCustomRange({ from: "", to: "" });
+          }}
+          customRange={customRange}
+          onApplyCustom={(next) => {
+            setCustomRange(next);
+            setRange("custom");
+          }}
+        />
+      </div>
+
       {statsError && (
         <p className="shrink-0 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
           Không tải được số liệu thống kê — các con số đang lấy tạm từ hàng chờ.
         </p>
       )}
 
-      {/* ── 1. Dải số liệu gọn: 1 thẻ chia 4 ô (2×2 trên màn nhỏ) ──────────── */}
-      <section className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 shadow-xs">
+      {/* ── 1. Dải số liệu gọn: 1 thẻ chia 6 ô (2×3 trên màn nhỏ) ─────────── */}
+      <section className="shrink-0 grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 shadow-xs">
         {kpis.map((k) => {
           const Icon = k.icon;
           return (
@@ -460,48 +547,77 @@ export default function ModeratorDashboardPage() {
           </div>
         </div>
 
-        {/* Cột phụ */}
-        <div className="flex min-w-0 flex-col gap-4 xl:col-span-4 xl:min-h-0">
-          <Panel title="Hiệu suất 30 ngày" icon={Gauge} tone="emerald" bodyClassName="px-5 py-2">
-            <dl className="divide-y divide-slate-100">
-              <StatRow label="Thời gian duyệt trung bình" value={formatAvgReview(stats?.avgReviewHours)} />
-              <StatRow label="Hồ sơ đã xử lý" value={`${stats?.reviewedLast30Days ?? 0} hồ sơ`} />
-              <StatRow label="Tổng hồ sơ bị từ chối" value={`${stats?.rejectedTotal ?? 0} hồ sơ`} />
-            </dl>
-          </Panel>
+        {/* Cột phụ: biểu đồ SLA + cơ cấu hàng chờ + lý do từ chối.
+            ⚠️ Cột này có 3 khối xếp dọc — tổng chiều cao vượt quá khung còn lại ⇒
+            trước đây 2 khối dưới bị `xl:overflow-hidden` CẮT mất. Nay cột phụ CUỘN
+            RIÊNG (overflow-y-auto) ⇒ mọi nội dung hiện đủ, không bị cắt. */}
+        <div className="flex min-w-0 flex-col gap-4 xl:col-span-4 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent] xl:pr-1">
+          <div className="shrink-0">
+            <QueueAgeChart queueAge={queueAge} isLoading={loading} />
+          </div>
 
-          <Panel title="Cơ cấu hàng chờ" icon={PieChart} tone="indigo" bodyClassName="p-5">
-            <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-              {segmentTotal > 0 &&
-                segments
-                  .filter((s) => s.value > 0)
-                  .map((s) => (
-                    <div
-                      key={s.label}
-                      className={`${s.bar} h-full`}
-                      style={{ width: `${(s.value / segmentTotal) * 100}%` }}
-                      title={`${s.label}: ${s.value}`}
-                    />
+          <div className="shrink-0">
+            <Panel title="Cơ cấu hàng chờ" icon={PieChart} tone="indigo" bodyClassName="p-5">
+              <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                {segmentTotal > 0 &&
+                  segments
+                    .filter((s) => s.value > 0)
+                    .map((s) => (
+                      <div
+                        key={s.label}
+                        className={`${s.bar} h-full`}
+                        style={{ width: `${(s.value / segmentTotal) * 100}%` }}
+                        title={`${s.label}: ${s.value}`}
+                      />
+                    ))}
+              </div>
+              {segmentTotal === 0 && (
+                <p className="mt-3 text-xs text-slate-400">Hàng chờ đang trống.</p>
+              )}
+              <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
+                {segments.map((s) => (
+                  <li key={s.label} className="flex min-w-0 items-center gap-2">
+                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${s.bar}`} />
+                    <span className="min-w-0 flex-1 truncate text-xs text-slate-600" title={s.label}>
+                      {s.label}
+                    </span>
+                    <span className="shrink-0 text-xs font-bold tabular-nums text-slate-900">
+                      {s.value}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Panel>
+          </div>
+
+          {/* Top lý do từ chối — chỉ ra điểm cần rà soát trong hồ sơ. */}
+          <div className="shrink-0">
+            <Panel
+              title="Lý do từ chối phổ biến"
+              icon={ShieldAlert}
+              tone="rose"
+              bodyClassName="px-5 py-3"
+            >
+              {topReasons.length === 0 ? (
+                <p className="py-3 text-xs text-slate-400">
+                  Chưa có hồ sơ nào bị từ chối trong {rangeLabel.toLowerCase()}.
+                </p>
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {topReasons.map((r) => (
+                    <li key={r.reason} className="flex items-center gap-3 py-2">
+                      <span className="min-w-0 flex-1 truncate text-xs text-slate-600" title={r.reason}>
+                        {REJECTION_REASONS[r.reason] || r.reason}
+                      </span>
+                      <span className="shrink-0 rounded-md bg-rose-50 px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-rose-700">
+                        {r.count}
+                      </span>
+                    </li>
                   ))}
-            </div>
-            {segmentTotal === 0 && (
-              <p className="mt-3 text-xs text-slate-400">Hàng chờ đang trống.</p>
-            )}
-            <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
-              {segments.map((s) => (
-                <li key={s.label} className="flex min-w-0 items-center gap-2">
-                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${s.bar}`} />
-                  <span className="min-w-0 flex-1 truncate text-xs text-slate-600" title={s.label}>
-                    {s.label}
-                  </span>
-                  <span className="shrink-0 text-xs font-bold tabular-nums text-slate-900">
-                    {s.value}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Panel>
-
+                </ul>
+              )}
+            </Panel>
+          </div>
         </div>
       </section>
     </div>
@@ -573,16 +689,5 @@ function QueueRow({ badge, title, meta = [], time, href, action }) {
         </Link>
       </div>
     </li>
-  );
-}
-
-function StatRow({ label, value }) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-2.5">
-      <dt className="min-w-0 truncate text-xs text-slate-600" title={label}>
-        {label}
-      </dt>
-      <dd className="shrink-0 text-sm font-bold tabular-nums text-slate-900">{value}</dd>
-    </div>
   );
 }

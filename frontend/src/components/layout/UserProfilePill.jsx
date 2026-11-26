@@ -154,8 +154,13 @@ export default function UserProfilePill({
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   const containerRef = useRef(null);
+  const triggerRef = useRef(null);
+  const dropdownRef = useRef(null);
   const fileInputRef = useRef(null);
   const [avatarError, setAvatarError] = useState("");
+
+  // Vị trí khung dropdown (tính theo viewport) để neo ĐÚNG dưới nút bấm.
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
 
   // Xử lý tải ảnh đại diện từ tệp máy tính (Upload lên Cloudinary qua Backend API, tự động lưu và load lại trang)
   const handleAvatarFileUpload = async (e) => {
@@ -304,10 +309,55 @@ export default function UserProfilePill({
     };
   }, [fetchProfile]);
 
+  // Tính vị trí khung dropdown theo viewport (để neo ngay dưới nút bấm).
+  // ⚠️ Dropdown render qua `createPortal` ra `document.body` vì nút nằm trong
+  // `<header class="z-30">` — header tạo stacking context ⇒ `z-50` bên trong
+  // KHÔNG thể vượt qua header dính `z-30` của trang nội dung ⇒ bị che.
+  const DROPDOWN_W = 320; // w-80
+  const DROPDOWN_H = 340; // chiều cao ước lượng
+
+  /** Neo dropdown theo vị trí nút bấm, canh trong viewport. */
+  const computeDropdownPos = useCallback(() => {
+    const el = triggerRef.current;
+    if (!el || typeof window === "undefined") return { top: 0, left: 0 };
+    const r = el.getBoundingClientRect();
+    // Căn mép phải theo nút; nếu tràn trái thì lùi vào trong viewport.
+    const left = Math.max(8, Math.min(r.right - DROPDOWN_W, window.innerWidth - DROPDOWN_W - 8));
+    // Ưu tiên hiện DƯỚI nút; nếu không đủ chỗ bên dưới thì hiện BÊN TRÊN.
+    const spaceBelow = window.innerHeight - r.bottom;
+    let top = spaceBelow < DROPDOWN_H && r.top > DROPDOWN_H ? r.top - 8 : r.bottom + 8;
+    // Luôn giữ khung nằm trong viewport.
+    top = Math.max(8, Math.min(top, window.innerHeight - DROPDOWN_H - 8));
+    return { top, left };
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const update = () => setDropdownPos(computeDropdownPos());
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [isOpen, computeDropdownPos]);
+
+  /** Mở/đóng dropdown — luôn tính vị trí TRƯỚC khi mở để không nháy ở góc (0,0). */
+  const toggleDropdown = useCallback(() => {
+    setIsOpen((prev) => {
+      if (!prev) setDropdownPos(computeDropdownPos());
+      return !prev;
+    });
+  }, [computeDropdownPos]);
+
   // Click outside listener để đóng Dropdown
   useEffect(() => {
     function handleClickOutside(event) {
       if (containerRef.current && !containerRef.current.contains(event.target)) {
+        // Dropdown được render qua portal ra document.body ⇒ phải kiểm tra thêm
+        // phần dropdown, nếu không thì bấm vào trong dropdown sẽ bị đóng nhầm.
+        if (dropdownRef.current && dropdownRef.current.contains(event.target)) return;
         setIsOpen(false);
       }
     }
@@ -446,13 +496,14 @@ export default function UserProfilePill({
           NÚT BẤM TRÊN TOPBAR (TRIGGER PILL Ở GÓC PHẢI)
       ──────────────────────────────────────────────────────── */}
       <div
+        ref={triggerRef}
         role="button"
         tabIndex={0}
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={toggleDropdown}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            setIsOpen((prev) => !prev);
+            toggleDropdown();
           }
         }}
         className={`flex items-center gap-3 pl-2 pr-3.5 py-1.5 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200/80 transition-all cursor-pointer ${className} ${
@@ -503,9 +554,11 @@ export default function UserProfilePill({
       {/* ────────────────────────────────────────────────────────
           KHUNG XỔ XUỐNG KHI NHẤN VÀO (DROPDOWN POPOVER CARD)
       ──────────────────────────────────────────────────────── */}
-      {isOpen && (
+      {isOpen && mounted && typeof document !== "undefined" && createPortal(
         <div
-          className="w-80 bg-white rounded-2xl shadow-2xl border border-slate-200/90 absolute right-0 top-14 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+          ref={dropdownRef}
+          style={{ top: dropdownPos.top, left: dropdownPos.left }}
+          className="fixed z-[90] w-80 bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
           role="dialog"
           aria-label="Khung thông tin hồ sơ tài khoản"
         >
@@ -647,7 +700,8 @@ export default function UserProfilePill({
               )}
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ────────────────────────────────────────────────────────
