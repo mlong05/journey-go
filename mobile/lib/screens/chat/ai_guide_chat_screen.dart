@@ -534,6 +534,9 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
     _lastInset = bottomInset;
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7FB),
+      // Ô nhập đã tự đệm đúng chiều cao bàn phím (_buildComposer). Nếu Scaffold cũng thu nhỏ thân thì
+      // bàn phím bị trừ hai lần ⇒ khung chat chỉ còn vài chục px và báo "BOTTOM OVERFLOWED".
+      resizeToAvoidBottomInset: false,
       appBar: _buildHeader(),
       body: Column(
         children: [
