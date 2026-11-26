@@ -384,15 +384,15 @@ export default function PartnerRegisterPage() {
 
   // ── Điều hướng giữa các giai đoạn ─────────────────────────────────────────
   const goNext = async () => {
+    if (step === 1 && !verificationToken) {
+      setOtpError(t("home.pr.err.verifyEmailFirst"));
+      showToast("error", t("home.pr.toast.verifyEmailFirst"));
+      return;
+    }
     const stepErrors = validateStep(step, form, t);
     if (Object.keys(stepErrors).length > 0) {
       setErrors((p) => ({ ...p, ...stepErrors }));
       showToast("error", t("home.pr.toast.stepIncomplete"));
-      return;
-    }
-    if (step === 1 && !verificationToken) {
-      setOtpError(t("home.pr.err.verifyEmailFirst"));
-      showToast("error", t("home.pr.toast.verifyEmailFirst"));
       return;
     }
 
@@ -428,8 +428,6 @@ export default function PartnerRegisterPage() {
       const result = await submitApplication(buildPayload());
       dirtyRef.current = false;
       setSubmitted(true);
-      showToast("success", t("home.pr.toast.submitSuccess"));
-      setTimeout(() => router.push("/partner-register/success"), 2500);
       return result;
     } catch (err) {
       showToast("error", err?.message || t("home.pr.toast.submitFailed"));
@@ -543,9 +541,7 @@ export default function PartnerRegisterPage() {
         <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           {/* Vùng nội dung: cuộn nội bộ khi nội dung dài hơn khung */}
           <div
-            className={`min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7 ${
-              submitted ? "hidden" : ""
-            }`}
+            className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7"
           >
           {/* ── GIAI ĐOẠN 1 ── */}
           {step === 1 && (
@@ -640,6 +636,12 @@ export default function PartnerRegisterPage() {
                 </div>
               )}
 
+              {!verificationToken && !otpError && (
+                <p className="text-[11px] font-semibold text-slate-500">
+                  {t("home.pr.err.verifyEmailFirst")}
+                </p>
+              )}
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label={t("home.pr.s1.phone")} required htmlFor="phone" error={errors.phone}>
                   <div className="relative">
@@ -654,7 +656,8 @@ export default function PartnerRegisterPage() {
                       onChange={(e) => setField("phone", e.target.value)}
                       placeholder="0901234567"
                       error={errors.phone}
-                      className="pl-10"
+                      disabled={!verificationToken}
+                      className="pl-10 disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </div>
                 </Field>
@@ -672,6 +675,8 @@ export default function PartnerRegisterPage() {
                     onChange={(e) => setField("representativeName", e.target.value)}
                     placeholder={t("home.pr.s1.repNamePlaceholder")}
                     error={errors.representativeName}
+                    disabled={!verificationToken}
+                    className="disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </Field>
               </div>
@@ -687,6 +692,8 @@ export default function PartnerRegisterPage() {
                   value={form.representativePosition}
                   onChange={(e) => setField("representativePosition", e.target.value)}
                   error={errors.representativePosition}
+                  disabled={!verificationToken}
+                  className="disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <option value="">{t("home.pr.s1.positionPlaceholder")}</option>
                   {POSITIONS.map((p) => (
@@ -1113,37 +1120,37 @@ export default function PartnerRegisterPage() {
 
           </div>
 
-          {/* ── Màn hình "đã gửi đơn" hiển thị tại chỗ (trước khi chuyển trang) ── */}
+          {/* ── Popup "đăng ký thành công" — nổi trên form, chỉ có nút về trang chủ ── */}
           {submitted && (
-            <div className="flex flex-1 flex-col items-center justify-center px-4 py-10 text-center">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-8 ring-emerald-100">
-                <CheckCircle2 size={26} />
-              </div>
-              <h2 className="text-base font-bold text-slate-900">
-                {t("home.pr.submitted.title")}
-              </h2>
-              <p className="mt-1.5 max-w-md text-xs leading-relaxed text-slate-500">
-                {t("home.pr.submitted.desc")}
-              </p>
-              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+            <div
+              className="fixed inset-0 z-[500] flex items-center justify-center bg-slate-900/50 p-4"
+              role="alertdialog"
+              aria-modal="true"
+              aria-label={t("home.pr.submitted.title")}
+            >
+              <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-2xl">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-8 ring-emerald-100">
+                  <CheckCircle2 size={30} />
+                </div>
+                <h2 className="text-lg font-bold text-slate-900">
+                  {t("home.pr.submitted.title")}
+                </h2>
+                <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                  {t("home.pr.submitted.desc")}
+                </p>
                 <Link
                   href="/"
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                  autoFocus
+                  className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-6 text-xs font-bold text-white transition hover:bg-emerald-800"
                 >
                   <ArrowLeft size={15} /> {t("home.pr.submitted.backHome")}
-                </Link>
-                <Link
-                  href="/login"
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 text-xs font-bold text-white transition hover:bg-emerald-800"
-                >
-                  {t("common.login")}
                 </Link>
               </div>
             </div>
           )}
 
           {/* ── Thanh điều hướng — ghim đáy khung form, luôn nhìn thấy ── */}
-          {!submitted && (
+          {(
           <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50/70 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-7">
             <div className="flex items-center gap-3">
               {step > 1 && (
@@ -1159,7 +1166,12 @@ export default function PartnerRegisterPage() {
             </div>
 
             {step < 4 ? (
-              <button type="button" onClick={goNext} className={buttonCls("primary")}>
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={step === 1 && !verificationToken}
+                className={buttonCls("primary")}
+              >
                 {t("home.pr.nav.next")} <ArrowRight size={15} />
               </button>
             ) : (
