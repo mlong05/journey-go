@@ -5,6 +5,7 @@ import {
   Building2,
   CheckCircle2,
   ChevronRight,
+  Eye,
   FileText,
   Landmark,
   Loader2,
@@ -128,7 +129,8 @@ export default function AdminPartnersPage() {
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
-  const [toast, setToast] = useState("");
+  // Hộp thông báo giữa màn hình: { tone: "success" | "danger" | "error", title, subject?, message? }.
+  const [notice, setNotice] = useState(null);
 
   const { confirm, confirmDialog } = useConfirm();
 
@@ -183,9 +185,9 @@ export default function AdminPartnersPage() {
     })();
   }, [loadStats]);
 
+  // Thông báo lỗi — cũng hiện giữa màn hình thay cho toast ở góc.
   const showToast = useCallback((msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 4000);
+    setNotice({ tone: "error", title: "Có lỗi xảy ra", message: msg });
   }, []);
 
   const rows = useMemo(() => {
@@ -222,8 +224,8 @@ export default function AdminPartnersPage() {
       title: "Phê duyệt hồ sơ đối tác?",
       subject: app.businessName || app.email,
       description:
-        "Hệ thống sẽ kiểm tra hồ sơ, tạo/nâng cấp tài khoản CONTENT_PROVIDER, " +
-        "cấp hồ sơ đối tác + ví và gửi email thiết lập mật khẩu cho người đại diện.",
+        "Hệ thống sẽ kiểm tra hồ sơ, tạo hoặc nâng cấp tài khoản thành " +
+        "Đối tác cung cấp nội dung, cấp hồ sơ đối tác cùng ví và gửi email thiết lập mật khẩu cho người đại diện.",
       confirmLabel: "Phê duyệt",
       cancelLabel: "Hủy bỏ",
     });
@@ -232,7 +234,12 @@ export default function AdminPartnersPage() {
     setActionBusy(true);
     try {
       const res = await approveApplication(app.id, null);
-      showToast(res?.message || "Đã phê duyệt hồ sơ đối tác.");
+      setNotice({
+        tone: "success",
+        title: "Phê duyệt thành công",
+        subject: app.businessName || app.email,
+        message: res?.message || "Đã phê duyệt hồ sơ đối tác.",
+      });
       await Promise.all([load(), loadStats()]);
       if (detail?.id === app.id) openDetail(app.id);
     } catch (e) {
@@ -263,8 +270,12 @@ export default function AdminPartnersPage() {
 
     setActionBusy(true);
     try {
-      const res = await rejectApplication(app.id, reason);
-      showToast(res?.message || "Đã từ chối hồ sơ.");
+      await rejectApplication(app.id, reason);
+      setNotice({
+        tone: "danger",
+        title: "Đã từ chối",
+        subject: app.businessName || app.email,
+      });
       await Promise.all([load(), loadStats()]);
       if (detail?.id === app.id) openDetail(app.id);
     } catch (e) {
@@ -496,9 +507,51 @@ export default function AdminPartnersPage() {
         )}
       </div>
 
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-[400] rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-xl max-w-sm">
-          {toast}
+      {notice && (
+        <div
+          className="fixed inset-0 z-[500] flex items-center justify-center bg-slate-900/50 p-4"
+          onClick={() => setNotice(null)}
+          role="alertdialog"
+          aria-modal="true"
+          aria-label={notice.title}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-8 text-center shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ring-8 ${
+                notice.tone === "success"
+                  ? "bg-emerald-50 text-emerald-600 ring-emerald-100"
+                  : notice.tone === "danger"
+                    ? "bg-rose-50 text-rose-600 ring-rose-100"
+                    : "bg-amber-50 text-amber-600 ring-amber-100"
+              }`}
+            >
+              {notice.tone === "success" ? (
+                <CheckCircle2 size={30} />
+              ) : notice.tone === "danger" ? (
+                <XCircle size={30} />
+              ) : (
+                <AlertTriangle size={30} />
+              )}
+            </div>
+            <h3 className="mt-5 text-lg font-bold text-slate-900">{notice.title}</h3>
+            {notice.subject && (
+              <p className="mt-1 text-sm font-semibold text-slate-700">{notice.subject}</p>
+            )}
+            {notice.message && (
+              <p className="mt-2 text-xs leading-relaxed text-slate-500">{notice.message}</p>
+            )}
+            <button
+              type="button"
+              autoFocus
+              onClick={() => setNotice(null)}
+              className="mt-6 inline-flex h-10 items-center justify-center rounded-xl bg-slate-900 px-6 text-xs font-bold text-white hover:bg-slate-800"
+            >
+              Đóng
+            </button>
+          </div>
         </div>
       )}
 
@@ -558,15 +611,81 @@ function DocLink({ label, url }) {
       </span>
     );
   }
+  return <DocPreview label={label} url={url} />;
+}
+
+/** Chip giấy tờ: bấm vào để xem ngay trong trang (ảnh hoặc PDF). */
+function DocPreview({ label, url }) {
+  const [open, setOpen] = useState(false);
+  const isPdf = /\.pdf(\?|#|$)/i.test(url);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
-    >
-      <BadgeCheck size={11} /> {label}
-    </a>
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title={`Xem ${label}`}
+        className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 shadow-sm transition hover:border-emerald-600 hover:bg-emerald-50 hover:text-emerald-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+      >
+        <FileText size={14} className="text-slate-500" />
+        {label}
+        <span className="ml-1 inline-flex items-center gap-1 rounded-md bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-white">
+          <Eye size={11} /> Xem
+        </span>
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/70 p-4"
+          onClick={() => setOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={label}
+        >
+          <div
+            className="flex h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
+              <h3 className="text-sm font-bold text-slate-900">{label}</h3>
+              <div className="flex items-center gap-2">
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] font-semibold text-emerald-700 hover:underline"
+                >
+                  Mở tab mới
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="Đóng"
+                  className="rounded-full p-1.5 text-slate-500 hover:bg-slate-100"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto bg-slate-50">
+              {isPdf ? (
+                <iframe src={url} title={label} className="h-full w-full border-0" />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={url} alt={label} className="mx-auto max-h-full max-w-full object-contain" />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -630,7 +749,7 @@ function PartnerApplicationDetailModal({
           ) : (
             <div className="space-y-4">
               {/* Giai đoạn 1 */}
-              <SectionCard icon={User} title="Giai đoạn 1 — Thông tin người đại diện">
+              <SectionCard icon={User} title="Thông tin người đại diện">
                 <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <Field label="Email" value={a.email} icon={Mail} />
                   <Field label="Số điện thoại" value={a.phone} icon={Phone} />
@@ -651,7 +770,7 @@ function PartnerApplicationDetailModal({
               </SectionCard>
 
               {/* Giai đoạn 2 */}
-              <SectionCard icon={Building2} title="Giai đoạn 2 — Thông tin doanh nghiệp">
+              <SectionCard icon={Building2} title="Thông tin doanh nghiệp">
                 <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <Field label="Tên doanh nghiệp / Cơ sở" value={a.businessName} />
                   <Field
@@ -681,7 +800,10 @@ function PartnerApplicationDetailModal({
                   />
                 </dl>
 
-                <div className="mt-4 flex flex-wrap gap-2">
+                <p className="mt-5 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                  Giấy tờ đính kèm
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
                   <DocLink label="Giấy phép hoạt động" url={a.operationLicenseUrl} />
                   <DocLink
                     label="Giấy đăng ký kinh doanh"
@@ -700,7 +822,7 @@ function PartnerApplicationDetailModal({
               </SectionCard>
 
               {/* Giai đoạn 3 */}
-              <SectionCard icon={Landmark} title="Giai đoạn 3 — Thông tin thanh toán">
+              <SectionCard icon={Landmark} title="Thông tin thanh toán">
                 <dl className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <Field label="Ngân hàng thụ hưởng" value={a.bankName} />
                   <Field label="Số tài khoản" value={a.bankAccountNumber} />
@@ -709,7 +831,7 @@ function PartnerApplicationDetailModal({
               </SectionCard>
 
               {/* Giai đoạn 4 */}
-              <SectionCard icon={ShieldCheck} title="Giai đoạn 4 — Xác nhận & Điều khoản">
+              <SectionCard icon={ShieldCheck} title="Xác nhận & Điều khoản">
                 <ul className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {[
                     { ok: a.confirmedAuthority, label: "Thẩm quyền đại diện" },
