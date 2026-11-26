@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
@@ -20,6 +19,7 @@ import '../common/ink.dart';
 import '../common/photo.dart';
 import '../tours/tour_detail_sections.dart' show showStopPreview;
 import '../tours/tour_detail_opener.dart';
+import 'check_in_sheet.dart';
 import 'journey_map.dart';
 import 'journey_summary_screen.dart';
 import 'journey_widgets.dart';
@@ -203,12 +203,40 @@ class _JourneyScreenState extends State<JourneyScreen> {
     return message.contains('ngày trải nghiệm') || message.contains('tour chỉ mở');
   }
 
+  /// Bấm "Check-in trạm": KHÔNG gửi lên máy chủ ngay. Mở bảng xác nhận có bản đồ, đo GPS mới, cho du khách
+  /// thấy mình đang ở đâu so với vùng check-in. Chỉ khi nằm trong vùng mới được xác nhận; chưa tới thì
+  /// chỉ đường; không dùng được GPS thì quét QR.
   Future<void> _checkIn(JourneyDestination dest) async {
     if (_blockRepeatCheckIn(dest)) return;
+    final point = _coords[dest.destinationId];
+    if (point == null) {
+      // Trạm chưa có toạ độ ⇒ không có gì để so vị trí: chỉ còn cách quét QR tại trạm.
+      await _checkInQr(dest);
+      return;
+    }
+    final choice = await showCheckInSheet(
+      context,
+      stopName: dest.name,
+      station: point,
+      radiusMeters: _checkInRadiusOf(dest),
+      arrivalMeters: _arrivalRadiusOf(dest),
+    );
+    if (choice == null || !mounted) return;
+    switch (choice.kind) {
+      case CheckInChoiceKind.confirm:
+        await _submitGpsCheckIn(dest, choice.position!);
+      case CheckInChoiceKind.directions:
+        await _openDirections(dest);
+      case CheckInChoiceKind.qr:
+        await _checkInQr(dest);
+    }
+  }
+
+  /// Gửi vị trí GPS đã xác nhận trên bảng lên máy chủ (máy chủ vẫn kiểm tra lại khoảng cách).
+  Future<void> _submitGpsCheckIn(JourneyDestination dest, Position position) async {
     final journey = _journey!;
     setState(() => _busyDestinationId = dest.destinationId);
     try {
-      final position = await LocationService.currentPosition();
       final result = await _service.checkInGps(
         journeyId: journey.id,
         destinationId: dest.destinationId,
@@ -216,8 +244,6 @@ class _JourneyScreenState extends State<JourneyScreen> {
         longitude: position.longitude,
       );
       await _afterCheckIn(result, dest);
-    } on LocationException catch (e) {
-      if (mounted) await _showLocationProblem(e);
     } on ApiException catch (e) {
       if (mounted) await _showCheckInProblem(e.message);
     } finally {
@@ -337,6 +363,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
 
   /// Mở phần Trải nghiệm của trạm (đã check-in): danh sách thử thách.
   Future<void> _openExperience(JourneyDestination dest) async {
+    final hadOpen = dest.tasks.any((t) => t.isOpen);
     final changed = await StopExperienceScreen.open(
       context,
       StopExperienceScreen(journeyId: _journey!.id, destination: dest, stop: _stopOf(dest)),
@@ -345,36 +372,54 @@ class _JourneyScreenState extends State<JourneyScreen> {
       final wasCompleted = _journey?.isCompleted ?? false;
       await _load(silent: true);
       if (!mounted) return;
-      if (!wasCompleted && (_journey?.isCompleted ?? false)) await _celebrateCompletion();
+      if (!wasCompleted && (_journey?.isCompleted ?? false)) {
+        await _celebrateCompletion();
+        return;
+      }
+      final now = _journey?.destinations.where((d) => d.destinationId == dest.destinationId).firstOrNull;
+      if (hadOpen && now != null && now.tasks.isNotEmpty && !now.tasks.any((t) => t.isOpen)) {
+        await _showStopExperienceDone(now);
+      }
     }
+  }
+
+  /// Báo đã xong toàn bộ trải nghiệm của một trạm, rồi để du khách ở lại màn hành trình.
+  Future<void> _showStopExperienceDone(JourneyDestination dest) {
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.verified_rounded, size: 48, color: AppCultureColors.heritageJade),
+              const SizedBox(height: 12),
+              Text(
+                appL10n.jsStopDoneTitle(dest.orderIndex),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                appL10n.jsStopDoneBody(dest.name),
+                textAlign: TextAlign.center,
+                style: const TextStyle(height: 1.45, color: AppCultureColors.textMuted),
+              ),
+              const SizedBox(height: 18),
+              PrimaryButton(label: appL10n.rfGotIt, onPressed: () => Navigator.pop(ctx)),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
 
   void _snack(String text) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text), behavior: SnackBarBehavior.floating));
-  }
-
-  Future<void> _showLocationProblem(LocationException e) {
-    return showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        icon: const Icon(Icons.location_off_rounded, size: 36, color: AppCultureColors.warning),
-        title: Text(appL10n.jsNoLocation),
-        content: Text(e.message),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(appL10n.commonClose)),
-          if (e.needsSettings)
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                LocationService.openSettings();
-              },
-              child: Text(appL10n.jsOpenSettings),
-            ),
-        ],
-      ),
-    );
   }
 
   /// Báo du khách đã check-in (hoặc đã hoàn thành hành trình), không cho check-in lại.
@@ -665,8 +710,8 @@ class _JourneyScreenState extends State<JourneyScreen> {
   int _checkInRadiusOf(JourneyDestination dest) =>
       _isWizard ? (_stopOf(dest)?.checkInRadiusMeters ?? 300) : 100;
 
-  /// Coi là "đã tới" khi vào trong bán kính check-in, chừa 20 m sai số GPS (tối thiểu 30 m).
-  int _arrivalRadiusOf(JourneyDestination dest) => math.max(30, _checkInRadiusOf(dest) - 20);
+  /// Coi là "đã tới" ngay khi vào trong bán kính check-in (khớp vòng tròn trên bản đồ và điều kiện máy chủ).
+  int _arrivalRadiusOf(JourneyDestination dest) => _checkInRadiusOf(dest);
 
   /// Du khách đang đứng trong bán kính check-in của [dest] (theo GPS của app) ⇒ thẻ trạm mới hiện nút
   /// "Check-in trạm". Ngoài bán kính / chưa có vị trí / trạm không có toạ độ ⇒ chỉ "Chỉ đường" + "Quét QR".
@@ -1763,6 +1808,11 @@ class _JourneyScreenState extends State<JourneyScreen> {
               user: _user,
               heading: _heading,
               satellite: _satellite,
+              // Vòng tròn vẽ đúng vùng mà nút Check-in hiện ra (đã trừ sai số GPS), không phải 100 m cố định
+              checkInRadiusMeters: [_navDestination ?? _currentDestination]
+                  .nonNulls
+                  .map((d) => _arrivalRadiusOf(d).toDouble())
+                  .firstOrNull ?? 100,
               fitPadding: EdgeInsets.fromLTRB(60, topInset + 90, 60, 250),
               onStopTap: (stop) => _showStopCard(stop.destinationId),
               navRoute: _navRoute,

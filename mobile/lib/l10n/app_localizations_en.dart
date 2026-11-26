@@ -261,14 +261,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get logoutSubtitle => 'Sign out of this device';
 
   @override
-  String get logoutConfirmTitle => 'Confirm sign out';
+  String get logoutConfirmTitle => 'Sign out of your account?';
 
   @override
   String get logoutConfirmMessage =>
-      'Your current session will be safely ended on the server and all tokens on this device will be removed.';
+      'You will be signed out on this device. You can sign back in anytime.';
 
   @override
-  String get logoutConfirmButton => 'Sign out now';
+  String get logoutConfirmButton => 'Sign out';
 
   @override
   String get commonNotifications => 'Notifications';
@@ -4066,6 +4066,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get jsCompletedJourney => 'You\'ve completed the journey';
 
   @override
+  String jsStopDoneTitle(int order) {
+    return 'You have completed the experience at stop $order';
+  }
+
+  @override
+  String jsStopDoneBody(String place) {
+    return 'You have finished every challenge at $place.';
+  }
+
+  @override
   String get jsAlreadyCheckedInShort => 'You\'re already checked in';
 
   @override
@@ -4279,6 +4289,40 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get jsCheckInStop => 'Check in';
+
+  @override
+  String get ciTitle => 'Confirm your check-in location';
+
+  @override
+  String get ciLocating => 'Finding your location…';
+
+  @override
+  String ciInside(String meters) {
+    return 'You are $meters m from the stop — inside the check-in zone.';
+  }
+
+  @override
+  String ciOutside(String meters, String radius) {
+    return 'You have not arrived: $meters m away (must be within $radius m).';
+  }
+
+  @override
+  String ciAccuracy(String meters) {
+    return 'GPS accuracy ±$meters m';
+  }
+
+  @override
+  String get ciConfirm => 'Confirm check-in';
+
+  @override
+  String get ciRefresh => 'Refresh location';
+
+  @override
+  String get ciQrFallback =>
+      'Can\'t use GPS? Scan the QR code at the stop to check in.';
+
+  @override
+  String get ciOpenSettings => 'Open settings';
 
   @override
   String get jsCheckInGps => 'GPS check-in';

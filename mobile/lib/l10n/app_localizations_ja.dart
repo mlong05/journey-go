@@ -240,14 +240,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get logoutSubtitle => 'この端末からログアウトします';
 
   @override
-  String get logoutConfirmTitle => 'ログアウトの確認';
+  String get logoutConfirmTitle => 'アカウントからログアウトしますか？';
 
   @override
-  String get logoutConfirmMessage =>
-      '現在のセッションはサーバー上で安全に終了し、この端末のトークンはすべて削除されます。';
+  String get logoutConfirmMessage => 'この端末からログアウトします。いつでも再ログインできます。';
 
   @override
-  String get logoutConfirmButton => '今すぐログアウト';
+  String get logoutConfirmButton => 'ログアウト';
 
   @override
   String get commonNotifications => 'お知らせ';
@@ -3684,6 +3683,16 @@ class AppLocalizationsJa extends AppLocalizations {
   String get jsCompletedJourney => '旅を完了しました';
 
   @override
+  String jsStopDoneTitle(int order) {
+    return 'スポット$orderの体験を完了しました';
+  }
+
+  @override
+  String jsStopDoneBody(String place) {
+    return '$placeのチャレンジをすべて完了しました。';
+  }
+
+  @override
   String get jsAlreadyCheckedInShort => 'チェックイン済みです';
 
   @override
@@ -3871,6 +3880,39 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get jsCheckInStop => 'チェックイン';
+
+  @override
+  String get ciTitle => 'チェックイン位置の確認';
+
+  @override
+  String get ciLocating => '現在地を確認しています…';
+
+  @override
+  String ciInside(String meters) {
+    return '停留所まで${meters}m — チェックイン範囲内です。';
+  }
+
+  @override
+  String ciOutside(String meters, String radius) {
+    return 'まだ到着していません：${meters}m先です（${radius}m以内が必要）。';
+  }
+
+  @override
+  String ciAccuracy(String meters) {
+    return 'GPS精度 ±${meters}m';
+  }
+
+  @override
+  String get ciConfirm => 'チェックインする';
+
+  @override
+  String get ciRefresh => '位置を再取得';
+
+  @override
+  String get ciQrFallback => 'GPSが使えない場合は、停留所のQRコードをスキャンしてチェックインしてください。';
+
+  @override
+  String get ciOpenSettings => '設定を開く';
 
   @override
   String get jsCheckInGps => 'GPSチェックイン';

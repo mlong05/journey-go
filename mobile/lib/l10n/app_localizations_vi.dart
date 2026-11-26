@@ -249,14 +249,14 @@ class AppLocalizationsVi extends AppLocalizations {
   String get logoutSubtitle => 'Thoát tài khoản khỏi thiết bị';
 
   @override
-  String get logoutConfirmTitle => 'Xác nhận đăng xuất';
+  String get logoutConfirmTitle => 'Đăng xuất khỏi tài khoản?';
 
   @override
   String get logoutConfirmMessage =>
-      'Phiên làm việc hiện tại sẽ được hủy an toàn trên máy chủ và toàn bộ token trên thiết bị sẽ được xóa.';
+      'Bạn sẽ thoát khỏi tài khoản trên thiết bị này. Bạn có thể đăng nhập lại bất cứ lúc nào.';
 
   @override
-  String get logoutConfirmButton => 'Đăng xuất ngay';
+  String get logoutConfirmButton => 'Đăng xuất';
 
   @override
   String get commonNotifications => 'Thông báo';
@@ -3810,6 +3810,16 @@ class AppLocalizationsVi extends AppLocalizations {
   String get jsCompletedJourney => 'Bạn đã hoàn thành hành trình';
 
   @override
+  String jsStopDoneTitle(int order) {
+    return 'Bạn đã hoàn thành trải nghiệm trạm $order';
+  }
+
+  @override
+  String jsStopDoneBody(String place) {
+    return 'Bạn đã làm xong mọi thử thách tại $place.';
+  }
+
+  @override
   String get jsAlreadyCheckedInShort => 'Bạn đã check-in rồi';
 
   @override
@@ -3999,6 +4009,40 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get jsCheckInStop => 'Check-in trạm';
+
+  @override
+  String get ciTitle => 'Xác nhận vị trí check-in';
+
+  @override
+  String get ciLocating => 'Đang xác định vị trí của bạn…';
+
+  @override
+  String ciInside(String meters) {
+    return 'Bạn đang cách trạm $meters m — nằm trong vùng check-in.';
+  }
+
+  @override
+  String ciOutside(String meters, String radius) {
+    return 'Bạn chưa tới trạm: còn cách $meters m (cần trong $radius m).';
+  }
+
+  @override
+  String ciAccuracy(String meters) {
+    return 'Độ chính xác GPS ±$meters m';
+  }
+
+  @override
+  String get ciConfirm => 'Xác nhận check-in';
+
+  @override
+  String get ciRefresh => 'Lấy lại vị trí';
+
+  @override
+  String get ciQrFallback =>
+      'Không dùng được GPS? Quét mã QR dán tại trạm để check-in.';
+
+  @override
+  String get ciOpenSettings => 'Mở cài đặt';
 
   @override
   String get jsCheckInGps => 'Check-in GPS';

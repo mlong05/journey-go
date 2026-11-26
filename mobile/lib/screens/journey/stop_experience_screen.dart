@@ -12,7 +12,6 @@ import '../../core/services/location_service.dart';
 import '../chat/ai_guide_chat_screen.dart';
 import '../common/ink.dart';
 import 'map_kit.dart' show distanceMeters, formatDistance;
-import 'stop_checkpoints_map.dart';
 import 'task_screen.dart';
 import '../../l10n/locale_controller.dart';
 
@@ -130,11 +129,6 @@ class _StopExperienceScreenState extends State<StopExperienceScreen> {
     }
   }
 
-  void _openCheckpoint(StopCheckpoint c) {
-    final task = _dest.tasks.where((t) => t.taskId == c.taskId).firstOrNull;
-    if (task != null) _open(task);
-  }
-
   Future<void> _refresh() async {
     try {
       final journey = await JourneyService().getById(widget.journeyId);
@@ -161,7 +155,12 @@ class _StopExperienceScreenState extends State<StopExperienceScreen> {
     );
     if (changed == true) {
       _changed = true;
+      final hadOpen = _dest.tasks.any((t) => t.isOpen);
       await _refresh();
+      // Vừa xong thử thách cuối của trạm: quay về màn hành trình (màn đó sẽ báo hoàn thành trạm).
+      if (mounted && hadOpen && _dest.tasks.isNotEmpty && !_dest.tasks.any((t) => t.isOpen)) {
+        Navigator.of(context).pop(true);
+      }
     }
   }
 
@@ -236,21 +235,11 @@ class _StopExperienceScreenState extends State<StopExperienceScreen> {
               Text(appL10n.seHeadline, style: AppType.display(size: 24)),
               const SizedBox(height: 16),
               _summary(done, tasks.length, points),
-              if ((_checkpoints?.checkpoints.isNotEmpty ?? false)) ...[
+              // Bản đồ checkpoint KHÔNG hiện ở danh sách chung này (có cả câu đố văn hóa không cần vị trí):
+              // chỉ mở bản đồ bên trong từng thử thách "Trải nghiệm thực tế" (TaskScreen).
+              if (_farBanner() case final banner?) ...[
                 const SizedBox(height: 16),
-                ?_farBanner(),
-                StopCheckpointsMap(
-                  data: _checkpoints!,
-                  user: _user,
-                  heading: null,
-                  doneTaskIds: {for (final t in tasks) if (!t.isOpen) t.taskId},
-                  onTapCheckpoint: _openCheckpoint,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  appL10n.seMapHint,
-                  style: TextStyle(fontSize: 11.5, color: AppInk.muted, height: 1.4),
-                ),
+                banner,
               ],
               const SizedBox(height: 24),
               if (tasks.isEmpty)

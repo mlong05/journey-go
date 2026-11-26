@@ -253,6 +253,12 @@ class NavigationBanner extends StatelessWidget {
       icon = Icons.straight_rounded;
       headline = p == null ? appL10n.navStart : appL10n.navContinueFor(formatDistance(p.toNextStepMeters));
       detail = appL10n.navTo(destinationName);
+    } else if (nextIndex != null && nextIndex == route.steps.length - 1 && nextIndex > 0) {
+      // Bước cuối của tuyến ("Bạn đã đến điểm đích") chỉ là đầu mút tuyến trên đường, chưa chắc đã vào vùng
+      // check-in của trạm ⇒ không báo "đã đến", chỉ nói còn bao xa tới trạm.
+      icon = Icons.flag_outlined;
+      headline = appL10n.navContinueFor(formatDistance(p!.toNextStepMeters));
+      detail = appL10n.navTo(destinationName);
     } else {
       icon = maneuverIcon(step.maneuver, step.instruction);
       headline = 'Sau ${formatDistance(p!.toNextStepMeters)}';

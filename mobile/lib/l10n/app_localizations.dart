@@ -517,19 +517,19 @@ abstract class AppLocalizations {
   /// No description provided for @logoutConfirmTitle.
   ///
   /// In vi, this message translates to:
-  /// **'Xác nhận đăng xuất'**
+  /// **'Đăng xuất khỏi tài khoản?'**
   String get logoutConfirmTitle;
 
   /// No description provided for @logoutConfirmMessage.
   ///
   /// In vi, this message translates to:
-  /// **'Phiên làm việc hiện tại sẽ được hủy an toàn trên máy chủ và toàn bộ token trên thiết bị sẽ được xóa.'**
+  /// **'Bạn sẽ thoát khỏi tài khoản trên thiết bị này. Bạn có thể đăng nhập lại bất cứ lúc nào.'**
   String get logoutConfirmMessage;
 
   /// No description provided for @logoutConfirmButton.
   ///
   /// In vi, this message translates to:
-  /// **'Đăng xuất ngay'**
+  /// **'Đăng xuất'**
   String get logoutConfirmButton;
 
   /// No description provided for @commonNotifications.
@@ -6705,6 +6705,18 @@ abstract class AppLocalizations {
   /// **'Bạn đã hoàn thành hành trình'**
   String get jsCompletedJourney;
 
+  /// No description provided for @jsStopDoneTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn đã hoàn thành trải nghiệm trạm {order}'**
+  String jsStopDoneTitle(int order);
+
+  /// No description provided for @jsStopDoneBody.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn đã làm xong mọi thử thách tại {place}.'**
+  String jsStopDoneBody(String place);
+
   /// No description provided for @jsAlreadyCheckedInShort.
   ///
   /// In vi, this message translates to:
@@ -7010,6 +7022,60 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Check-in trạm'**
   String get jsCheckInStop;
+
+  /// No description provided for @ciTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xác nhận vị trí check-in'**
+  String get ciTitle;
+
+  /// No description provided for @ciLocating.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang xác định vị trí của bạn…'**
+  String get ciLocating;
+
+  /// No description provided for @ciInside.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn đang cách trạm {meters} m — nằm trong vùng check-in.'**
+  String ciInside(String meters);
+
+  /// No description provided for @ciOutside.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn chưa tới trạm: còn cách {meters} m (cần trong {radius} m).'**
+  String ciOutside(String meters, String radius);
+
+  /// No description provided for @ciAccuracy.
+  ///
+  /// In vi, this message translates to:
+  /// **'Độ chính xác GPS ±{meters} m'**
+  String ciAccuracy(String meters);
+
+  /// No description provided for @ciConfirm.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xác nhận check-in'**
+  String get ciConfirm;
+
+  /// No description provided for @ciRefresh.
+  ///
+  /// In vi, this message translates to:
+  /// **'Lấy lại vị trí'**
+  String get ciRefresh;
+
+  /// No description provided for @ciQrFallback.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không dùng được GPS? Quét mã QR dán tại trạm để check-in.'**
+  String get ciQrFallback;
+
+  /// No description provided for @ciOpenSettings.
+  ///
+  /// In vi, this message translates to:
+  /// **'Mở cài đặt'**
+  String get ciOpenSettings;
 
   /// No description provided for @jsCheckInGps.
   ///

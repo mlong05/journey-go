@@ -69,9 +69,9 @@
   "hotlineCannotOpen": "この端末では電話アプリを開けませんでした。",
   "logoutTitle": "ログアウト",
   "logoutSubtitle": "この端末からログアウトします",
-  "logoutConfirmTitle": "ログアウトの確認",
-  "logoutConfirmMessage": "現在のセッションはサーバー上で安全に終了し、この端末のトークンはすべて削除されます。",
-  "logoutConfirmButton": "今すぐログアウト",
+  "logoutConfirmTitle": "アカウントからログアウトしますか？",
+  "logoutConfirmMessage": "この端末からログアウトします。いつでも再ログインできます。",
+  "logoutConfirmButton": "ログアウト",
   "commonNotifications": "お知らせ",
   "commonSeeAll": "すべて見る",
   "commonRetry": "再試行",
@@ -1142,6 +1142,22 @@
   "jsNoLocation": "位置情報を取得できません",
   "jsOpenSettings": "設定を開く",
   "jsCompletedJourney": "旅を完了しました",
+  "jsStopDoneTitle": "スポット{order}の体験を完了しました",
+  "@jsStopDoneTitle": {
+    "placeholders": {
+      "order": {
+        "type": "int"
+      }
+    }
+  },
+  "jsStopDoneBody": "{place}のチャレンジをすべて完了しました。",
+  "@jsStopDoneBody": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
   "jsAlreadyCheckedInShort": "チェックイン済みです",
   "jsCheckedInAllDone": "{place}にチェックインし、旅をすべて完了しました。これ以上のチェックインは不要です。",
   "jsCheckedInContinue": "{place}にはチェックイン済みです。この目的地のミッションを続けましょう。",
@@ -1193,6 +1209,39 @@
   "jsCheckInHint": "到着したらチェックインして、文化コンテンツ、体験、文化遺産バッジを解放しましょう。",
   "jsDirections": "道案内",
   "jsCheckInStop": "チェックイン",
+  "ciTitle": "チェックイン位置の確認",
+  "ciLocating": "現在地を確認しています…",
+  "ciInside": "停留所まで{meters}m — チェックイン範囲内です。",
+  "@ciInside": {
+    "placeholders": {
+      "meters": {
+        "type": "String"
+      }
+    }
+  },
+  "ciOutside": "まだ到着していません：{meters}m先です（{radius}m以内が必要）。",
+  "@ciOutside": {
+    "placeholders": {
+      "meters": {
+        "type": "String"
+      },
+      "radius": {
+        "type": "String"
+      }
+    }
+  },
+  "ciAccuracy": "GPS精度 ±{meters}m",
+  "@ciAccuracy": {
+    "placeholders": {
+      "meters": {
+        "type": "String"
+      }
+    }
+  },
+  "ciConfirm": "チェックインする",
+  "ciRefresh": "位置を再取得",
+  "ciQrFallback": "GPSが使えない場合は、停留所のQRコードをスキャンしてチェックインしてください。",
+  "ciOpenSettings": "設定を開く",
   "jsCheckInGps": "GPSチェックイン",
   "jsScanQr": "現地のQRコードをスキャン",
   "jsScanQrShort": "QRスキャン",

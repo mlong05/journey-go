@@ -69,9 +69,9 @@
   "hotlineCannotOpen": "Couldn't open the phone dialer on this device.",
   "logoutTitle": "Sign out",
   "logoutSubtitle": "Sign out of this device",
-  "logoutConfirmTitle": "Confirm sign out",
-  "logoutConfirmMessage": "Your current session will be safely ended on the server and all tokens on this device will be removed.",
-  "logoutConfirmButton": "Sign out now",
+  "logoutConfirmTitle": "Sign out of your account?",
+  "logoutConfirmMessage": "You will be signed out on this device. You can sign back in anytime.",
+  "logoutConfirmButton": "Sign out",
   "commonNotifications": "Notifications",
   "commonSeeAll": "See all",
   "commonRetry": "Try again",
@@ -1142,6 +1142,22 @@
   "jsNoLocation": "Couldn't get your location",
   "jsOpenSettings": "Open settings",
   "jsCompletedJourney": "You've completed the journey",
+  "jsStopDoneTitle": "You have completed the experience at stop {order}",
+  "@jsStopDoneTitle": {
+    "placeholders": {
+      "order": {
+        "type": "int"
+      }
+    }
+  },
+  "jsStopDoneBody": "You have finished every challenge at {place}.",
+  "@jsStopDoneBody": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
   "jsAlreadyCheckedInShort": "You're already checked in",
   "jsCheckedInAllDone": "You've checked in at {place} and completed the whole journey. No more check-ins needed.",
   "jsCheckedInContinue": "You've already checked in at {place}. Keep going with the missions here.",
@@ -1193,6 +1209,39 @@
   "jsCheckInHint": "Check in when you arrive to unlock cultural content, experiences and the heritage badge.",
   "jsDirections": "Directions",
   "jsCheckInStop": "Check in",
+  "ciTitle": "Confirm your check-in location",
+  "ciLocating": "Finding your location…",
+  "ciInside": "You are {meters} m from the stop — inside the check-in zone.",
+  "@ciInside": {
+    "placeholders": {
+      "meters": {
+        "type": "String"
+      }
+    }
+  },
+  "ciOutside": "You have not arrived: {meters} m away (must be within {radius} m).",
+  "@ciOutside": {
+    "placeholders": {
+      "meters": {
+        "type": "String"
+      },
+      "radius": {
+        "type": "String"
+      }
+    }
+  },
+  "ciAccuracy": "GPS accuracy ±{meters} m",
+  "@ciAccuracy": {
+    "placeholders": {
+      "meters": {
+        "type": "String"
+      }
+    }
+  },
+  "ciConfirm": "Confirm check-in",
+  "ciRefresh": "Refresh location",
+  "ciQrFallback": "Can't use GPS? Scan the QR code at the stop to check in.",
+  "ciOpenSettings": "Open settings",
   "jsCheckInGps": "GPS check-in",
   "jsScanQr": "Scan the QR code on site",
   "jsScanQrShort": "Scan QR",

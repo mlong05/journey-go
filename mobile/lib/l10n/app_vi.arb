@@ -156,9 +156,9 @@
   "hotlineCannotOpen": "Không mở được trình gọi điện trên thiết bị này.",
   "logoutTitle": "Đăng xuất",
   "logoutSubtitle": "Thoát tài khoản khỏi thiết bị",
-  "logoutConfirmTitle": "Xác nhận đăng xuất",
-  "logoutConfirmMessage": "Phiên làm việc hiện tại sẽ được hủy an toàn trên máy chủ và toàn bộ token trên thiết bị sẽ được xóa.",
-  "logoutConfirmButton": "Đăng xuất ngay",
+  "logoutConfirmTitle": "Đăng xuất khỏi tài khoản?",
+  "logoutConfirmMessage": "Bạn sẽ thoát khỏi tài khoản trên thiết bị này. Bạn có thể đăng nhập lại bất cứ lúc nào.",
+  "logoutConfirmButton": "Đăng xuất",
   "commonNotifications": "Thông báo",
   "commonSeeAll": "Xem tất cả",
   "commonRetry": "Thử lại",
@@ -2433,6 +2433,22 @@
   "jsNoLocation": "Chưa lấy được vị trí",
   "jsOpenSettings": "Mở cài đặt",
   "jsCompletedJourney": "Bạn đã hoàn thành hành trình",
+  "jsStopDoneTitle": "Bạn đã hoàn thành trải nghiệm trạm {order}",
+  "@jsStopDoneTitle": {
+    "placeholders": {
+      "order": {
+        "type": "int"
+      }
+    }
+  },
+  "jsStopDoneBody": "Bạn đã làm xong mọi thử thách tại {place}.",
+  "@jsStopDoneBody": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
   "jsAlreadyCheckedInShort": "Bạn đã check-in rồi",
   "jsCheckedInAllDone": "Bạn đã check-in {place} và đi trọn hành trình. Không cần check-in thêm.",
   "@jsCheckedInAllDone": {
@@ -2615,6 +2631,39 @@
   "jsCheckInHint": "Đến nơi rồi check-in để mở khóa Nội dung văn hóa, Trải nghiệm và nhận huy hiệu di sản.",
   "jsDirections": "Chỉ đường",
   "jsCheckInStop": "Check-in trạm",
+  "ciTitle": "Xác nhận vị trí check-in",
+  "ciLocating": "Đang xác định vị trí của bạn…",
+  "ciInside": "Bạn đang cách trạm {meters} m — nằm trong vùng check-in.",
+  "@ciInside": {
+    "placeholders": {
+      "meters": {
+        "type": "String"
+      }
+    }
+  },
+  "ciOutside": "Bạn chưa tới trạm: còn cách {meters} m (cần trong {radius} m).",
+  "@ciOutside": {
+    "placeholders": {
+      "meters": {
+        "type": "String"
+      },
+      "radius": {
+        "type": "String"
+      }
+    }
+  },
+  "ciAccuracy": "Độ chính xác GPS ±{meters} m",
+  "@ciAccuracy": {
+    "placeholders": {
+      "meters": {
+        "type": "String"
+      }
+    }
+  },
+  "ciConfirm": "Xác nhận check-in",
+  "ciRefresh": "Lấy lại vị trí",
+  "ciQrFallback": "Không dùng được GPS? Quét mã QR dán tại trạm để check-in.",
+  "ciOpenSettings": "Mở cài đặt",
   "jsCheckInGps": "Check-in GPS",
   "jsScanQr": "Quét mã QR tại điểm",
   "jsScanQrShort": "Quét QR",
