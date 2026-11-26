@@ -111,9 +111,6 @@ public class PartnerApplicationEmailService {
                       <div style="margin:24px 0;text-align:center;">
                         <a href="{{activationLink}}" style="display:inline-block;background:#047857;color:#fff;text-decoration:none;font-weight:700;padding:14px 28px;border-radius:999px;">Thiết lập mật khẩu</a>
                       </div>
-                      <p style="text-align:center;font-size:13px;color:#64748b;">
-                        Hoặc truy cập trực tiếp: <a href="{{loginLink}}" style="color:#0d9488;">{{loginLink}}</a>
-                      </p>
                       <div style="font-size:13px;color:#64748b;background:#f1f5f9;padding:14px;border-radius:8px;margin-top:24px;">
                         <strong>Lưu ý:</strong> Vui lòng thiết lập mật khẩu ngay để bắt đầu đăng ký nội dung.
                       </div>
