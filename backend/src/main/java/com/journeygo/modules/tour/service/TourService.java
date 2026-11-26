@@ -129,8 +129,9 @@ public class TourService {
      */
     @Transactional(readOnly = true)
     public TourDeparturesResponse departures(LocalDate from, LocalDate to) {
-        LocalDate today = LocalDate.now(TourSubmissionValidator.ZONE);
-        LocalDate start = from == null || from.isBefore(today) ? today : from;
+        // Chỉ mở đặt từ ngày mai: lịch khởi hành không liệt kê hôm nay.
+        LocalDate firstBookable = LocalDate.now(TourSubmissionValidator.ZONE).plusDays(1);
+        LocalDate start = from == null || from.isBefore(firstBookable) ? firstBookable : from;
         LocalDate maxEnd = start.plusDays(MAX_DEPARTURE_RANGE_DAYS);
         LocalDate end = to == null ? start.plusDays(DEFAULT_DEPARTURE_RANGE_DAYS) : to;
         if (end.isAfter(maxEnd)) end = maxEnd;

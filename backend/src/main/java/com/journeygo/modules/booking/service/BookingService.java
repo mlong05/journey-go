@@ -968,10 +968,10 @@ public class BookingService {
     }
 
     private void validateExperienceDate(Tour tour, LocalDate experienceDate) {
-        LocalDate today = LocalDate.now(VIETNAM_ZONE);
-        if (experienceDate == null || experienceDate.isBefore(today)) {
+        LocalDate firstBookable = LocalDate.now(VIETNAM_ZONE).plusDays(1);
+        if (experienceDate == null || experienceDate.isBefore(firstBookable)) {
             throw new AppException(ErrorCode.BOOKING_INVALID_DATE,
-                    "Ngày trải nghiệm không được nằm trong quá khứ");
+                    "Chỉ có thể đặt tour từ ngày mai, không đặt cho hôm nay hoặc ngày đã qua");
         }
         // Tour luồng 5 bước: ngày trải nghiệm phải nằm trong lịch khởi hành đã công bố.
         if (tour.isWizardTour() && catalogService.findDepartureDate(tour, experienceDate).isEmpty()) {

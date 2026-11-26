@@ -58,10 +58,11 @@ public class TourAvailabilityService {
         Tour tour = tourRepository.findByTourId(tourId)
                 .orElseThrow(() -> new AppException(ErrorCode.TOUR_NOT_FOUND));
 
-        LocalDate today = LocalDate.now(TourSubmissionValidator.ZONE);
+        // Chỉ mở đặt từ ngày mai: ngày hôm nay không còn được liệt kê để chọn.
+        LocalDate firstBookable = LocalDate.now(TourSubmissionValidator.ZONE).plusDays(1);
         List<TourSlotAvailabilityResponse.DateAvailability> dates = tour.isWizardTour()
-                ? wizardAvailability(tour, today)
-                : legacyAvailability(tour, today);
+                ? wizardAvailability(tour, firstBookable)
+                : legacyAvailability(tour, firstBookable);
 
         return TourSlotAvailabilityResponse.builder()
                 .tourId(tour.getTourId())
@@ -194,7 +195,7 @@ public class TourAvailabilityService {
     }
 
     /**
-     * Ngày khởi hành gần nhất CÓ THỂ ĐẶT của nhiều tour (tính từ hôm nay).
+     * Ngày khởi hành gần nhất CÓ THỂ ĐẶT của nhiều tour (tính từ ngày mai, không tính hôm nay).
      *
      * <p>Áp dụng cho CẢ HAI luồng tạo tour:
      * <ul>
@@ -215,12 +216,13 @@ public class TourAvailabilityService {
         if (tours == null || tours.isEmpty()) {
             return result;
         }
-        LocalDate today = LocalDate.now(TourSubmissionValidator.ZONE);
+        // Chỉ mở đặt từ ngày mai: ngày khởi hành gần nhất không bao giờ là hôm nay.
+        LocalDate firstBookable = LocalDate.now(TourSubmissionValidator.ZONE).plusDays(1);
 
         // Tour luồng 5 bước: một truy vấn duy nhất cho mọi tour.
         List<Long> wizardIds = tours.stream().filter(Tour::isWizardTour).map(Tour::getTourId).toList();
         if (!wizardIds.isEmpty()) {
-            for (TourSlot slot : tourSlotRepository.findByTourIdsBetween(wizardIds, today, today.plusDays(MAX_LOOKAHEAD_DAYS))) {
+            for (TourSlot slot : tourSlotRepository.findByTourIdsBetween(wizardIds, firstBookable, firstBookable.plusDays(MAX_LOOKAHEAD_DAYS))) {
                 if (slot.getStatus() != TourSlotStatus.OPEN) continue;
                 int capacity = slot.getCapacity() == null ? 0 : slot.getCapacity();
                 int booked = slot.getBookedCount() == null ? 0 : slot.getBookedCount();
@@ -286,7 +288,7 @@ public class TourAvailabilityService {
                     // Ngày → tourId → MIN(remaining) (giống logic legacyAvailability).
                     Map<LocalDate, Map<Long, Integer>> remainingByDate = new LinkedHashMap<>();
                     for (ExperienceSlot slot : experienceSlotRepository.findByExperienceIds(allExperienceIds)) {
-                        if (slot.getSlotDate().isBefore(today)) {
+                        if (slot.getSlotDate().isBefore(firstBookable)) {
                             continue;
                         }
                         int remaining = Math.max(0,
