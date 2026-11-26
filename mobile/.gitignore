@@ -44,6 +44,12 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# ── Signing release (KHÔNG commit) ───────────────────────────────────────────
+# Keystore + mật khẩu: tuyệt đối KHÔNG đưa lên git.
+/android/key.properties
+/android/*.jks
+/android/*.keystore
+
 # ── Flutter Windows: file TỰ SINH, không track ──────────────────────────────────
 # ⚠️ Vì sao ignore?
 # Flutter tool tự sinh lại 3 file này mỗi lần `flutter pub get` / `flutter run`:
