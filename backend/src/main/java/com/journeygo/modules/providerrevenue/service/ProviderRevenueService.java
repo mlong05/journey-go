@@ -319,16 +319,24 @@ public class ProviderRevenueService {
                         : unresolved.size() + " yêu cầu refund đang chờ/processing"));
         if (!unresolved.isEmpty() && deferred == null) deferred = DeferredReason.REFUND_PENDING;
 
-        // 4. Đã cập nhật Refund thành công — số tiền hoàn phải khớp tổng đã hoàn thành
+        // 4. Đã cập nhật Refund thành công — số tiền hoàn trên khoản doanh thu này
+        //    phải KHỚP với số tiền hoàn đã hoàn thành (đã phân bổ theo tỷ lệ gross).
+        //
+        //    ⚠️ Điều kiện cũ dùng `refundAmount <= refundedTotal` ⇒ bị ĐẢO:
+        //    khi khoản doanh thu CHƯA cập nhật refund (refundAmount = 0) thì 0 <= tổng
+        //    ⇒ điều kiện lại TRUE ⇒ hệ thống tưởng đã áp refund và cho qua bước 4.
+        //    Điều kiện đúng là so sánh với SỐ TIỀN HOÀN ĐÃ PHÂN BỔ cho khoản doanh thu này.
         BigDecimal refundedTotal = refunds.stream()
                 .filter(r -> r.getStatus() == RefundStatus.REFUNDED)
                 .map(RefundRequest::getRefundedAmount)
                 .filter(a -> a != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal expectedRefundShare = resolveRefundShare(revenue, refundedTotal);
         boolean refundApplied = revenue.getRefundAmount() != null
-                && revenue.getRefundAmount().compareTo(refundedTotal) <= 0;
+                && revenue.getRefundAmount().compareTo(expectedRefundShare) == 0;
         checks.add(check("4_REFUND_APPLIED", "Số tiền Refund thành công đã được cập nhật", refundApplied,
-                "refundAmount=" + revenue.getRefundAmount() + " / đã hoàn thành=" + refundedTotal));
+                "refundAmount=" + revenue.getRefundAmount() + " / đã hoàn thành=" + refundedTotal
+                        + " / kỳ vọng=" + expectedRefundShare));
 
         // 5. Không có vấn đề đối soát — chưa có khoản điều chỉnh tài chính chờ xử lý
         boolean hasPendingAdjustment = financialAdjustmentRepository
@@ -450,18 +458,27 @@ public class ProviderRevenueService {
         BigDecimal refundedTotal = refundRepository
                 .sumRefundedAmountByPayment(revenue.getPayment().getId());
 
-        // Nếu Booking có nhiều ProviderProfile, mỗi ProviderProfile gánh một phần refund tương ứng với
-        // tỷ lệ doanh thu của họ trong tổng giá trị Booking.
+        revenue.setRefundAmount(resolveRefundShare(revenue, refundedTotal));
+        revenue.recalculate();
+    }
+
+    /**
+     * Phân bổ số tiền hoàn cho một khoản doanh thu.
+     *
+     * <p>Nếu Booking có nhiều ProviderProfile, mỗi ProviderProfile gánh một phần refund
+     * tương ứng với tỷ lệ doanh thu của họ trong tổng giá trị Booking.
+     */
+    private BigDecimal resolveRefundShare(ProviderRevenue revenue, BigDecimal refundedTotal) {
+        if (refundedTotal == null || refundedTotal.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
         BigDecimal bookingGross = totalGrossOfBooking(revenue.getBooking());
-        BigDecimal share = refundedTotal;
         if (bookingGross != null && bookingGross.compareTo(BigDecimal.ZERO) > 0
                 && revenue.getGrossAmount() != null) {
-            share = refundedTotal.multiply(revenue.getGrossAmount())
+            return refundedTotal.multiply(revenue.getGrossAmount())
                     .divide(bookingGross, 2, RoundingMode.HALF_UP);
         }
-
-        revenue.setRefundAmount(share);
-        revenue.recalculate();
+        return refundedTotal;
     }
 
     /**
