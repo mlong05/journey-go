@@ -47,6 +47,26 @@ public class AuthService {
     @org.springframework.beans.factory.annotation.Value("${app.mail.otp-expiration-minutes:10}")
     private int otpExpirationMinutes;
 
+    /**
+     * Role cho tài khoản tạo qua luồng public (đăng ký email / Google OAuth).
+     *
+     * <p>⚠️ SECURITY (P1-1 — chặn role escalation): client có thể tuỳ ý gửi
+     * {@code role: "ADMIN"} / {@code "CONTENT_PROVIDER"} trong body. Nếu server tin
+     * giá trị đó ⇒ bất kỳ ai cũng tự cấp được quyền quản trị / đối tác.
+     *
+     * <p>⇒ Luồng public CHỈ tạo tài khoản {@link Role#TOURIST}.
+     * Muốn trở thành đối tác: gửi đơn tại {@code /api/v1/partner-applications} và chờ
+     * Admin duyệt (xem {@code PartnerApplicationService.approve} — hàm duy nhất được
+     * phép cấp role {@code CONTENT_PROVIDER}).
+     *
+     * <p>Tài khoản đối tác ĐÃ CÓ sẵn (được duyệt trước đây) không bị ảnh hưởng:
+     * vai trò của họ nằm trong DB và chỉ được đổi bởi Admin / luồng duyệt đơn.
+     */
+    private Role resolvePublicRegistrationRole() {
+        return roleRepository.findByName(Role.TOURIST)
+                .orElseGet(() -> roleRepository.save(new Role(Role.TOURIST, "Khách du lịch")));
+    }
+
     @Transactional
     public AuthResponse login(LoginRequest request) {
         // Kiểm tra chống tấn công Brute-force đăng nhập bằng Redis
@@ -95,11 +115,11 @@ public class AuthService {
             throw new AppException(ErrorCode.USER_EXISTED);
         }
 
-        String targetRoleName = (request.role() != null && request.role().getName() != null)
-                ? request.role().getName()
-                : Role.TOURIST;
-        Role assignedRole = roleRepository.findByName(targetRoleName)
-                .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
+        // ⚠️ SECURITY (P1-1): KHÔNG tin `role` do client gửi lên.
+        // Mọi tài khoản tạo qua luồng public (đăng ký / Google OAuth) đều là TOURIST.
+        // Muốn trở thành đối tác (CONTENT_PROVIDER) phải đi qua luồng đơn đăng ký
+        // `/partner-applications` và được Admin duyệt (PartnerApplicationService.approve).
+        Role assignedRole = resolvePublicRegistrationRole();
 
         User user = User.builder()
                 .email(request.email())
@@ -138,12 +158,8 @@ public class AuthService {
         User user = userRepository.findByEmail(email).orElse(null);
 
         if (user == null) {
-            String targetRoleName = (request.role() != null && request.role().getName() != null)
-                    ? request.role().getName()
-                    : Role.TOURIST;
-            Role assignedRole = roleRepository.findByName(targetRoleName)
-                    .orElseGet(() -> roleRepository.findByName(Role.TOURIST)
-                            .orElseGet(() -> roleRepository.save(new Role(Role.TOURIST, "Khách du lịch"))));
+            // ⚠️ SECURITY (P1-1): KHÔNG tin `role` do client gửi lên — luồng public chỉ tạo TOURIST.
+            Role assignedRole = resolvePublicRegistrationRole();
             String fullName = (googleUser.name() != null && !googleUser.name().isBlank())
                     ? googleUser.name()
                     : email.split("@")[0];
