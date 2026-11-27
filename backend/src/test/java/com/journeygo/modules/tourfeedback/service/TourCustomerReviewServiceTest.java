@@ -20,10 +20,14 @@ import com.journeygo.modules.tourfeedback.dto.request.CreateTourCustomerReviewRe
 import com.journeygo.modules.tourfeedback.dto.request.ReplyTourCustomerReviewRequest;
 import com.journeygo.modules.tourfeedback.dto.request.ToggleReviewVisibilityRequest;
 import com.journeygo.modules.tourfeedback.dto.request.UpdateTourCustomerReviewRequest;
+import com.journeygo.modules.tourfeedback.dto.response.ReviewReplyResponse;
 import com.journeygo.modules.tourfeedback.dto.response.TourCustomerReviewResponse;
 import com.journeygo.modules.tourfeedback.dto.response.TourRatingSummaryResponse;
 import com.journeygo.modules.tourfeedback.dto.response.TourReviewEligibilityResponse;
 import com.journeygo.modules.tourfeedback.entity.TourCustomerReview;
+import com.journeygo.modules.tourfeedback.entity.TourCustomerReviewReply;
+import com.journeygo.modules.tourfeedback.repository.TourCustomerReviewModerationHistoryRepository;
+import com.journeygo.modules.tourfeedback.repository.TourCustomerReviewReplyRepository;
 import com.journeygo.modules.tourfeedback.repository.TourCustomerReviewRepository;
 import com.journeygo.modules.user.entity.Role;
 import com.journeygo.modules.user.entity.User;
@@ -52,6 +56,8 @@ class TourCustomerReviewServiceTest {
     private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     @Mock private TourCustomerReviewRepository reviewRepository;
+    @Mock private TourCustomerReviewReplyRepository replyRepository;
+    @Mock private TourCustomerReviewModerationHistoryRepository moderationHistoryRepository;
     @Mock private BookingRepository bookingRepository;
     @Mock private BookingPassengerRepository bookingPassengerRepository;
     @Mock private RefundRequestRepository refundRequestRepository;
@@ -266,17 +272,30 @@ class TourCustomerReviewServiceTest {
         when(reviewRepository.findByIdWithRelations(700L)).thenReturn(Optional.of(review));
         when(userRepository.findById(10L)).thenReturn(Optional.of(provider));
         when(reviewRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(replyRepository.findFirstByReview_IdAndAuthor_IdOrderByCreatedAtDesc(700L, 10L))
+                .thenReturn(Optional.empty());
 
         // Other provider cannot reply
         AppException otherReply = assertThrows(AppException.class,
                 () -> service.replyToReview(700L, new ReplyTourCustomerReviewRequest("Cảm ơn bạn"), 999L));
         assertEquals(ErrorCode.TOUR_CUSTOMER_REVIEW_FORBIDDEN, otherReply.getErrorCode());
 
-        // Owner replies -> notifies reviewer
-        TourCustomerReviewResponse replied = service.replyToReview(700L,
+        // Owner replies → phản hồi được lưu với trạng thái PENDING (chờ kiểm duyệt),
+        // CHƯA hiển thị công khai ⇒ providerReply của đánh giá vẫn null.
+        TourCustomerReviewReply pendingReply = TourCustomerReviewReply.builder()
+                .id(900L).review(review).content("Cảm ơn bạn đã đồng hành cùng chúng tôi!")
+                .status(TourCustomerReviewReply.Status.PENDING)
+                .author(provider).authorName("Đối tác Di Sản")
+                .createdAt(Instant.now())
+                .build();
+        when(replyRepository.save(any(TourCustomerReviewReply.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ReviewReplyResponse replied = service.replyToReview(700L,
                 new ReplyTourCustomerReviewRequest("Cảm ơn bạn đã đồng hành cùng chúng tôi!"), 10L);
-        assertEquals("Cảm ơn bạn đã đồng hành cùng chúng tôi!", replied.providerReply());
-        verify(notifications).send(NotificationType.TOUR_REVIEW_REPLIED);
+        assertEquals(TourCustomerReviewReply.Status.PENDING.name(), replied.getStatus());
+        assertEquals("Cảm ơn bạn đã đồng hành cùng chúng tôi!", replied.getContent());
+        assertNull(review.getProviderReply());
+        assertEquals(pendingReply.getContent(), replied.getContent());
 
         // Self-moderation blocked for non-admin
         AppException selfMod = assertThrows(AppException.class,
@@ -296,6 +315,35 @@ class TourCustomerReviewServiceTest {
         assertTrue(hiddenRes.hidden());
         assertEquals("Ngôn từ không phù hợp", hiddenRes.hiddenReason());
         verify(notifications).send(NotificationType.TOUR_REVIEW_HIDDEN);
+    }
+
+    @Test
+    void approveReply_publishesToReviewAndNotifiesReviewer() {
+        TourCustomerReview review = TourCustomerReview.builder()
+                .id(700L).booking(completedBooking).tour(tour).reviewer(tourist)
+                .overallRating(5).comment("Rất tuyệt vời!").experienceDate(completedBooking.getExperienceDate())
+                .createdAt(Instant.now()).updatedAt(Instant.now())
+                .build();
+        TourCustomerReviewReply reply = TourCustomerReviewReply.builder()
+                .id(900L).review(review).content("Cảm ơn bạn!")
+                .status(TourCustomerReviewReply.Status.PENDING)
+                .author(provider).authorName("Đối tác Di Sản")
+                .createdAt(Instant.now())
+                .build();
+
+        when(replyRepository.findById(900L)).thenReturn(Optional.of(reply));
+        when(replyRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(reviewRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        User mod = User.builder().id(888L).fullName("Mod A").role(Role.of(Role.CONTENT_MODERATOR)).build();
+        when(userRepository.findById(888L)).thenReturn(Optional.of(mod));
+
+        ReviewReplyResponse approved = service.approveReply(900L, 888L);
+        assertEquals(TourCustomerReviewReply.Status.APPROVED.name(), approved.getStatus());
+        assertEquals("Mod A", approved.getModeratorName());
+        // Phản hồi mới được ghi vào đánh giá khi DUYỆT xong.
+        assertEquals("Cảm ơn bạn!", review.getProviderReply());
+        verify(notifications).send(NotificationType.TOUR_REVIEW_REPLIED);
     }
 
     @Test
