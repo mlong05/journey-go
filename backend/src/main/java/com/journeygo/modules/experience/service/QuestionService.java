@@ -31,19 +31,33 @@ public class QuestionService {
     private final CheckInPointRepository checkInPointRepository;
     private final UnlockConditionRepository unlockConditionRepository;
     private final UserCheckInPointRepository userCheckInPointRepository;
+    /** ⚠️ SECURITY (P1-3): server tự quyết định có lộ đáp án hay không — không tin client. */
+    private final com.journeygo.modules.experience.security.AnswerVisibilityGuard answerVisibilityGuard;
 
+    /**
+     * Lấy chi tiết một câu hỏi.
+     *
+     * <p>⚠️ SECURITY (P1-3): tham số {@code forTourist} từ client KHÔNG còn quyết định
+     * việc ẩn đáp án nữa. Server tự mask {@code expectedText} / {@code isCorrect} /
+     * {@code explanation} cho mọi role không phải ADMIN / CONTENT_PROVIDER / CONTENT_MODERATOR.
+     */
     @Transactional(readOnly = true)
     public QuestionResponse getById(Long id, boolean forTourist) {
         Question q = findOrThrow(id);
-        return forTourist ? QuestionResponse.forTourist(q) : QuestionResponse.fromEntity(q);
+        return maskIfNeeded(q);
     }
 
     @Transactional(readOnly = true)
     public List<QuestionResponse> listByTask(Long taskId, boolean forTourist) {
         List<Question> qs = questionRepository.findByTaskIdOrderBySequenceOrderAsc(taskId);
-        return qs.stream()
-                .map(forTourist ? QuestionResponse::forTourist : QuestionResponse::fromEntity)
-                .toList();
+        return qs.stream().map(this::maskIfNeeded).toList();
+    }
+
+    /** Lộ đáp án cho người có quyền (Admin / Provider / Moderator), mask cho du khách. */
+    private QuestionResponse maskIfNeeded(Question q) {
+        return answerVisibilityGuard.canSeeAnswers()
+                ? QuestionResponse.fromEntity(q)
+                : QuestionResponse.forTourist(q);
     }
 
     @Transactional

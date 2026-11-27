@@ -28,24 +28,26 @@ public class QuestionController {
 
     @GetMapping("/questions/{id}")
     @Operation(summary = "Lấy Question theo ID",
-            description = "?forTourist=true ẩn expectedText & answers.isCorrect (BR-TASK-5)")
+            description = "Server tự ẩn expectedText & answers.isCorrect cho du khách (BR-TASK-5). "
+                    + "Tham số ?forTourist không còn quyết định việc này (giữ lại để tương thích, bị bỏ qua).")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404")
     })
     public ResponseEntity<ApiResponse<QuestionResponse>> getById(
             @PathVariable Long id,
-            @RequestParam(defaultValue = "false") boolean forTourist) {
+            @RequestParam(defaultValue = "false") @Deprecated boolean forTourist) {
         return ResponseEntity.ok(ApiResponse.success(questionService.getById(id, forTourist)));
     }
 
     @GetMapping("/tasks/{taskId}/questions")
     @Operation(summary = "Danh sách Question theo Task",
-            description = "?forTourist=true ẩn đáp án (BR-TASK-5)")
+            description = "Server tự ẩn đáp án cho du khách (BR-TASK-5). "
+                    + "Tham số ?forTourist không còn quyết định việc này (giữ lại để tương thích, bị bỏ qua).")
     @ApiResponses(@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"))
     public ResponseEntity<ApiResponse<List<QuestionResponse>>> listByTask(
             @PathVariable Long taskId,
-            @RequestParam(defaultValue = "false") boolean forTourist) {
+            @RequestParam(defaultValue = "false") @Deprecated boolean forTourist) {
         return ResponseEntity.ok(ApiResponse.success(
                 questionService.listByTask(taskId, forTourist)));
     }

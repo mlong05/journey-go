@@ -20,6 +20,8 @@ import {
   UsersRound,
   Ticket,
   Bot,
+  Star,
+  Download,
 } from "lucide-react";
 import { useRequireLogin } from "@/hooks";
 import { useLogout, LogoutModal } from "@/features/auth";
@@ -162,10 +164,26 @@ const ADMIN_NAV_ITEMS = [
     badge: null,
   },
   {
+    id: "reviews",
+    label: "Quản lý đánh giá",
+    href: "/admin/reviews",
+    icon: Star,
+    group: "Giám sát",
+    badge: null,
+  },
+  {
     id: "audit-logs",
     label: "Nhật ký kiểm toán",
     href: "/admin/audit-logs",
     icon: ShieldAlert,
+    group: "Giám sát",
+    badge: null,
+  },
+  {
+    id: "exports",
+    label: "Xuất dữ liệu",
+    href: "/admin/exports",
+    icon: Download,
     group: "Giám sát",
     badge: null,
   },

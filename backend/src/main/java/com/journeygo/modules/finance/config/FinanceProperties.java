@@ -27,8 +27,14 @@ public class FinanceProperties {
 
     /**
      * Thời hạn (giờ) để Tourist gửi yêu cầu Refund kể từ thời điểm thanh toán thành công
-     * đã được xác minh. Mặc định 24 giờ theo tài liệu.
+     * đã được xác minh.
+     *
+     * @deprecated KHÔNG còn được code dùng — thời hạn hoàn tiền được quyết định bởi
+     *             3 BẬC chính sách V50 tính theo thời điểm hủy so với ngày trải nghiệm
+     *             (xem {@link com.journeygo.modules.refund.service.PersonalRefundPolicy}).
+     *             Giữ lại để không làm hỏng cấu hình môi trường cũ.
      */
+    @Deprecated(forRemoval = true)
     private int refundWindowHours = 24;
 
     /**

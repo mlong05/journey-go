@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Ban, CheckCircle2, Eye, History, Search } from "lucide-react";
+import { Ban, CheckCircle2, Eye, History, Search, Star } from "lucide-react";
 import { PageHeader, KpiTile } from "@/components/dashboard/DashboardUI";
 import { moderationService } from "@/features/destination";
+import { tourReviewService } from "@/features/tourreviews";
 import { formatDateTimeVN } from "@/lib/money";
 
 /**
@@ -18,16 +19,41 @@ import { formatDateTimeVN } from "@/lib/money";
 const KINDS = {
   destination: {
     label: "Điểm đến",
-    byStatus: (status) => moderationService.getDestinationsByStatus(status, { page: 0, size: 200 }),
+    decisions: ["APPROVED", "REJECTED"],
+    statusOf: (r) => r.status,
+    load: () =>
+      Promise.all([
+        moderationService.getDestinationsByStatus("APPROVED", { page: 0, size: 200 }),
+        moderationService.getDestinationsByStatus("REJECTED", { page: 0, size: 200 }),
+      ]).then(([approved, rejected]) => [...contentOf(approved), ...contentOf(rejected)]),
     history: (id) => moderationService.getDestinationHistory(id),
     id: (r) => r.destinationId,
     name: (r) => r.destinationName,
   },
   tour: {
     label: "Tour",
-    byStatus: (status) => moderationService.getToursByModerationStatus(status, { page: 0, size: 200 }),
+    decisions: ["APPROVED", "REJECTED"],
+    statusOf: (r) => r.status,
+    load: () =>
+      Promise.all([
+        moderationService.getToursByModerationStatus("APPROVED", { page: 0, size: 200 }),
+        moderationService.getToursByModerationStatus("REJECTED", { page: 0, size: 200 }),
+      ]).then(([approved, rejected]) => [...contentOf(approved), ...contentOf(rejected)]),
     history: (id) => moderationService.getTourHistory(id),
     id: (r) => r.tourId,
+    name: (r) => r.tourTitle,
+  },
+  // ── Lịch sử kiểm duyệt đánh giá tour (C4) ──────────────────────────────
+  review: {
+    label: "Đánh giá tour",
+    decisions: ["HIDDEN", "RESTORED"],
+    statusOf: (r) => r.action,
+    load: () =>
+      tourReviewService
+        .listAllReviewHistory({ page: 0, size: 200 })
+        .then((res) => contentOf(res)),
+    history: (id) => tourReviewService.getReviewHistory(id),
+    id: (r) => r.reviewId,
     name: (r) => r.tourTitle,
   },
 };
@@ -36,6 +62,8 @@ const DECISIONS = {
   ALL: "Tất cả quyết định",
   APPROVED: "Đã duyệt",
   REJECTED: "Bị từ chối",
+  HIDDEN: "Đã ẩn đánh giá",
+  RESTORED: "Đã khôi phục đánh giá",
 };
 
 const STATUS_BADGE = {
@@ -43,9 +71,17 @@ const STATUS_BADGE = {
   REJECTED: { label: "Từ chối", cls: "bg-red-50 text-red-700 border-red-200" },
   PENDING: { label: "Chờ duyệt", cls: "bg-amber-50 text-amber-700 border-amber-200" },
   DRAFT: { label: "Bản nháp", cls: "bg-slate-50 text-slate-600 border-slate-200" },
+  HIDDEN: { label: "Đã ẩn đánh giá", cls: "bg-rose-50 text-rose-700 border-rose-200" },
+  RESTORED: { label: "Đã khôi phục", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
 };
 
-const ACTION_LABEL = { SUBMITTED: "Gửi duyệt", APPROVED: "Duyệt", REJECTED: "Từ chối" };
+const ACTION_LABEL = {
+  SUBMITTED: "Gửi duyệt",
+  APPROVED: "Duyệt",
+  REJECTED: "Từ chối",
+  HIDDEN: "Ẩn đánh giá",
+  RESTORED: "Khôi phục đánh giá",
+};
 
 function contentOf(payload) {
   const data = payload?.data ?? payload;
@@ -71,13 +107,13 @@ export default function ModeratorHistoryPage() {
   useEffect(() => {
     let active = true;
     const cfg = KINDS[kind];
-    Promise.all([cfg.byStatus("APPROVED"), cfg.byStatus("REJECTED")])
-      .then(([approved, rejected]) => {
+    cfg.load()
+      .then((list) => {
         if (!active) return;
-        const list = [...contentOf(approved), ...contentOf(rejected)].sort(
-          (a, b) => new Date(b.reviewedAt ?? 0) - new Date(a.reviewedAt ?? 0),
+        const sorted = [...list].sort(
+          (a, b) => new Date(b.reviewedAt ?? b.createdAt ?? 0) - new Date(a.reviewedAt ?? a.createdAt ?? 0),
         );
-        setRecords(list);
+        setRecords(sorted);
         setError("");
       })
       .catch((err) => active && setError(err?.message || "Không tải được lịch sử duyệt."))
@@ -92,8 +128,10 @@ export default function ModeratorHistoryPage() {
     const q = search.trim().toLowerCase();
     return records.filter(
       (r) =>
-        (decision === "ALL" || r.status === decision) &&
-        (!q || (cfg.name(r) ?? "").toLowerCase().includes(q) || (r.reviewerName ?? "").toLowerCase().includes(q)),
+        (decision === "ALL" || cfg.statusOf(r) === decision) &&
+        (!q ||
+          (cfg.name(r) ?? "").toLowerCase().includes(q) ||
+          (r.reviewerName ?? r.actorName ?? "").toLowerCase().includes(q)),
     );
   }, [records, decision, search, kind]);
 
@@ -111,15 +149,22 @@ export default function ModeratorHistoryPage() {
     if (record.history) return;
     try {
       const data = await KINDS[kind].history(KINDS[kind].id(record));
-      setTimeline((data?.data ?? data)?.history ?? []);
+      const raw = data?.data ?? data;
+      setTimeline(Array.isArray(raw) ? raw : (raw?.history ?? []));
     } catch {
       setTimeline([]);
     }
   }
 
   const cfg = KINDS[kind];
-  const approvedCount = records.filter((r) => r.status === "APPROVED").length;
-  const rejectedCount = records.filter((r) => r.status === "REJECTED").length;
+  const approvedCount = records.filter((r) => cfg.statusOf(r) === "APPROVED").length;
+  const rejectedCount = records.filter((r) => cfg.statusOf(r) === "REJECTED").length;
+  const hiddenCount = records.filter((r) => cfg.statusOf(r) === "HIDDEN").length;
+
+  const decisionOptions = [
+    { key: "ALL", label: DECISIONS.ALL },
+    ...cfg.decisions.map((d) => ({ key: d, label: DECISIONS[d] })),
+  ];
 
   return (
     <div className="space-y-5">
@@ -138,6 +183,9 @@ export default function ModeratorHistoryPage() {
         />
         <KpiTile icon={CheckCircle2} label="Đã duyệt" value={approvedCount} unit="hồ sơ" tone="emerald" />
         <KpiTile icon={Ban} label="Bị từ chối" value={rejectedCount} unit="hồ sơ" tone="rose" />
+        {kind === "review" && (
+          <KpiTile icon={Star} label="Đánh giá đã bị ẩn" value={hiddenCount} unit="đánh giá" tone="rose" />
+        )}
       </section>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -159,7 +207,7 @@ export default function ModeratorHistoryPage() {
           onChange={(e) => setDecision(e.target.value)}
           className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
         >
-          {Object.entries(DECISIONS).map(([key, label]) => (
+          {decisionOptions.map(({ key, label }) => (
             <option key={key} value={key}>
               {label}
             </option>
@@ -196,7 +244,8 @@ export default function ModeratorHistoryPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {visible.map((r) => {
-                const badge = STATUS_BADGE[r.status] ?? STATUS_BADGE.DRAFT;
+                const status = cfg.statusOf(r);
+                const badge = STATUS_BADGE[status] ?? STATUS_BADGE.DRAFT;
                 const isSelected = selected === r;
                 return (
                   <tr
@@ -212,8 +261,8 @@ export default function ModeratorHistoryPage() {
                         {badge.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{r.reviewerName || "—"}</td>
-                    <td className="px-4 py-3 text-slate-500 tabular-nums">{formatTime(r.reviewedAt)}</td>
+                    <td className="px-4 py-3 text-slate-600">{r.reviewerName || r.actorName || "—"}</td>
+                    <td className="px-4 py-3 text-slate-500 tabular-nums">{formatTime(r.reviewedAt ?? r.createdAt)}</td>
                     <td className="px-4 py-3 text-right">
                       <button
                         type="button"

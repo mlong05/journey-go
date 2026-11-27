@@ -25,6 +25,9 @@ public record RegisterRequest(
         @Schema(description = "Số điện thoại", example = "0912345678")
         String phone,
 
-        @Schema(description = "Vai trò người dùng (TOURIST, PROVIDER)", example = "TOURIST")
+        @Schema(description = "Vai trò mong muốn — KHÔNG được dùng, server luôn gán TOURIST cho luồng public. "
+                + "Muốn trở thành đối tác hãy gửi đơn tại /api/v1/partner-applications.",
+                example = "TOURIST", deprecated = true)
         Role role
-) {}
+) {
+}

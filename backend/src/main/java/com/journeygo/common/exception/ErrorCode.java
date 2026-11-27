@@ -87,7 +87,7 @@ public enum ErrorCode {
     REFUND_METHOD_NOT_ALLOWED("Chưa xác minh được trạng thái VNPay — không thể chuyển sang phương thức thủ công", HttpStatus.CONFLICT),
     REFUND_BANK_INFO_REQUIRED("Thiếu thông tin tài khoản nhận tiền cho chuyển khoản thủ công", HttpStatus.BAD_REQUEST),
     REFUND_TOUR_ALREADY_STARTED("Tour đã bắt đầu — không thể gửi yêu cầu hoàn tiền", HttpStatus.BAD_REQUEST),
-    REFUND_NO_SHOW_WINDOW("Đã quá thời hạn 48 giờ trước ngày trải nghiệm, yêu cầu hoàn tiền không đủ điều kiện", HttpStatus.BAD_REQUEST),
+    REFUND_NO_SHOW_WINDOW("Đã quá thời hạn 72 giờ trước ngày trải nghiệm, yêu cầu hoàn tiền không đủ điều kiện", HttpStatus.BAD_REQUEST),
     REFUND_REASON_GROUP_NOT_FOUND("Nhóm lý do hoàn tiền không tồn tại", HttpStatus.NOT_FOUND),
     REFUND_REASON_CODE_NOT_FOUND("Mã lý do hoàn tiền không tồn tại", HttpStatus.NOT_FOUND),
     REFUND_REASON_CODE_IN_USE("Mã lý do đã được dùng trong yêu cầu hoàn tiền nên không thể xóa", HttpStatus.CONFLICT),
@@ -221,7 +221,18 @@ public enum ErrorCode {
     TOUR_CUSTOMER_REVIEW_HIDDEN("Đánh giá này đang bị ẩn bởi kiểm duyệt viên", HttpStatus.CONFLICT),
     TOUR_CUSTOMER_REVIEW_INVALID_IMAGES("Danh sách ảnh đính kèm không hợp lệ (tối đa 5 ảnh http/https)", HttpStatus.BAD_REQUEST),
     TOUR_CUSTOMER_REVIEW_HIDE_REASON_REQUIRED("Vui lòng nhập lý do khi ẩn đánh giá", HttpStatus.BAD_REQUEST),
-    TOUR_CUSTOMER_REVIEW_SELF_MODERATION_FORBIDDEN("Không thể tự kiểm duyệt đánh giá thuộc tour của mình hoặc do chính mình viết", HttpStatus.FORBIDDEN);
+    TOUR_CUSTOMER_REVIEW_SELF_MODERATION_FORBIDDEN("Không thể tự kiểm duyệt đánh giá thuộc tour của mình hoặc do chính mình viết", HttpStatus.FORBIDDEN),
+
+    // ── Phản hồi của đối tác cần kiểm duyệt (E2c) ────────────────────────────
+    TOUR_CUSTOMER_REVIEW_REPLY_NOT_FOUND("Phản hồi của đối tác không tồn tại", HttpStatus.NOT_FOUND),
+    TOUR_CUSTOMER_REVIEW_REPLY_ALREADY_PENDING("Phản hồi của bạn đang chờ kiểm duyệt — vui lòng đợi kết quả", HttpStatus.CONFLICT),
+    TOUR_CUSTOMER_REVIEW_REPLY_ALREADY_HANDLED("Phản hồi này đã được xử lý", HttpStatus.CONFLICT),
+
+    // ── Báo cáo đánh giá vi phạm (E2e / D1) ─────────────────────────────────
+    TOUR_CUSTOMER_REVIEW_REPORT_DUPLICATED("Bạn đã báo cáo đánh giá này trước đó", HttpStatus.CONFLICT),
+    TOUR_CUSTOMER_REVIEW_REPORT_SELF_FORBIDDEN("Không thể báo cáo đánh giá do chính bạn viết", HttpStatus.FORBIDDEN),
+    TOUR_CUSTOMER_REVIEW_REPORT_NOT_FOUND("Báo cáo không tồn tại", HttpStatus.NOT_FOUND),
+    TOUR_CUSTOMER_REVIEW_REPORT_ALREADY_HANDLED("Báo cáo này đã được xử lý", HttpStatus.CONFLICT);
 
     private final String message;
     private final HttpStatus httpStatus;

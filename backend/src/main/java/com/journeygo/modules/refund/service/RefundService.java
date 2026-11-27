@@ -63,8 +63,10 @@ import java.util.UUID;
  * <p>Các quy tắc được cài đặt (theo tài liệu "Refund Processing Policy"):
  * <ul>
  *   <li><b>Quy tắc 1</b> — chỉ hoàn tiền cho Payment có trạng thái SUCCESS.</li>
- *   <li><b>Quy tắc 2</b> — thời hạn 24 giờ kể từ thời điểm thanh toán thành công <b>đã được
- *       xác minh</b> ({@code paidAt}), không dùng thời điểm tạo Booking/Payment.</li>
+ *   <li><b>Quy tắc 2</b> — thời hạn gửi yêu cầu hoàn tiền do 3 BẬC chính sách V50 quyết
+ *       định theo thời điểm hủy so với ngày trải nghiệm
+ *       (xem {@link PersonalRefundPolicy}); thời điểm thanh toán thành công đã được
+ *       xác minh ({@code paidAt}) là mốc bắt buộc để tính tỷ lệ.</p>
  *   <li><b>Quy tắc 3</b> — mỗi Payment chỉ có tối đa một yêu cầu Refund đang xử lý hoặc đã hoàn
  *       tất.</li>
  *   <li><b>Quy tắc 5</b> — số tiền do hệ thống tính: nhóm cá nhân theo 3 bậc thời gian
@@ -118,7 +120,7 @@ public class RefundService {
      * <ol>
      *   <li>Payment thuộc về Tourist đang đăng nhập.</li>
      *   <li>Payment có trạng thái SUCCESS (đã xác minh).</li>
-     *   <li>Còn trong thời hạn 24 giờ kể từ {@code paidAt}.</li>
+     *   <li>Còn trong thời hạn áp dụng theo 3 bậc chính sách V50.</li>
      *   <li>Chưa có yêu cầu Refund đang mở / đã hoàn tất cho Payment này.</li>
      * </ol>
      */
@@ -1080,14 +1082,21 @@ public class RefundService {
             return toResponse(refund);
         }
 
+        // ⚠️ QueryDR trả về trạng thái của giao dịch THANH TOÁN GỐC (luôn là 00/00 khi
+        // khách đã trả tiền) — KHÔNG phải trạng thái của yêu cầu hoàn tiền.
+        // Vì vậy KHÔNG được ghi đè vnpResponseCode / vnpTransactionStatus của RefundRequest
+        // bằng kết quả QueryDR: làm vậy sẽ khiến applyVnPayRefundStatus() hiểu nhầm là
+        // yêu cầu hoàn đã thành công và đánh dấu REFUNDED giả ⇒ tiền chưa về tài khoản
+        // khách nhưng hệ thống đã ghi nhận hoàn xong.
+        // Thay vào đó: mã phản hồi/trạng thái CỦA CHÍNH YÊU Cầu HOÀN (đã lưu từ lúc gửi
+        // yêu cầu tới VNPay) mới là nguồn sự thật để quyết định trạng thái.
+        String refundResponseCode = refund.getVnpResponseCode();
+
         Payment payment = refund.getPayment();
         String transactionDate = payment.getCreatedAt() != null
                 ? vnPayClient.formatDate(LocalDateTime.ofInstant(payment.getCreatedAt(), VIETNAM_ZONE))
                 : null;
 
-        // QueryDR trả về trạng thái giao dịch GỐC. Với yêu cầu hoàn tiền, VNPay Sandbox
-        // hiển thị "Chờ duyệt" — vì vậy trạng thái cuối cùng của yêu cầu hoàn chỉnh được
-        // xác minh qua phản hồi refund đã lưu, hoặc qua trạng thái giao dịch gốc.
         Map<String, String> response = vnPayClient.queryTransaction(
                 payment.getTxnRef(),
                 payment.getVnpTransactionNo(),
@@ -1101,15 +1110,21 @@ public class RefundService {
             return toResponse(refund);
         }
 
-        String transactionStatus = response.get("vnp_TransactionStatus");
-        refund.setVnpResponseCode(response.get("vnp_ResponseCode"));
-        refund.setVnpTransactionStatus(transactionStatus);
-        refund.setVnpMessage(userFacingVnPayMessage(response.get("vnp_ResponseCode"),
-                response.get("vnp_Message")));
+        // Lưu kết quả QueryDR vào raw response để tra cứu, nhưng KHÔNG ghi đè mã phản hồi
+        // của yêu cầu hoàn (xem giải thích ở trên).
         refund.setVnpRawResponse(response.toString());
 
-        // Trạng thái giao dịch gốc vẫn là 00 (đã thanh toán) — không phải trạng thái hoàn tiền.
-        // Vì vậy chỉ khi chính phản hồi refund đã ghi nhận thành công mới chuyển REFUNDED.
+        if (!"00".equals(refundResponseCode)) {
+            // Chưa từng nhận được phản hồi thành công từ lệnh refund ⇒ vẫn đang xử lý.
+            refund.setVnpMessage("Chưa xác minh được kết quả hoàn tiền từ VNPay — yêu cầu vẫn đang được xử lý.");
+            refundRepository.save(refund);
+            audit(refund, RefundAuditLog.Action.VNPAY_STATUS_UPDATED, refund.getStatus(),
+                    RefundStatus.VNPAY_PROCESSING, null, null, refund.getVnpRequestId(),
+                    "Đã kiểm tra lại trạng thái hoàn tiền với VNPay. Yêu cầu vẫn đang được xử lý.",
+                    true);
+            return toResponse(refund);
+        }
+
         audit(refund, RefundAuditLog.Action.VNPAY_STATUS_UPDATED, RefundStatus.VNPAY_PROCESSING,
                 RefundStatus.VNPAY_PROCESSING, null, null, refund.getVnpRequestId(),
                 "Đã kiểm tra lại trạng thái hoàn tiền với VNPay. Yêu cầu vẫn đang được xử lý.",

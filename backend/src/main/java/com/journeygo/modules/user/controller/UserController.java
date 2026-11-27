@@ -1,6 +1,8 @@
 package com.journeygo.modules.user.controller;
 
 import com.journeygo.common.dto.ApiResponse;
+import com.journeygo.modules.audit.entity.SystemAuditLog;
+import com.journeygo.modules.audit.service.SystemAuditLogService;
 import com.journeygo.modules.auth.dto.UserResponse;
 import com.journeygo.modules.user.dto.AdminCreateUserRequest;
 import com.journeygo.modules.user.dto.AdminUpdateUserRequest;
@@ -14,6 +16,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -36,6 +39,7 @@ public class UserController {
 
     private final UserService userService;
     private final com.journeygo.common.service.CloudinaryService cloudinaryService;
+    private final SystemAuditLogService auditLogService;
 
     @GetMapping
     @Operation(summary = "Xem danh sách người dùng", description = "Hỗ trợ tìm kiếm theo từ khóa (email, tên, sđt), lọc theo vai trò (role), trạng thái kích hoạt (active) và phân trang. Để sort, truyền 'id,asc' hoặc 'createdAt,desc'.")
@@ -87,9 +91,13 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserResponse>> updateUserRole(
             @PathVariable Long id,
             @Valid @RequestBody UpdateRoleRequest request,
-            @AuthenticationPrincipal UserPrincipal currentUser
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            HttpServletRequest httpRequest
     ) {
         UserResponse updated = userService.updateUserRole(id, request, currentUser.getId());
+        auditLogService.logSuccess(SystemAuditLog.Category.RBAC, "USER_ROLE_CHANGED",
+                currentUser, "User", String.valueOf(id), resolveClientIp(httpRequest),
+                "Đổi vai trò của user " + id + " sang " + updated.role());
         return ResponseEntity.ok(ApiResponse.success("Cập nhật vai trò người dùng thành công", updated));
     }
 
@@ -98,9 +106,14 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserResponse>> updateUserStatus(
             @PathVariable Long id,
             @Valid @RequestBody UpdateUserStatusRequest request,
-            @AuthenticationPrincipal UserPrincipal currentUser
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            HttpServletRequest httpRequest
     ) {
         UserResponse updated = userService.setUserActiveStatus(id, request.active(), currentUser.getId());
+        auditLogService.logSuccess(SystemAuditLog.Category.RBAC,
+                Boolean.TRUE.equals(request.active()) ? "USER_ACTIVATED" : "USER_DEACTIVATED",
+                currentUser, "User", String.valueOf(id), resolveClientIp(httpRequest),
+                "Trạng thái tài khoản của user " + id + " → " + request.active());
         String msg = Boolean.TRUE.equals(request.active())
                 ? "Kích hoạt người dùng thành công"
                 : "Vô hiệu hóa người dùng thành công";
@@ -149,5 +162,21 @@ public class UserController {
         String avatarUrl = cloudinaryService.uploadImage(file, "journeygo/avatars");
         UserResponse updated = userService.updateUserAvatar(id, avatarUrl);
         return ResponseEntity.ok(ApiResponse.success("Tải ảnh đại diện lên Cloudinary thành công", updated));
+    }
+
+    /** Lấy IP thật của client (ưu tiên {@code X-Forwarded-For}). */
+    private String resolveClientIp(HttpServletRequest request) {
+        if (request == null) {
+            return null;
+        }
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp.trim();
+        }
+        return request.getRemoteAddr();
     }
 }

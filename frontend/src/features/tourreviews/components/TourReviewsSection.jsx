@@ -2,12 +2,14 @@
 /* eslint-disable @next/next/no-img-element -- ảnh review & avatar từ Cloudinary */
 
 import { useEffect, useState } from "react";
-import { ShieldCheck, Camera, MessageSquareReply, Star, Loader2, CalendarCheck2 } from "lucide-react";
+import { ShieldCheck, Camera, MessageSquareReply, Star, Loader2, CalendarCheck2, Flag } from "lucide-react";
 import { useI18n } from "@/i18n";
+import { useAuthSession } from "@/hooks";
 import PaginationBar from "@/components/ui/PaginationBar";
 import tourReviewService from "../services/tourReviewService";
 import { StarDisplay } from "./StarRating";
 import { shortDate } from "@/features/tourist/utils";
+import ReportReviewModal from "./ReportReviewModal";
 
 function RatingBars({ summary, activeStar, onSelectStar, t }) {
   const total = Number(summary?.totalReviews || 0);
@@ -41,6 +43,7 @@ function RatingBars({ summary, activeStar, onSelectStar, t }) {
 
 export default function TourReviewsSection({ tourId }) {
   const { t, locale } = useI18n();
+  const auth = useAuthSession();
   const [summary, setSummary] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [totalPages, setTotalPages] = useState(1);
@@ -49,6 +52,8 @@ export default function TourReviewsSection({ tourId }) {
   const [hasPhotos, setHasPhotos] = useState(false);
   const [sort, setSort] = useState("newest");
   const [loading, setLoading] = useState(true);
+  const [reportTarget, setReportTarget] = useState(null);
+  const [reportNotice, setReportNotice] = useState("");
 
   useEffect(() => {
     if (!tourId) return;
@@ -261,6 +266,19 @@ export default function TourReviewsSection({ tourId }) {
                   <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-slate-700">{r.providerReply}</p>
                 </div>
               )}
+
+              {/* Báo cáo vi phạm (D1 / E2e) — chỉ hiện với người đã đăng nhập và không phải tác giả. */}
+              {auth?.user?.id && Number(auth.user.id) !== Number(r.reviewerId) && (
+                <div className="mt-3 border-t border-slate-100 pt-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setReportTarget(r)}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                  >
+                    <Flag size={12} /> {t("reviews.reportButton")}
+                  </button>
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -270,6 +288,24 @@ export default function TourReviewsSection({ tourId }) {
         <div className="mt-4">
           <PaginationBar page={page} totalPages={totalPages} onPageChange={setPage} />
         </div>
+      )}
+
+      {reportNotice && (
+        <p role="status" className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-semibold text-emerald-700">
+          {reportNotice}
+        </p>
+      )}
+
+      {reportTarget && (
+        <ReportReviewModal
+          reviewId={reportTarget.id}
+          reviewTitle={reportTarget.tourTitle || reportTarget.title || ""}
+          onClose={() => setReportTarget(null)}
+          onReported={() => {
+            setReportTarget(null);
+            setReportNotice(t("reviews.reportSuccess"));
+          }}
+        />
       )}
     </section>
   );

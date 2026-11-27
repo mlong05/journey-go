@@ -138,6 +138,12 @@ app:
   oauth2:
     default-redirect-uri: ${OAUTH2_DEFAULT_REDIRECT_URI:http://localhost:3000/oauth2/redirect}
     authorized-redirect-uris: ${OAUTH2_AUTHORIZED_REDIRECT_URIS:http://localhost:3000/oauth2/redirect,http://127.0.0.1:3000/oauth2/redirect,journeygo://oauth2/redirect,journeygo://auth/callback}
+  auth:
+    google:
+      # ⚠️ SECURITY (P1-2): danh sách client id được phép nhận idToken (kiểm tra `aud`/`azp`).
+      # Mặc định dùng client id của Spring OAuth2 ở trên (Web Client ID — Mobile cũng dùng
+      # chung Web Client ID làm audience). Thêm client id khác bằng dấu phẩy.
+      allowed-client-ids: ${GOOGLE_ALLOWED_CLIENT_IDS:}
   mail:
     from-name: ${MAIL_FROM_NAME:JourneyGo Platform}
     otp-expiration-minutes: ${MAIL_OTP_EXPIRATION_MINUTES:10}
@@ -167,8 +173,10 @@ app:
 
   # ── Finance (Booking / Payment / Refund / Wallet & Settlement) ────────────
   finance:
-    # Thời hạn gửi yêu cầu hoàn tiền kể từ thời điểm thanh toán thành công đã xác minh.
-    refund-window-hours: ${REFUND_WINDOW_HOURS:24}
+    # ⚠️ KHÔNG dùng `refund-window-hours` nữa — thời hạn gửi yêu cầu hoàn tiền
+    # được quyết định bởi 3 BẬC chính sách V50 (80% / 50% / 0%) tính theo thời điểm
+    # hủy so với ngày trải nghiệm (xem PersonalRefundPolicy). Cấu hình thời hạn
+    # riêng biệt chỉ tạo mâu thuẫn giữa tài liệu, UI và code thực thi.
     # Tỷ lệ hoa hồng nền tảng mặc định (0.20 = 20%).
     default-commission-rate: ${DEFAULT_COMMISSION_RATE:0.2000}
     # Tỷ lệ hoàn tiền theo nguyên nhân.
@@ -199,7 +207,11 @@ app:
     # ── Chính sách hoàn tiền (mới) ──────────────────────────────────────────────
     # Cửa sổ no-show: yêu cầu của nhóm cá nhân gửi trong vòng N giờ trước ngày trải
     # nghiệm (hoặc muộn hơn) sẽ bị tính tỷ lệ hoàn 0%.
-    refund-no-show-window-hours: ${REFUND_NO_SHOW_WINDOW_HOURS:48}
+    # ⚠️ KHÔNG đặt override 48 ở đây — mặc định 72 giờ nằm trong FinanceProperties và
+    # phải khớp với PersonalRefundPolicy.LATE_CANCEL_HOURS (72) + bảng chính sách V50.
+    # Nếu đặt 48 ⇒ backend tính 0% trong khoảng 48-72h trong khi frontend hiển thị 72h
+    # ⇒ số tiền hiện ra lệch với số tiền thực hoàn.
+    refund-no-show-window-hours: ${REFUND_NO_SHOW_WINDOW_HOURS:72}
     # Số giờ trước ngày trải nghiệm mà Tourist được gửi lại yêu cầu sau khi bị từ chối
     # (0 = không cho gửi lại).
     refund-resubmit-hours-before-start: ${REFUND_RESUBMIT_HOURS_BEFORE_START:0}

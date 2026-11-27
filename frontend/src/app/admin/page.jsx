@@ -29,6 +29,7 @@ import {
 } from "./overview/TourPerformance";
 import { GRID } from "./overview.tokens";
 import { KPI_HINTS } from "./overview/glossary";
+import PlatformRevenueSection from "./overview/revenue/PlatformRevenueSection";
 
 
 /**
@@ -48,6 +49,8 @@ export default function AdminDashboardPage() {
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  /** Bộ đếm tăng dần để yêu cầu các khối con nạp lại dữ liệu (thay cho Date.now). */
+  const [refreshTick, setRefreshTick] = useState(0);
   const [error, setError] = useState("");
 
   // Khung so sánh: all | today | weekly | monthly | yearly | custom. Mặc định = all (Tất cả).
@@ -106,6 +109,9 @@ export default function AdminDashboardPage() {
   }, [loadDashboard]);
 
   const refreshAll = useCallback(() => {
+    // ⚠️ `refreshTick` là bộ đếm TĂNG DẦN thay cho `Date.now()` — React Compiler
+    // cấm gọi hàm "impure" (Date.now) trong lúc render (rule react-hooks/purity).
+    setRefreshTick((n) => n + 1);
     loadDashboard(true);
   }, [loadDashboard]);
 
@@ -241,12 +247,15 @@ export default function AdminDashboardPage() {
       tone: "sky",
     },
     {
-      id: "tourists",
+      id: "providers",
       label: "Đối tác đang hoạt động",
-      tooltip: KPI_HINTS.tourists,
-      value: (kpis?.activeTourists ?? 0).toLocaleString("vi-VN"),
-      unit: "khách",
-      change: percentChange(kpis?.activeTourists, previousKpis?.activeTourists),
+      // ⚠️ Trước đây thẻ này lấy `activeTourists` (số KHÁCH du lịch có đặt tour) ⇒
+      // nhãn "Đối tác" nhưng số liệu là số khách ⇒ sai hoàn toàn.
+      // Đối tác = `activeProviders` (số chủ tour có tour đang publish trong kỳ).
+      tooltip: KPI_HINTS.providers,
+      value: (kpis?.activeProviders ?? 0).toLocaleString("vi-VN"),
+      unit: "đối tác",
+      change: percentChange(kpis?.activeProviders, previousKpis?.activeProviders),
       icon: Users,
       tone: "slate",
       href: "/admin/partners",
@@ -386,6 +395,11 @@ export default function AdminDashboardPage() {
           <TopDestinationsCard destinations={data?.topDestinations} isLoading={isLoading} />
         </div>
       </section>
+
+      {/* ══ Tầng 6 — DOANH THU NỀN TẢNG ══
+          Khối này luôn tính theo THÁNG DƯƠNG LỊCH nên không bị ảnh hưởng bởi
+          khung so sánh / bộ lọc khu vực ở trên. */}
+      <PlatformRevenueSection refreshKey={refreshTick} />
     </div>
   );
 }

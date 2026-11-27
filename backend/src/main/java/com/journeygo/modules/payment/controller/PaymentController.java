@@ -225,7 +225,10 @@ public class PaymentController {
             @PathVariable Long paymentId,
             HttpServletRequest httpRequest,
             @AuthenticationPrincipal UserPrincipal principal) {
-        PaymentOutcome outcome = paymentService.queryAndResolve(paymentId, resolveClientIp(httpRequest));
+        // ⚠️ SECURITY (P1-4): chỉ chủ giao dịch hoặc Admin mới được truy vấn.
+        boolean isAdmin = AuthorizationGuard.isAdmin();
+        PaymentOutcome outcome = paymentService.queryAndResolve(
+                paymentId, resolveClientIp(httpRequest), principal.getId(), isAdmin);
         Map<String, Object> data = new HashMap<>();
         data.put("outcome", outcome.name());
         data.put("message", switch (outcome) {

@@ -19,6 +19,8 @@ export const KPI_HINTS = {
   gmv: GLOSSARY.gmv,
   success: "Booking đã thanh toán và được xác nhận (đã xác minh giao dịch thành công).",
   tourists: "Số khách du lịch có đặt tour trong kỳ (đếm theo khách duy nhất).",
+  providers:
+    "Số đối tác có ít nhất một tour đang publish trong kỳ (đếm theo người tạo tour).",
   refundRate: "Tiền đã hoàn khách chia cho GMV của kỳ. Tỷ lệ cao bất thường ⇒ kiểm tra chất lượng tour hoặc chính sách hoàn.",
   avgBookingValue: "GMV chia cho số booking thành công — giá trị trung bình mỗi đơn trong kỳ.",
   successRate: "Tỷ lệ booking thành công trên tổng số booking phát sinh trong kỳ.",

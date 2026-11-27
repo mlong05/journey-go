@@ -21,10 +21,20 @@ import com.journeygo.modules.tourfeedback.dto.request.ReplyTourCustomerReviewReq
 import com.journeygo.modules.tourfeedback.dto.request.ToggleReviewVisibilityRequest;
 import com.journeygo.modules.tourfeedback.dto.request.UpdateTourCustomerReviewRequest;
 import com.journeygo.modules.tourfeedback.dto.response.ProviderReviewSummaryResponse;
+import com.journeygo.modules.tourfeedback.dto.response.ReviewHistoryEntryResponse;
+import com.journeygo.modules.tourfeedback.dto.response.ReviewModerationHistoryResponse;
+import com.journeygo.modules.tourfeedback.dto.response.ReviewReplyResponse;
+import com.journeygo.modules.tourfeedback.dto.response.ReviewReportResponse;
 import com.journeygo.modules.tourfeedback.dto.response.TourCustomerReviewResponse;
 import com.journeygo.modules.tourfeedback.dto.response.TourRatingSummaryResponse;
 import com.journeygo.modules.tourfeedback.dto.response.TourReviewEligibilityResponse;
 import com.journeygo.modules.tourfeedback.entity.TourCustomerReview;
+import com.journeygo.modules.tourfeedback.entity.TourCustomerReviewModerationHistory;
+import com.journeygo.modules.tourfeedback.entity.TourCustomerReviewReply;
+import com.journeygo.modules.tourfeedback.entity.TourCustomerReviewReport;
+import com.journeygo.modules.tourfeedback.repository.TourCustomerReviewModerationHistoryRepository;
+import com.journeygo.modules.tourfeedback.repository.TourCustomerReviewReplyRepository;
+import com.journeygo.modules.tourfeedback.repository.TourCustomerReviewReportRepository;
 import com.journeygo.modules.tourfeedback.repository.TourCustomerReviewRepository;
 import com.journeygo.modules.user.entity.User;
 import com.journeygo.modules.user.repository.UserRepository;
@@ -66,6 +76,9 @@ public class TourCustomerReviewService {
     private final TourRepository tourRepository;
     private final UserRepository userRepository;
     private final NotificationPublisher notifications;
+    private final TourCustomerReviewModerationHistoryRepository moderationHistoryRepository;
+    private final TourCustomerReviewReplyRepository replyRepository;
+    private final TourCustomerReviewReportRepository reportRepository;
 
     // ── Tourist: Kiểm tra điều kiện & CRUD đánh giá ───────────────────────────
 
@@ -154,7 +167,10 @@ public class TourCustomerReviewService {
                     .title("Tour nhận được đánh giá mới")
                     .body(displayName(reviewer) + " vừa đánh giá " + saved.getOverallRating()
                             + " sao cho tour " + NotificationPublisher.quote(tour.getTitle()) + ".")
-                    .link(NotificationPublisher.dashboardPath(tour.getCreatedBy(), "/reviews"))
+                    // ⚠️ Link phải trỏ tới trang CÓ THẬT. Trước đây dùng
+                    // `dashboardPath(owner, "/reviews")` ⇒ admin nhận link "/admin/reviews"
+                    // nhưng route đó KHÔNG tồn tại (404). Đối tác thì có "/provider/reviews".
+                    .link(resolveReviewInboxPath(tour.getCreatedBy()))
                     .ref("TOUR_REVIEW", saved.getId())
                     .publish();
         }
@@ -200,6 +216,12 @@ public class TourCustomerReviewService {
 
         if (!isAdmin && !Objects.equals(review.getReviewer().getId(), actorId)) {
             throw new AppException(ErrorCode.TOUR_CUSTOMER_REVIEW_FORBIDDEN);
+        }
+        // ⚠️ Cửa sổ xoá = 7 ngày kể từ khi đánh giá được tạo (giống cửa sổ sửa).
+        // Trước đây KHÔNG có giới hạn ⇒ du khách có thể xoá đánh giá bất cứ lúc nào
+        // (kể cả sau khi đối tác đã phản hồi) ⇒ mất dữ liệu phản hồi & doanh thu ảo.
+        if (!isWithinEditWindow(review.getCreatedAt(), Instant.now())) {
+            throw new AppException(ErrorCode.TOUR_CUSTOMER_REVIEW_EDIT_WINDOW_EXPIRED);
         }
         reviewRepository.delete(review);
         log.info("Deleted tour review id={} by actorId={} isAdmin={}", reviewId, actorId, isAdmin);
@@ -327,8 +349,19 @@ public class TourCustomerReviewService {
         );
     }
 
+    /**
+     * Đối tác phản hồi đánh giá — PHẢI QUA KIỂM DUYỆT (E2c).
+     *
+     * <p>Phản hồi được lưu với trạng thái {@code PENDING} ⇒ CHƯA hiển thị công khai.
+     * Chỉ khi kiểm duyệt viên duyệt ({@link #approveReply}) thì phản hồi mới được
+     * ghi vào {@code providerReply} và hiển thị công khai.
+     *
+     * <p>⚠️ Trước đây phản hồi được ghi thẳng vào {@code providerReply} và hiển thị
+     * ngay ⇒ đối tác có thể đăng nội dung vi phạm (xúc phạm, quảng cáo, thông tin
+     * sai lệch) mà không qua bất kỳ bước duyệt nào.
+     */
     @Transactional
-    public TourCustomerReviewResponse replyToReview(Long reviewId, ReplyTourCustomerReviewRequest request, Long providerId) {
+    public ReviewReplyResponse replyToReview(Long reviewId, ReplyTourCustomerReviewRequest request, Long providerId) {
         TourCustomerReview review = reviewRepository.findByIdWithRelations(reviewId)
                 .orElseThrow(() -> new AppException(ErrorCode.TOUR_CUSTOMER_REVIEW_NOT_FOUND));
 
@@ -342,22 +375,29 @@ public class TourCustomerReviewService {
 
         User provider = userRepository.findById(providerId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
-        review.setProviderReply(request.reply().trim());
-        review.setProviderRepliedBy(provider);
-        review.setProviderRepliedAt(Instant.now());
 
-        TourCustomerReview saved = reviewRepository.save(review);
+        String content = request.reply().trim();
 
-        notifications.send(NotificationType.TOUR_REVIEW_REPLIED)
-                .to(review.getReviewer().getId())
-                .title("Nhà tour đã phản hồi đánh giá của bạn")
-                .body("Đối tác đã phản hồi đánh giá của bạn về tour "
-                        + NotificationPublisher.quote(review.getTour().getTitle()) + ".")
-                .link("/tours/" + review.getTour().getTourId())
-                .ref("TOUR_REVIEW", saved.getId())
-                .publish();
+        // Đối tác đã có phản hồi đang chờ duyệt ⇒ không cho tạo thêm (tránh spam
+        // hàng đợi kiểm duyệt).
+        replyRepository.findFirstByReview_IdAndAuthor_IdOrderByCreatedAtDesc(reviewId, providerId)
+                .filter(r -> r.getStatus() == TourCustomerReviewReply.Status.PENDING)
+                .ifPresent(r -> {
+                    throw new AppException(ErrorCode.TOUR_CUSTOMER_REVIEW_REPLY_ALREADY_PENDING);
+                });
 
-        return toResponse(saved, providerId);
+        TourCustomerReviewReply reply = replyRepository.save(TourCustomerReviewReply.builder()
+                .review(review)
+                .content(content)
+                .status(TourCustomerReviewReply.Status.PENDING)
+                .author(provider)
+                .authorName(displayName(provider))
+                .build());
+
+        log.info("Provider id={} submitted reply for review id={} — awaiting moderation",
+                providerId, reviewId);
+
+        return ReviewReplyResponse.fromEntity(reply);
     }
 
     // ── Moderator / Admin: Kiểm duyệt ẩn / khôi phục đánh giá ────────────────
@@ -405,6 +445,8 @@ public class TourCustomerReviewService {
         User actor = userRepository.findById(actorId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
+        boolean wasHidden = review.isHidden();
+
         review.setHidden(nextHidden);
         if (nextHidden) {
             review.setHiddenReason(cleanReason);
@@ -417,6 +459,20 @@ public class TourCustomerReviewService {
         }
 
         TourCustomerReview saved = reviewRepository.save(review);
+
+        // Ghi lịch sử kiểm duyệt (E2d) — append-only, để tra cứu được đầy đủ
+        // dòng thời gian "ai ẩn/khôi phục, lúc nào, vì lý do gì".
+        moderationHistoryRepository.save(TourCustomerReviewModerationHistory.builder()
+                .review(saved)
+                .action(nextHidden
+                        ? TourCustomerReviewModerationHistory.Action.HIDDEN
+                        : TourCustomerReviewModerationHistory.Action.RESTORED)
+                .fromStatus(wasHidden ? "HIDDEN" : "VISIBLE")
+                .toStatus(nextHidden ? "HIDDEN" : "VISIBLE")
+                .actor(actor)
+                .actorName(displayName(actor))
+                .reason(cleanReason)
+                .build());
 
         if (nextHidden) {
             notifications.send(NotificationType.TOUR_REVIEW_HIDDEN)
@@ -434,7 +490,193 @@ public class TourCustomerReviewService {
         return toResponse(saved, actorId);
     }
 
+    /**
+     * Lịch sử kiểm duyệt một đánh giá (E2d).
+     *
+     * <p>Mỗi lần ẩn / khôi phục đều được ghi lại ⇒ trang "/moderator/history" hiển thị
+     * được đầy đủ dòng thời gian kiểm duyệt của từng đánh giá.
+     */
+    @Transactional(readOnly = true)
+    public List<ReviewModerationHistoryResponse> getModerationHistory(Long reviewId) {
+        reviewRepository.findByIdWithRelations(reviewId)
+                .orElseThrow(() -> new AppException(ErrorCode.TOUR_CUSTOMER_REVIEW_NOT_FOUND));
+        return moderationHistoryRepository.findByReview_IdOrderByCreatedAtDesc(reviewId).stream()
+                .map(ReviewModerationHistoryResponse::fromEntity)
+                .toList();
+    }
+
+    /**
+     * Lịch sử kiểm duyệt đánh giá toàn hệ thống (C4) — dùng cho trang
+     * "/moderator/history" để moderator thấy được ai ẩn/khôi phục đánh giá nào.
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<ReviewHistoryEntryResponse> listAllModerationHistory(String keyword, int page, int size) {
+        Pageable pageable = PageRequest.of(Math.max(0, page), clampSize(size),
+                Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<TourCustomerReviewModerationHistory> result = moderationHistoryRepository
+                .findAllForHistory(keyword == null ? "" : keyword.trim(), pageable);
+        return PageResponse.from(result, ReviewHistoryEntryResponse::fromEntity);
+    }
+
+    // ── Moderator / Admin: Duyệt phản hồi của đối tác (E2c) ─────────────────
+
+    /** Hàng đợi phản hồi của đối tác đang chờ kiểm duyệt. */
+    @Transactional(readOnly = true)
+    public PageResponse<ReviewReplyResponse> listPendingReplies(int page, int size) {
+        Pageable pageable = PageRequest.of(Math.max(0, page), clampSize(size),
+                Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<TourCustomerReviewReply> result = replyRepository
+                .findByStatusOrderByCreatedAtDesc(TourCustomerReviewReply.Status.PENDING, pageable);
+        return PageResponse.from(result, ReviewReplyResponse::fromEntity);
+    }
+
+    /** Duyệt phản hồi của đối tác ⇒ hiển thị công khai + thông báo cho du khách. */
+    @Transactional
+    public ReviewReplyResponse approveReply(Long replyId, Long actorId) {
+        TourCustomerReviewReply reply = replyRepository.findById(replyId)
+                .orElseThrow(() -> new AppException(ErrorCode.TOUR_CUSTOMER_REVIEW_REPLY_NOT_FOUND));
+        if (reply.getStatus() != TourCustomerReviewReply.Status.PENDING) {
+            throw new AppException(ErrorCode.TOUR_CUSTOMER_REVIEW_REPLY_ALREADY_HANDLED);
+        }
+
+        User actor = userRepository.findById(actorId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        reply.setStatus(TourCustomerReviewReply.Status.APPROVED);
+        reply.setModerator(actor);
+        reply.setModeratorName(displayName(actor));
+        reply.setDecisionReason(null);
+        reply.setDecidedAt(Instant.now());
+        TourCustomerReviewReply saved = replyRepository.save(reply);
+
+        // Áp dụng vào đánh giá để hiển thị công khai.
+        TourCustomerReview review = saved.getReview();
+        if (review != null) {
+            review.setProviderReply(saved.getContent());
+            review.setProviderRepliedBy(saved.getAuthor());
+            review.setProviderRepliedAt(Instant.now());
+            reviewRepository.save(review);
+
+            notifications.send(NotificationType.TOUR_REVIEW_REPLIED)
+                    .to(review.getReviewer().getId())
+                    .title("Nhà tour đã phản hồi đánh giá của bạn")
+                    .body("Đối tác đã phản hồi đánh giá của bạn về tour "
+                            + NotificationPublisher.quote(review.getTour().getTitle()) + ".")
+                    .link("/tours/" + review.getTour().getTourId())
+                    .ref("TOUR_REVIEW", review.getId())
+                    .publish();
+        }
+        return ReviewReplyResponse.fromEntity(saved);
+    }
+
+    /** Từ chối phản hồi của đối tác ⇒ không hiển thị, đối tác có thể viết lại. */
+    @Transactional
+    public ReviewReplyResponse rejectReply(Long replyId, Long actorId, String reason) {
+        TourCustomerReviewReply reply = replyRepository.findById(replyId)
+                .orElseThrow(() -> new AppException(ErrorCode.TOUR_CUSTOMER_REVIEW_REPLY_NOT_FOUND));
+        if (reply.getStatus() != TourCustomerReviewReply.Status.PENDING) {
+            throw new AppException(ErrorCode.TOUR_CUSTOMER_REVIEW_REPLY_ALREADY_HANDLED);
+        }
+
+        User actor = userRepository.findById(actorId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        reply.setStatus(TourCustomerReviewReply.Status.REJECTED);
+        reply.setModerator(actor);
+        reply.setModeratorName(displayName(actor));
+        reply.setDecisionReason(cleanOptionalText(reason));
+        reply.setDecidedAt(Instant.now());
+        return ReviewReplyResponse.fromEntity(replyRepository.save(reply));
+    }
+
+    // ── Du khách: Báo cáo đánh giá vi phạm (E2e / D1) ───────────────────────
+
+    /** Du khách báo cáo một đánh giá vi phạm. */
+    @Transactional
+    public ReviewReportResponse reportReview(Long reviewId, String reason, Long reporterId) {
+        TourCustomerReview review = reviewRepository.findByIdWithRelations(reviewId)
+                .orElseThrow(() -> new AppException(ErrorCode.TOUR_CUSTOMER_REVIEW_NOT_FOUND));
+
+        if (Objects.equals(review.getReviewer().getId(), reporterId)) {
+            throw new AppException(ErrorCode.TOUR_CUSTOMER_REVIEW_REPORT_SELF_FORBIDDEN);
+        }
+        if (reportRepository.existsByReview_IdAndReporter_Id(reviewId, reporterId)) {
+            throw new AppException(ErrorCode.TOUR_CUSTOMER_REVIEW_REPORT_DUPLICATED);
+        }
+
+        User reporter = userRepository.findById(reporterId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        TourCustomerReviewReport report = reportRepository.save(TourCustomerReviewReport.builder()
+                .review(review)
+                .reporter(reporter)
+                .reporterName(displayName(reporter))
+                .reason(reason.trim())
+                .status(TourCustomerReviewReport.Status.PENDING)
+                .build());
+
+        log.info("User id={} reported review id={}", reporterId, reviewId);
+        return ReviewReportResponse.fromEntity(report);
+    }
+
+    /** Hàng đợi báo cáo đánh giá vi phạm (kiểm duyệt viên / admin). */
+    @Transactional(readOnly = true)
+    public PageResponse<ReviewReportResponse> listReports(String status, int page, int size) {
+        Pageable pageable = PageRequest.of(Math.max(0, page), clampSize(size),
+                Sort.by(Sort.Direction.DESC, "createdAt"));
+        TourCustomerReviewReport.Status parsed = status == null || status.isBlank()
+                ? TourCustomerReviewReport.Status.PENDING
+                : TourCustomerReviewReport.Status.valueOf(status);
+        Page<TourCustomerReviewReport> result = reportRepository
+                .findByStatusOrderByCreatedAtDesc(parsed, pageable);
+        return PageResponse.from(result, ReviewReportResponse::fromEntity);
+    }
+
+    /** Xử lý báo cáo: RESOLVED (đã xử lý) hoặc DISMISSED (báo cáo không có cơ sở). */
+    @Transactional
+    public ReviewReportResponse resolveReport(Long reportId, Long actorId, String resolution,
+                                              boolean dismiss) {
+        TourCustomerReviewReport report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new AppException(ErrorCode.TOUR_CUSTOMER_REVIEW_REPORT_NOT_FOUND));
+        if (report.getStatus() != TourCustomerReviewReport.Status.PENDING) {
+            throw new AppException(ErrorCode.TOUR_CUSTOMER_REVIEW_REPORT_ALREADY_HANDLED);
+        }
+
+        User actor = userRepository.findById(actorId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        report.setStatus(dismiss
+                ? TourCustomerReviewReport.Status.DISMISSED
+                : TourCustomerReviewReport.Status.RESOLVED);
+        report.setResolution(cleanOptionalText(resolution));
+        report.setHandledBy(actor);
+        report.setHandledAt(Instant.now());
+        return ReviewReportResponse.fromEntity(reportRepository.save(report));
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Đường dẫn trang quản lý đánh giá theo vai trò của chủ hồ sơ.
+     *
+     * <p>Admin → {@code /admin/reviews} (trang quản lý đánh giá dành cho Admin).
+     * Đối tác → {@code /provider/reviews}.
+     * Kiểm duyệt viên → {@code /moderator/reviews}.
+     */
+    private static String resolveReviewInboxPath(User owner) {
+        if (owner == null || owner.getRole() == null) {
+            return "/provider/reviews";
+        }
+        String roleName = owner.getRole().getName();
+        if (roleName == null) {
+            return "/provider/reviews";
+        }
+        return switch (roleName) {
+            case "ADMIN" -> "/admin/reviews";
+            case "CONTENT_MODERATOR" -> "/moderator/reviews";
+            default -> "/provider/reviews";
+        };
+    }
 
     private ErrorCode evaluateEligibilityFailure(Booking booking, Long userId) {
         boolean isOwner = booking.getTourist() != null && Objects.equals(booking.getTourist().getId(), userId);
@@ -451,10 +693,15 @@ public class TourCustomerReviewService {
         }
 
         LocalDate today = LocalDate.now(VN_ZONE);
+        // ⚠️ Tour nhiều ngày: ngày KẾT THÚC trải nghiệm mới là mốc "đã đi xong".
+        // Trước đây chỉ so sánh `experienceDate` (ngày khởi hành) ⇒ khách của tour
+        // 3 ngày bị chặn đánh giá suốt 2 ngày còn lại, và cũng cho phép đánh giá
+        // sớm khi tour còn đang diễn ra.
+        LocalDate endDate = booking.experienceEndDate();
         boolean completed = booking.getStatus() == BookingStatus.COMPLETED
                 || (booking.getStatus() == BookingStatus.CONFIRMED
-                && booking.getExperienceDate() != null
-                && booking.getExperienceDate().isBefore(today));
+                && endDate != null
+                && endDate.isBefore(today));
         if (!completed) {
             return ErrorCode.TOUR_CUSTOMER_REVIEW_BOOKING_NOT_COMPLETED;
         }
@@ -520,6 +767,19 @@ public class TourCustomerReviewService {
 
         List<String> images = r.getImageUrls() == null ? List.of() : List.copyOf(r.getImageUrls());
 
+        // Phản hồi của đối tác: chỉ phản hồi ĐÃ DUYỆT mới hiển thị công khai
+        // (r.getProviderReply()). Phản hồi đang chờ duyệt chỉ hiện cho chính đối tác
+        // (người viết) — du khách & khách công khai KHÔNG thấy nội dung chưa duyệt.
+        boolean isTourOwner = viewerUserId != null && r.getTour() != null
+                && r.getTour().getCreatedBy() != null
+                && Objects.equals(r.getTour().getCreatedBy().getId(), viewerUserId);
+        TourCustomerReviewReply pendingReply = isTourOwner
+                ? replyRepository.findFirstByReview_IdAndAuthor_IdOrderByCreatedAtDesc(
+                        r.getId(), viewerUserId)
+                .filter(reply -> reply.getStatus() == TourCustomerReviewReply.Status.PENDING)
+                .orElse(null)
+                : null;
+
         return new TourCustomerReviewResponse(
                 r.getId(),
                 r.getBooking().getId(),
@@ -543,6 +803,10 @@ public class TourCustomerReviewService {
                 r.getProviderReply(),
                 r.getProviderRepliedBy() != null ? displayName(r.getProviderRepliedBy()) : null,
                 r.getProviderRepliedAt(),
+                r.getProviderReply() != null && !r.getProviderReply().isBlank()
+                        ? TourCustomerReviewReply.Status.APPROVED.name()
+                        : (pendingReply != null ? TourCustomerReviewReply.Status.PENDING.name() : null),
+                (pendingReply != null) ? pendingReply.getContent() : null,
                 r.isHidden(),
                 r.getHiddenReason(),
                 r.getHiddenAt(),

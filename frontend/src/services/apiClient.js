@@ -246,6 +246,84 @@ class ApiClient {
       body: formData,
     });
   }
+
+  /**
+   * Tải file nhị phân (xlsx / csv) — KHÔNG đi qua `request()` vì hàm đó luôn
+   * parse response thành JSON (file binary sẽ lỗi parse).
+   *
+   * Trả về `{ blob, filename }` — filename lấy từ header `Content-Disposition`
+   * (backend trả tên file dạng `journeygo_bookings_2026-11-27.xlsx`).
+   *
+   * Vẫn hỗ trợ tự refresh token khi gặp 401 (giống `request`).
+   */
+  async download(endpoint, options = {}, isRetry = false) {
+    const url = `${this.baseUrl}${endpoint}`;
+    const token = this.getAccessToken();
+
+    const headers = {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      "Accept-Language": getLocale(),
+      ...options.headers,
+    };
+
+    let response;
+    try {
+      response = await fetch(url, { ...options, headers });
+    } catch (networkError) {
+      console.error(`[API Download Error] ${endpoint}:`, networkError?.message);
+      throw new ApiError("Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng và thử lại.", {
+        status: 0,
+      });
+    }
+
+    if (response.status === 401 && !isRetry && !AUTH_ENDPOINTS.some((a) => endpoint.includes(a))) {
+      const newToken = await this.ensureFreshToken();
+      if (newToken) {
+        return this.download(endpoint, options, true);
+      }
+      const hadSession = Boolean(token);
+      this.clearSession();
+      if (hadSession && !options.silentAuth) redirectToLogin("expired");
+      throw new ApiError(hadSession
+        ? "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục."
+        : "Vui lòng đăng nhập để sử dụng chức năng này.", {
+        code: null,
+        status: 401,
+      });
+    }
+
+    if (!response.ok) {
+      // Lỗi trả về vẫn là JSON envelope → đọc để lấy message tiếng Việt.
+      const errorBody = await response.json().catch(() => null);
+      throw new ApiError(
+        errorBody?.message || `Không thể tải file (mã ${response.status}).`,
+        { code: errorBody?.code ?? null, status: response.status, payload: errorBody },
+      );
+    }
+
+    const blob = await response.blob();
+    return { blob, filename: parseFilename(response.headers.get("Content-Disposition")) };
+  }
+}
+
+/**
+ * Rút tên file từ header `Content-Disposition`.
+ * Hỗ trợ cả dạng `filename="x.xlsx"` và dạng RFC 5987 `filename*=UTF-8''x.xlsx`.
+ */
+function parseFilename(contentDisposition) {
+  if (!contentDisposition) return null;
+
+  const extended = contentDisposition.match(/filename\*=(?:UTF-8'')?"?([^";]+)"?/i);
+  if (extended) {
+    try {
+      return decodeURIComponent(extended[1]);
+    } catch {
+      return extended[1];
+    }
+  }
+
+  const plain = contentDisposition.match(/filename="?([^";]+)"?/i);
+  return plain ? plain[1] : null;
 }
 
 export const apiClient = new ApiClient(BASE_URL);

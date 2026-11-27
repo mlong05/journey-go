@@ -13,6 +13,7 @@ import {
   Sparkles,
   Compass,
   PenSquare,
+  Star,
   ChevronDown,
   Check,
   ArrowLeft,
@@ -36,6 +37,7 @@ export const ACCOUNT_GROUPS = [
       { href: ROUTES.ACCOUNT_ACHIEVEMENTS, labelKey: "account.achievements", Icon: Trophy, match: (p) => p.startsWith("/account/achievements"), badge: "achievements" },
       { href: ROUTES.ACCOUNT_REWARDS, labelKey: "nav.rewards", Icon: Gift, match: (p) => p.startsWith("/account/rewards") },
       { href: ROUTES.ACCOUNT_POSTS, labelKey: "account.myPosts", Icon: PenSquare, match: (p) => p.startsWith("/account/posts") },
+      { href: ROUTES.ACCOUNT_REVIEWS, labelKey: "account.myReviews", Icon: Star, match: (p) => p.startsWith("/account/reviews") },
     ],
   },
   {

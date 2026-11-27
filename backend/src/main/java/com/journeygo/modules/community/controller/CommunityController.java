@@ -56,7 +56,8 @@ public class CommunityController {
     ) {
         Long currentUserId = userPrincipal != null ? userPrincipal.getId() : null;
         boolean canModerate = userPrincipal != null && userPrincipal.getAuthorities().stream()
-                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()) || "ROLE_MODERATOR".equals(a.getAuthority()));
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority())
+                        || "ROLE_CONTENT_MODERATOR".equals(a.getAuthority()));
         PostResponse post = communityService.getPostDetail(id, currentUserId, canModerate);
         if (!canModerate) {
             post = tourTranslationService.localizePost(post, LocaleContextHolder.getLocale());

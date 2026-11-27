@@ -27,6 +27,14 @@ public record TourCustomerReviewResponse(
         String providerReply,
         String providerRepliedByName,
         Instant providerRepliedAt,
+        /**
+         * Trạng thái phản hồi của đối tác: APPROVED (đã duyệt, hiển thị công khai) /
+         * PENDING (đang chờ kiểm duyệt, CHƯA hiển thị) / REJECTED (bị từ chối) /
+         * null (chưa có phản hồi nào).
+         */
+        String providerReplyStatus,
+        /** Nội dung phản hồi đang chờ duyệt — chỉ đối tác tác giả & kiểm duyệt viên thấy. */
+        String pendingProviderReply,
         boolean hidden,
         String hiddenReason,
         Instant hiddenAt,

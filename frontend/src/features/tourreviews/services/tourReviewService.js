@@ -80,6 +80,51 @@ export const tourReviewService = {
       reason: reason?.trim() || null,
     }));
   },
+
+  // ── Lịch sử kiểm duyệt (E2d) ─────────────────────────────────────────────
+  async getReviewHistory(reviewId) {
+    return unwrap(await apiClient.get(`/moderation/tour-reviews/${reviewId}/history`)) || [];
+  },
+
+  /** Lịch sử kiểm duyệt đánh giá toàn hệ thống (C4) — dùng cho /moderator/history. */
+  async listAllReviewHistory({ q = "", page = 0, size = 20 } = {}) {
+    const params = new URLSearchParams({ page: String(page), size: String(size) });
+    if (q?.trim()) params.set("q", q.trim());
+    return unwrap(await apiClient.get(`/moderation/tour-reviews/history/all?${params.toString()}`));
+  },
+
+  // ── Phản hồi của đối tác cần duyệt (E2c) ────────────────────────────────
+  async listPendingReplies({ page = 0, size = 10 } = {}) {
+    return unwrap(await apiClient.get(`/moderation/tour-reviews/replies/pending?page=${page}&size=${size}`));
+  },
+
+  async approveReply(replyId) {
+    return unwrap(await apiClient.patch(`/moderation/tour-reviews/replies/${replyId}/approve`, {}));
+  },
+
+  async rejectReply(replyId, reason) {
+    return unwrap(await apiClient.patch(`/moderation/tour-reviews/replies/${replyId}/reject`, { reason }));
+  },
+
+  // ── Báo cáo đánh giá vi phạm (E2e / D1) ─────────────────────────────────
+  async listReviewReports({ status = "PENDING", page = 0, size = 10 } = {}) {
+    const params = new URLSearchParams({ page: String(page), size: String(size) });
+    if (status) params.set("status", status);
+    return unwrap(await apiClient.get(`/moderation/tour-reviews/reports?${params.toString()}`));
+  },
+
+  async resolveReviewReport(reportId, resolution) {
+    return unwrap(await apiClient.patch(`/moderation/tour-reviews/reports/${reportId}/resolve`, { resolution }));
+  },
+
+  async dismissReviewReport(reportId, resolution) {
+    return unwrap(await apiClient.patch(`/moderation/tour-reviews/reports/${reportId}/dismiss`, { resolution }));
+  },
+
+  // ── Du khách báo cáo đánh giá (D1) ───────────────────────────────────────
+  async reportReview(reviewId, reason) {
+    return unwrap(await apiClient.post(`/tour-reviews/${reviewId}/reports`, { reason }));
+  },
 };
 
 export default tourReviewService;

@@ -4,6 +4,7 @@ import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.common.dto.PageResponse;
 import com.journeygo.modules.tourfeedback.dto.request.ReplyTourCustomerReviewRequest;
 import com.journeygo.modules.tourfeedback.dto.response.ProviderReviewSummaryResponse;
+import com.journeygo.modules.tourfeedback.dto.response.ReviewReplyResponse;
 import com.journeygo.modules.tourfeedback.dto.response.TourCustomerReviewResponse;
 import com.journeygo.modules.tourfeedback.service.TourCustomerReviewService;
 import com.journeygo.security.UserPrincipal;
@@ -53,14 +54,14 @@ public class ProviderTourReviewController {
     }
 
     @PostMapping("/{reviewId}/reply")
-    @Operation(summary = "Đối tác gửi hoặc cập nhật phản hồi cho đánh giá")
-    public ResponseEntity<ApiResponse<TourCustomerReviewResponse>> reply(
+    @Operation(summary = "Đối tác gửi phản hồi cho đánh giá (phản hồi sẽ được kiểm duyệt trước khi hiển thị)")
+    public ResponseEntity<ApiResponse<ReviewReplyResponse>> reply(
             @PathVariable Long reviewId,
             @Valid @RequestBody ReplyTourCustomerReviewRequest request,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Phản hồi đánh giá thành công",
+                "Đã gửi phản hồi — phản hồi sẽ hiển thị sau khi được kiểm duyệt",
                 reviewService.replyToReview(reviewId, request, principal.getId())));
     }
 }
