@@ -96,8 +96,9 @@ public class TourAvailabilityService {
             List<TourSlot> slots = tourSlotRepository.findByTourIdsBetween(wizardIds, from, to);
             Map<Long, TourMerge> approvedMerges = loadApprovedMergesBySlotId(slots);
             for (TourSlot slot : slots) {
+                TourMerge merge = slot.getId() != null ? approvedMerges.get(slot.getId()) : null;
                 result.computeIfAbsent(slot.getTour().getTourId(), id -> new ArrayList<>())
-                        .add(toAvailability(slot, approvedMerges.get(slot.getId())));
+                        .add(toAvailability(slot, merge));
             }
         }
 
@@ -125,7 +126,8 @@ public class TourAvailabilityService {
         Map<Long, TourMerge> approvedMerges = loadApprovedMergesBySlotId(slots);
         List<TourSlotAvailabilityResponse.DateAvailability> result = new ArrayList<>(slots.size());
         for (TourSlot slot : slots) {
-            result.add(toAvailability(slot, approvedMerges.get(slot.getId())));
+            TourMerge merge = slot.getId() != null ? approvedMerges.get(slot.getId()) : null;
+            result.add(toAvailability(slot, merge));
         }
         return result;
     }
@@ -157,12 +159,12 @@ public class TourAvailabilityService {
     }
 
     private Map<Long, TourMerge> loadApprovedMergesBySlotId(List<TourSlot> slots) {
-        if (slots == null || slots.isEmpty()) {
-            return Map.of();
+        if (tourMergeRepository == null || slots == null || slots.isEmpty()) {
+            return java.util.Collections.emptyMap();
         }
         List<Long> slotIds = slots.stream().map(TourSlot::getId).filter(java.util.Objects::nonNull).distinct().toList();
         if (slotIds.isEmpty()) {
-            return Map.of();
+            return java.util.Collections.emptyMap();
         }
         Map<Long, TourMerge> map = new HashMap<>();
         for (TourMerge merge : tourMergeRepository.findApprovedBySlotIds(slotIds)) {
@@ -264,8 +266,9 @@ public class TourAvailabilityService {
             Map<Long, TourMerge> approvedMerges = loadApprovedMergesBySlotId(slots);
             for (TourSlot slot : slots) {
                 if (slot.getStatus() != TourSlotStatus.OPEN) continue;
+                TourMerge merge = slot.getId() != null ? approvedMerges.get(slot.getId()) : null;
                 TourSlotAvailabilityResponse.DateAvailability avail =
-                        toAvailability(slot, approvedMerges.get(slot.getId()));
+                        toAvailability(slot, merge);
                 if (avail.remaining() <= 0) continue;
                 result.merge(slot.getTour().getTourId(), slot.getSlotDate(),
                         (a, b) -> a.isBefore(b) ? a : b);
