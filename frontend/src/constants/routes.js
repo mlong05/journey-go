@@ -35,6 +35,8 @@ export const ROUTES = {
   ACCOUNT_NOTIFICATIONS: "/account/notifications",
   /** Bài viết cộng đồng của tôi: /account/posts */
   ACCOUNT_POSTS: "/account/posts",
+  /** Đánh giá của tôi: /account/reviews */
+  ACCOUNT_REVIEWS: "/account/reviews",
   /** Lời mời tham gia tour đang chờ tôi xác nhận: /account/invitations */
   ACCOUNT_INVITATIONS: "/account/invitations",
   /** Yêu cầu tạo tour riêng theo nhu cầu: /account/requests */
@@ -75,6 +77,9 @@ export const ROUTES = {
   ADMIN_FINANCE: "/admin/finance",
   ADMIN_SETTLEMENTS: "/admin/settlements",
   ADMIN_AUDIT_LOGS: "/admin/audit-logs",
+  ADMIN_REVIEWS: "/admin/reviews",
+  /** Admin — xuất dữ liệu ra Excel / CSV (báo cáo & đối soát). */
+  ADMIN_EXPORTS: "/admin/exports",
 
   // ── Khu vực kiểm duyệt ────────────────────────────────────────────────────
   MODERATOR: "/moderator",
