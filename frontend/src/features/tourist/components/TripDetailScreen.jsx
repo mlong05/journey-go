@@ -13,6 +13,7 @@ import Breadcrumbs from "./Breadcrumbs";
 import { RefundPanel } from "./RefundsScreen";
 import PassengerGroupPanel from "./PassengerGroupPanel";
 import BookingChatPanel from "./TripChatPanel";
+import { TripReviewCard } from "@/features/tourreviews";
 import { touristService } from "../services/touristService";
 import { useTouristSession } from "../hooks/useTouristSession";
 import { BOOKING_STATUS, dateTime, longDate, vnd } from "../utils";
@@ -256,6 +257,11 @@ function TripDetail({ bookingId }) {
 
       {/* Đơn đã thanh toán: xem / gửi yêu cầu hoàn tiền (chỉ chủ đơn được yêu cầu hoàn). */}
       {booking.paidAt && isOwner && <RefundPanel booking={booking} />}
+
+      {/* Đánh giá xác thực sau khi hoàn thành chuyến đi. */}
+      {!refunded && (booking.status === "COMPLETED" || booking.status === "CONFIRMED") && (
+        <TripReviewCard booking={booking} />
+      )}
 
       {/* Chat hỗ trợ gắn với đơn (khách ↔ nhà tour) — mở sẵn khi đơn đã xác nhận. */}
       {booking.status !== "PENDING_PAYMENT" && (

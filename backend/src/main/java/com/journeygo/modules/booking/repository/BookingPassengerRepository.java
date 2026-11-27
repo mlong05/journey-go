@@ -22,6 +22,8 @@ public interface BookingPassengerRepository extends JpaRepository<BookingPasseng
 
     Optional<BookingPassenger> findByIdAndBooking_Id(Long id, Long bookingId);
 
+    boolean existsByBooking_IdAndLinkedUserIdAndStatus(Long bookingId, Long linkedUserId, BookingPassengerStatus status);
+
     /** Hành khách đã liên kết với một User cụ thể (dùng để kiểm tra quyền truy cập). */
     List<BookingPassenger> findByLinkedUserIdAndStatus(Long linkedUserId, BookingPassengerStatus status);
 

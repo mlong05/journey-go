@@ -66,7 +66,12 @@ public enum NotificationType {
     /** Tin nhắn mới trong khung chat hỗ trợ của Booking. */
     BOOKING_MESSAGE_RECEIVED(Category.CHAT),
     /** Tin nhắn mới trong khung chat với nhà tour (trước khi đặt tour). */
-    PROVIDER_MESSAGE_RECEIVED(Category.CHAT);
+    PROVIDER_MESSAGE_RECEIVED(Category.CHAT),
+
+    // ── Đánh giá tour xác thực (Verified Tour Reviews) ───────────────────────
+    TOUR_REVIEW_RECEIVED(Category.BOOKING),
+    TOUR_REVIEW_REPLIED(Category.COMMUNITY),
+    TOUR_REVIEW_HIDDEN(Category.REJECTED);
 
     /** Nhóm hiển thị: web/app dùng để chọn biểu tượng và màu nhấn. */
     public enum Category { REVIEW, COMMUNITY, REFUND, FINANCE, APPROVED, REJECTED, BOOKING, REWARD, CHAT }

@@ -7,6 +7,7 @@ import com.journeygo.modules.tour.repository.TourPriceProjection;
 import com.journeygo.modules.tour.repository.TourPriceRepository;
 import com.journeygo.modules.tour.repository.TourRepository;
 import com.journeygo.modules.tour.repository.TourRewardProjection;
+import com.journeygo.modules.tourfeedback.repository.TourCustomerReviewRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -31,6 +33,7 @@ public class TourPricingService {
     private final TourPriceRepository tourPriceRepository;
     /** Tính ngày khởi hành gần nhất cho CẢ tour luồng 5 bước lẫn tour luồng cũ. */
     private final TourAvailabilityService availabilityService;
+    private final TourCustomerReviewRepository tourCustomerReviewRepository;
 
     @Transactional(readOnly = true)
     public TourResponse toResponse(Tour tour) {
@@ -62,11 +65,25 @@ public class TourPricingService {
             for (Object[] row : tourRepository.sumStopExperiencesByTourIds(wizardIds)) addReward(stopRewards, row);
         }
         Map<Long, LocalDate> nextDepartures = availabilityService.nextDepartureDates(tours);
+        Map<Long, double[]> ratings = new HashMap<>();
+        if (tourCustomerReviewRepository != null) {
+            for (Object[] row : tourCustomerReviewRepository.aggregateBatchByTourIds(ids)) {
+                Long tid = (Long) row[0];
+                double avg = row[1] instanceof Number n ? Math.round(n.doubleValue() * 10.0) / 10.0 : 0.0;
+                long cnt = row[2] instanceof Number n ? n.longValue() : 0L;
+                ratings.put(tid, new double[]{avg, cnt});
+            }
+        }
         return tour -> {
+            double[] rating = ratings.get(tour.getTourId());
+            Double avgRating = (rating != null && rating[1] > 0) ? rating[0] : null;
+            long revCount = rating != null ? (long) rating[1] : 0L;
             TourResponse.TourResponseBuilder builder = TourResponse.fromEntity(tour)
                     .toBuilder()
                     .price(totals.getOrDefault(tour.getTourId(), BigDecimal.ZERO))
-                    .nextDepartureDate(nextDepartures.get(tour.getTourId()));
+                    .nextDepartureDate(nextDepartures.get(tour.getTourId()))
+                    .averageRating(avgRating)
+                    .reviewCount(revCount);
             if (tour.isWizardTour()) {
                 long[] reward = stopRewards.getOrDefault(tour.getTourId(), new long[2]);
                 return builder

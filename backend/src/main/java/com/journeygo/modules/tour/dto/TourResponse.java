@@ -57,6 +57,8 @@ public record TourResponse(
         @Schema(description = "Quyền xem tour: ALL hoặc SPECIFIC_USER") TourVisibility visibility,
         @Schema(description = "Email người dùng chỉ định xem và đặt tour") String specificUserEmail,
         @Schema(description = "ID yêu cầu tạo tour của khách") Long tourRequestId,
+        @Schema(description = "Điểm đánh giá trung bình từ du khách đã trải nghiệm (null nếu chưa có)") Double averageRating,
+        @Schema(description = "Tổng số đánh giá xác thực đang hiển thị") long reviewCount,
         @Schema(description = "Thời gian tạo") Instant createdAt,
         @Schema(description = "Thời gian cập nhật") Instant updatedAt
 ) {
@@ -112,6 +114,8 @@ public record TourResponse(
                 .visibility(t.getVisibility())
                 .specificUserEmail(t.getSpecificUserEmail())
                 .tourRequestId(t.getTourRequestId())
+                .averageRating(null)
+                .reviewCount(0L)
                 .createdAt(t.getCreatedAt())
                 .updatedAt(t.getUpdatedAt())
                 .build();

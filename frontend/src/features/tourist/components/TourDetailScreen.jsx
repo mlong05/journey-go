@@ -16,6 +16,7 @@ import { tourCoverTransition } from "./TourCard";
 import Breadcrumbs from "./Breadcrumbs";
 import DepartureSchedule from "./DepartureSchedule";
 import LoginRequiredModal from "./LoginRequiredModal";
+import { TourReviewsSection } from "@/features/tourreviews";
 import { useTouristSession } from "../hooks/useTouristSession";
 import { usePurchasedBooking } from "../hooks/usePurchasedBooking";
 import { dateTime, durationLabel, shortDate, longDate, tomorrowIso, vnd } from "../utils";
@@ -511,6 +512,8 @@ export default function TourDetailScreen({ tourId }) {
                 </div>
               </Section>
             )}
+
+            <TourReviewsSection tourId={tour.tourId} />
 
             <CommunityPosts tourId={tour.tourId} />
 
