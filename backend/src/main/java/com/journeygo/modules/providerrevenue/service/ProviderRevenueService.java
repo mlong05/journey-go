@@ -512,8 +512,7 @@ public class ProviderRevenueService {
                 return result;
             }
             providerProfileRepository.findByUser_Id(owner.getId()).ifPresent(profile ->
-                    result.put(profile.getId(),
-                            booking.getTotalAmount() != null ? booking.getTotalAmount() : BigDecimal.ZERO));
+                    result.put(profile.getId(), resolveWizardGrossAmount(booking)));
             return result;
         }
         List<Long> destinationIds = booking.getTour().getTourDestinations() == null
@@ -556,6 +555,25 @@ public class ProviderRevenueService {
             result.merge(providerProfileId, price, BigDecimal::add);
         }
         return result;
+    }
+
+    /**
+     * Doanh thu gốc (trước voucher) của tour tạo theo wizard.
+     *
+     * <p>⚠️ {@code booking.totalAmount} là số tiền ĐÃ TRỪ voucher ⇒ dùng nó làm
+     * {@code grossAmount} sẽ khiến {@link ProviderRevenue#recalculate()} trừ voucher
+     * MỘT LẦN NỮA (gross đã ròng + voucherDiscount lại bị trừ) ⇒ đối tác mất tiền
+     * oan. Vì vậy gross phải là giá GỐC (chưa trừ voucher), giống hệt cách tính
+     * gross của tour thường (tổng giá các Experience).
+     *
+     * <p>Giá gốc = {@code totalAmount + discountAmount}.
+     */
+    private BigDecimal resolveWizardGrossAmount(Booking booking) {
+        BigDecimal total = booking.getTotalAmount() != null ? booking.getTotalAmount() : BigDecimal.ZERO;
+        BigDecimal discount = booking.getDiscountAmount() != null
+                ? booking.getDiscountAmount()
+                : BigDecimal.ZERO;
+        return total.add(discount);
     }
 
     /**
