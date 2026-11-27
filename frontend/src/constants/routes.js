@@ -78,10 +78,12 @@ export const ROUTES = {
 
   // ── Khu vực kiểm duyệt ────────────────────────────────────────────────────
   MODERATOR: "/moderator",
+  MODERATOR_REVIEWS: "/moderator/reviews",
 
   // ── Khu vực đối tác cung cấp nội dung (CONTENT_PROVIDER) ───────────────────
   PROVIDER: "/provider",
   PROVIDER_TOURS: "/provider/tours",
+  PROVIDER_REVIEWS: "/provider/reviews",
   /** Đối tác — tab "Thông tin đối tác" (hồ sơ đăng ký + yêu cầu đổi thông tin). */
   PROVIDER_PARTNER_INFO: "/provider/partner-info",
   /** Đối tác — danh sách khách hàng đã đặt tour + duyệt thay đổi hành khách. */

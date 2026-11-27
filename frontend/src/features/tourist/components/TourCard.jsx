@@ -4,7 +4,7 @@ import { useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { isPlainClick, transitionNavigate } from "../navigation";
-import { Clock, MapPin, CalendarDays, ImageOff } from "lucide-react";
+import { Clock, MapPin, CalendarDays, ImageOff, Star } from "lucide-react";
 import { durationLabel, shortDate, vnd } from "../utils";
 import { useI18n } from "@/i18n";
 
@@ -85,7 +85,16 @@ export default function TourCard({ tour, badge }) {
         <div className="mt-auto flex items-end justify-between gap-2 sm:border-t sm:border-dashed sm:border-slate-200 sm:pt-3">
           <div className="min-w-0">
             <span className="hidden text-[11.5px] font-semibold text-slate-500 sm:block">{t("tourCard.adultFrom")}</span>
-            <span className="block truncate whitespace-nowrap text-[15px] font-extrabold tabular-nums text-slate-900 sm:text-[17px]">{vnd(tour.price)}</span>
+            <div className="flex items-center gap-2">
+              <span className="block truncate whitespace-nowrap text-[15px] font-extrabold tabular-nums text-slate-900 sm:text-[17px]">{vnd(tour.price)}</span>
+              {Number(tour.reviewCount) > 0 && tour.averageRating != null && (
+                <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-amber-700">
+                  <Star size={11} className="fill-amber-400 text-amber-400" />
+                  {Number(tour.averageRating).toFixed(1)}
+                  <span className="font-medium text-amber-600/80">({tour.reviewCount})</span>
+                </span>
+              )}
+            </div>
           </div>
           {tour.nextDepartureDate && (
             <div className="shrink-0 text-right text-xs text-slate-500">

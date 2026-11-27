@@ -3861,5 +3861,88 @@
   "tkMatchingColB": "Cột B",
   "tkMatchingTapZoom": "Chạm ảnh để phóng to",
   "tkMatchingCorrectPairs": "Cặp nối đúng",
-  "tkMatchingClear": "Bỏ nối"
+  "tkMatchingClear": "Bỏ nối",
+  "rvTabLabel": "Đánh giá",
+  "rvSectionTitle": "Đánh giá từ khách đã trải nghiệm",
+  "rvVerifiedBadge": "Đã trải nghiệm tour",
+  "rvVerifiedDate": "Đi tour ngày {date}",
+  "@rvVerifiedDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "rvEditedLabel": "Đã chỉnh sửa",
+  "rvEmptyTitle": "Chưa có đánh giá nào",
+  "rvEmptyDesc": "Những đánh giá xác thực đầu tiên từ du khách hoàn thành chuyến đi sẽ hiển thị tại đây.",
+  "rvTotalCount": "{count} đánh giá xác thực",
+  "@rvTotalCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "rvReplyRate": "{rate}% phản hồi từ nhà tour",
+  "@rvReplyRate": {
+    "placeholders": {
+      "rate": {
+        "type": "int"
+      }
+    }
+  },
+  "rvFilterAll": "Tất cả",
+  "rvFilterStars": "{star} sao",
+  "@rvFilterStars": {
+    "placeholders": {
+      "star": {
+        "type": "int"
+      }
+    }
+  },
+  "rvFilterPhotos": "Có ảnh",
+  "rvSortNewest": "Mới nhất",
+  "rvSortHighest": "Điểm cao nhất",
+  "rvSortLowest": "Điểm thấp nhất",
+  "rvCriteriaGuide": "Hướng dẫn viên",
+  "rvCriteriaCulture": "Nội dung văn hóa",
+  "rvCriteriaSchedule": "Đúng lịch trình",
+  "rvCriteriaValue": "Đáng giá tiền",
+  "rvProviderReplyTitle": "Phản hồi từ nhà tour",
+  "rvWriteReview": "Viết đánh giá chuyến đi",
+  "rvEditReview": "Chỉnh sửa",
+  "rvDeleteReview": "Xóa",
+  "rvDeleteConfirmTitle": "Xóa đánh giá của bạn?",
+  "rvDeleteConfirmDesc": "Đánh giá sẽ bị xóa khỏi trang chi tiết tour và không thể khôi phục.",
+  "rvTripCardTitle": "Đánh giá trải nghiệm của bạn",
+  "rvTripEligibleDesc": "Chuyến đi đã hoàn thành! Chia sẻ cảm nhận thực tế để giúp cộng đồng du khách khác.",
+  "rvModalCreateTitle": "Đánh giá tour đã trải nghiệm",
+  "rvModalEditTitle": "Chỉnh sửa đánh giá (trong 7 ngày)",
+  "rvOverallLabel": "Đánh giá tổng thể *",
+  "rvCriteriaOptional": "Đánh giá chi tiết theo tiêu chí (tùy chọn)",
+  "rvTitleLabel": "Tiêu đề ngắn (tùy chọn)",
+  "rvTitlePlaceholder": "Ví dụ: Hành trình di sản rất giàu cảm xúc",
+  "rvCommentLabel": "Cảm nhận chi tiết *",
+  "rvCommentPlaceholder": "Chia sẻ trải nghiệm về lịch trình, hướng dẫn viên (tối thiểu 10 ký tự)...",
+  "rvPhotosLabel": "Ảnh thực tế chuyến đi (tối đa 5 ảnh)",
+  "rvAddPhoto": "Thêm ảnh",
+  "rvUploading": "Đang tải ảnh...",
+  "rvSubmit": "Gửi đánh giá",
+  "rvSaveChanges": "Lưu thay đổi",
+  "rvCancel": "Đóng",
+  "rvLoadMore": "Xem thêm đánh giá",
+  "rvErrMinComment": "Vui lòng nhập nội dung đánh giá tối thiểu 10 ký tự",
+  "rvErrRating": "Vui lòng chọn số sao tổng thể từ 1 đến 5",
+  "rvErrMaxPhotos": "Tối đa 5 ảnh cho mỗi đánh giá",
+  "rvHiddenNotice": "Đánh giá đang bị ẩn bởi kiểm duyệt viên: {reason}",
+  "@rvHiddenNotice": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "rvSavedToast": "Đã lưu đánh giá xác thực của bạn!",
+  "rvDeletedToast": "Đã xóa đánh giá."
 }

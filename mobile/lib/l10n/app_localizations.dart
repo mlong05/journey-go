@@ -9632,6 +9632,294 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Bỏ nối'**
   String get tkMatchingClear;
+
+  /// No description provided for @rvTabLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đánh giá'**
+  String get rvTabLabel;
+
+  /// No description provided for @rvSectionTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đánh giá từ khách đã trải nghiệm'**
+  String get rvSectionTitle;
+
+  /// No description provided for @rvVerifiedBadge.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã trải nghiệm tour'**
+  String get rvVerifiedBadge;
+
+  /// No description provided for @rvVerifiedDate.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đi tour ngày {date}'**
+  String rvVerifiedDate(String date);
+
+  /// No description provided for @rvEditedLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã chỉnh sửa'**
+  String get rvEditedLabel;
+
+  /// No description provided for @rvEmptyTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa có đánh giá nào'**
+  String get rvEmptyTitle;
+
+  /// No description provided for @rvEmptyDesc.
+  ///
+  /// In vi, this message translates to:
+  /// **'Những đánh giá xác thực đầu tiên từ du khách hoàn thành chuyến đi sẽ hiển thị tại đây.'**
+  String get rvEmptyDesc;
+
+  /// No description provided for @rvTotalCount.
+  ///
+  /// In vi, this message translates to:
+  /// **'{count} đánh giá xác thực'**
+  String rvTotalCount(int count);
+
+  /// No description provided for @rvReplyRate.
+  ///
+  /// In vi, this message translates to:
+  /// **'{rate}% phản hồi từ nhà tour'**
+  String rvReplyRate(int rate);
+
+  /// No description provided for @rvFilterAll.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tất cả'**
+  String get rvFilterAll;
+
+  /// No description provided for @rvFilterStars.
+  ///
+  /// In vi, this message translates to:
+  /// **'{star} sao'**
+  String rvFilterStars(int star);
+
+  /// No description provided for @rvFilterPhotos.
+  ///
+  /// In vi, this message translates to:
+  /// **'Có ảnh'**
+  String get rvFilterPhotos;
+
+  /// No description provided for @rvSortNewest.
+  ///
+  /// In vi, this message translates to:
+  /// **'Mới nhất'**
+  String get rvSortNewest;
+
+  /// No description provided for @rvSortHighest.
+  ///
+  /// In vi, this message translates to:
+  /// **'Điểm cao nhất'**
+  String get rvSortHighest;
+
+  /// No description provided for @rvSortLowest.
+  ///
+  /// In vi, this message translates to:
+  /// **'Điểm thấp nhất'**
+  String get rvSortLowest;
+
+  /// No description provided for @rvCriteriaGuide.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hướng dẫn viên'**
+  String get rvCriteriaGuide;
+
+  /// No description provided for @rvCriteriaCulture.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nội dung văn hóa'**
+  String get rvCriteriaCulture;
+
+  /// No description provided for @rvCriteriaSchedule.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đúng lịch trình'**
+  String get rvCriteriaSchedule;
+
+  /// No description provided for @rvCriteriaValue.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đáng giá tiền'**
+  String get rvCriteriaValue;
+
+  /// No description provided for @rvProviderReplyTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Phản hồi từ nhà tour'**
+  String get rvProviderReplyTitle;
+
+  /// No description provided for @rvWriteReview.
+  ///
+  /// In vi, this message translates to:
+  /// **'Viết đánh giá chuyến đi'**
+  String get rvWriteReview;
+
+  /// No description provided for @rvEditReview.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chỉnh sửa'**
+  String get rvEditReview;
+
+  /// No description provided for @rvDeleteReview.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xóa'**
+  String get rvDeleteReview;
+
+  /// No description provided for @rvDeleteConfirmTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xóa đánh giá của bạn?'**
+  String get rvDeleteConfirmTitle;
+
+  /// No description provided for @rvDeleteConfirmDesc.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đánh giá sẽ bị xóa khỏi trang chi tiết tour và không thể khôi phục.'**
+  String get rvDeleteConfirmDesc;
+
+  /// No description provided for @rvTripCardTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đánh giá trải nghiệm của bạn'**
+  String get rvTripCardTitle;
+
+  /// No description provided for @rvTripEligibleDesc.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chuyến đi đã hoàn thành! Chia sẻ cảm nhận thực tế để giúp cộng đồng du khách khác.'**
+  String get rvTripEligibleDesc;
+
+  /// No description provided for @rvModalCreateTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đánh giá tour đã trải nghiệm'**
+  String get rvModalCreateTitle;
+
+  /// No description provided for @rvModalEditTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chỉnh sửa đánh giá (trong 7 ngày)'**
+  String get rvModalEditTitle;
+
+  /// No description provided for @rvOverallLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đánh giá tổng thể *'**
+  String get rvOverallLabel;
+
+  /// No description provided for @rvCriteriaOptional.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đánh giá chi tiết theo tiêu chí (tùy chọn)'**
+  String get rvCriteriaOptional;
+
+  /// No description provided for @rvTitleLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tiêu đề ngắn (tùy chọn)'**
+  String get rvTitleLabel;
+
+  /// No description provided for @rvTitlePlaceholder.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ví dụ: Hành trình di sản rất giàu cảm xúc'**
+  String get rvTitlePlaceholder;
+
+  /// No description provided for @rvCommentLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cảm nhận chi tiết *'**
+  String get rvCommentLabel;
+
+  /// No description provided for @rvCommentPlaceholder.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chia sẻ trải nghiệm về lịch trình, hướng dẫn viên (tối thiểu 10 ký tự)...'**
+  String get rvCommentPlaceholder;
+
+  /// No description provided for @rvPhotosLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ảnh thực tế chuyến đi (tối đa 5 ảnh)'**
+  String get rvPhotosLabel;
+
+  /// No description provided for @rvAddPhoto.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thêm ảnh'**
+  String get rvAddPhoto;
+
+  /// No description provided for @rvUploading.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang tải ảnh...'**
+  String get rvUploading;
+
+  /// No description provided for @rvSubmit.
+  ///
+  /// In vi, this message translates to:
+  /// **'Gửi đánh giá'**
+  String get rvSubmit;
+
+  /// No description provided for @rvSaveChanges.
+  ///
+  /// In vi, this message translates to:
+  /// **'Lưu thay đổi'**
+  String get rvSaveChanges;
+
+  /// No description provided for @rvCancel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đóng'**
+  String get rvCancel;
+
+  /// No description provided for @rvLoadMore.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xem thêm đánh giá'**
+  String get rvLoadMore;
+
+  /// No description provided for @rvErrMinComment.
+  ///
+  /// In vi, this message translates to:
+  /// **'Vui lòng nhập nội dung đánh giá tối thiểu 10 ký tự'**
+  String get rvErrMinComment;
+
+  /// No description provided for @rvErrRating.
+  ///
+  /// In vi, this message translates to:
+  /// **'Vui lòng chọn số sao tổng thể từ 1 đến 5'**
+  String get rvErrRating;
+
+  /// No description provided for @rvErrMaxPhotos.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tối đa 5 ảnh cho mỗi đánh giá'**
+  String get rvErrMaxPhotos;
+
+  /// No description provided for @rvHiddenNotice.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đánh giá đang bị ẩn bởi kiểm duyệt viên: {reason}'**
+  String rvHiddenNotice(String reason);
+
+  /// No description provided for @rvSavedToast.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã lưu đánh giá xác thực của bạn!'**
+  String get rvSavedToast;
+
+  /// No description provided for @rvDeletedToast.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã xóa đánh giá.'**
+  String get rvDeletedToast;
 }
 
 class _AppLocalizationsDelegate

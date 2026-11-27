@@ -207,7 +207,21 @@ public enum ErrorCode {
     TOUR_MERGE_INVALID_STATUS("Trạng thái yêu cầu ghép tour không cho phép thao tác này", HttpStatus.CONFLICT),
     TOUR_MERGE_FORBIDDEN("Bạn không có quyền thực hiện thao tác trên yêu cầu ghép tour này", HttpStatus.FORBIDDEN),
     TOUR_MERGE_REJECT_REASON_REQUIRED("Vui lòng nhập lý do từ chối hoặc hủy ghép", HttpStatus.BAD_REQUEST),
-    TOUR_MERGE_INVALID_PROVIDER("Thông tin đối tác tham gia ghép tour không hợp lệ", HttpStatus.BAD_REQUEST);
+    TOUR_MERGE_INVALID_PROVIDER("Thông tin đối tác tham gia ghép tour không hợp lệ", HttpStatus.BAD_REQUEST),
+
+    // ── Verified Tour Reviews (Đánh giá xác thực từ du khách) ─────────────────
+    TOUR_CUSTOMER_REVIEW_NOT_FOUND("Đánh giá tour không tồn tại", HttpStatus.NOT_FOUND),
+    TOUR_CUSTOMER_REVIEW_ALREADY_EXISTS("Bạn đã đánh giá chuyến đi này rồi", HttpStatus.CONFLICT),
+    TOUR_CUSTOMER_REVIEW_NOT_ELIGIBLE("Bạn không phải chủ đơn hoặc hành khách hợp lệ của đơn đặt tour này", HttpStatus.BAD_REQUEST),
+    TOUR_CUSTOMER_REVIEW_BOOKING_NOT_COMPLETED("Chỉ có thể đánh giá sau khi chuyến đi đã hoàn thành", HttpStatus.BAD_REQUEST),
+    TOUR_CUSTOMER_REVIEW_BOOKING_REFUNDED("Đơn đặt tour đã yêu cầu hoàn tiền nên không thể đánh giá", HttpStatus.BAD_REQUEST),
+    TOUR_CUSTOMER_REVIEW_SELF_FORBIDDEN("Không thể tự đánh giá tour do chính bạn tạo", HttpStatus.FORBIDDEN),
+    TOUR_CUSTOMER_REVIEW_FORBIDDEN("Bạn không có quyền thao tác trên đánh giá này", HttpStatus.FORBIDDEN),
+    TOUR_CUSTOMER_REVIEW_EDIT_WINDOW_EXPIRED("Đã quá thời hạn 7 ngày để chỉnh sửa đánh giá", HttpStatus.BAD_REQUEST),
+    TOUR_CUSTOMER_REVIEW_HIDDEN("Đánh giá này đang bị ẩn bởi kiểm duyệt viên", HttpStatus.CONFLICT),
+    TOUR_CUSTOMER_REVIEW_INVALID_IMAGES("Danh sách ảnh đính kèm không hợp lệ (tối đa 5 ảnh http/https)", HttpStatus.BAD_REQUEST),
+    TOUR_CUSTOMER_REVIEW_HIDE_REASON_REQUIRED("Vui lòng nhập lý do khi ẩn đánh giá", HttpStatus.BAD_REQUEST),
+    TOUR_CUSTOMER_REVIEW_SELF_MODERATION_FORBIDDEN("Không thể tự kiểm duyệt đánh giá thuộc tour của mình hoặc do chính mình viết", HttpStatus.FORBIDDEN);
 
     private final String message;
     private final HttpStatus httpStatus;

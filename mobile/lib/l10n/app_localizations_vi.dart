@@ -5558,4 +5558,163 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get tkMatchingClear => 'Bỏ nối';
+
+  @override
+  String get rvTabLabel => 'Đánh giá';
+
+  @override
+  String get rvSectionTitle => 'Đánh giá từ khách đã trải nghiệm';
+
+  @override
+  String get rvVerifiedBadge => 'Đã trải nghiệm tour';
+
+  @override
+  String rvVerifiedDate(String date) {
+    return 'Đi tour ngày $date';
+  }
+
+  @override
+  String get rvEditedLabel => 'Đã chỉnh sửa';
+
+  @override
+  String get rvEmptyTitle => 'Chưa có đánh giá nào';
+
+  @override
+  String get rvEmptyDesc =>
+      'Những đánh giá xác thực đầu tiên từ du khách hoàn thành chuyến đi sẽ hiển thị tại đây.';
+
+  @override
+  String rvTotalCount(int count) {
+    return '$count đánh giá xác thực';
+  }
+
+  @override
+  String rvReplyRate(int rate) {
+    return '$rate% phản hồi từ nhà tour';
+  }
+
+  @override
+  String get rvFilterAll => 'Tất cả';
+
+  @override
+  String rvFilterStars(int star) {
+    return '$star sao';
+  }
+
+  @override
+  String get rvFilterPhotos => 'Có ảnh';
+
+  @override
+  String get rvSortNewest => 'Mới nhất';
+
+  @override
+  String get rvSortHighest => 'Điểm cao nhất';
+
+  @override
+  String get rvSortLowest => 'Điểm thấp nhất';
+
+  @override
+  String get rvCriteriaGuide => 'Hướng dẫn viên';
+
+  @override
+  String get rvCriteriaCulture => 'Nội dung văn hóa';
+
+  @override
+  String get rvCriteriaSchedule => 'Đúng lịch trình';
+
+  @override
+  String get rvCriteriaValue => 'Đáng giá tiền';
+
+  @override
+  String get rvProviderReplyTitle => 'Phản hồi từ nhà tour';
+
+  @override
+  String get rvWriteReview => 'Viết đánh giá chuyến đi';
+
+  @override
+  String get rvEditReview => 'Chỉnh sửa';
+
+  @override
+  String get rvDeleteReview => 'Xóa';
+
+  @override
+  String get rvDeleteConfirmTitle => 'Xóa đánh giá của bạn?';
+
+  @override
+  String get rvDeleteConfirmDesc =>
+      'Đánh giá sẽ bị xóa khỏi trang chi tiết tour và không thể khôi phục.';
+
+  @override
+  String get rvTripCardTitle => 'Đánh giá trải nghiệm của bạn';
+
+  @override
+  String get rvTripEligibleDesc =>
+      'Chuyến đi đã hoàn thành! Chia sẻ cảm nhận thực tế để giúp cộng đồng du khách khác.';
+
+  @override
+  String get rvModalCreateTitle => 'Đánh giá tour đã trải nghiệm';
+
+  @override
+  String get rvModalEditTitle => 'Chỉnh sửa đánh giá (trong 7 ngày)';
+
+  @override
+  String get rvOverallLabel => 'Đánh giá tổng thể *';
+
+  @override
+  String get rvCriteriaOptional => 'Đánh giá chi tiết theo tiêu chí (tùy chọn)';
+
+  @override
+  String get rvTitleLabel => 'Tiêu đề ngắn (tùy chọn)';
+
+  @override
+  String get rvTitlePlaceholder => 'Ví dụ: Hành trình di sản rất giàu cảm xúc';
+
+  @override
+  String get rvCommentLabel => 'Cảm nhận chi tiết *';
+
+  @override
+  String get rvCommentPlaceholder =>
+      'Chia sẻ trải nghiệm về lịch trình, hướng dẫn viên (tối thiểu 10 ký tự)...';
+
+  @override
+  String get rvPhotosLabel => 'Ảnh thực tế chuyến đi (tối đa 5 ảnh)';
+
+  @override
+  String get rvAddPhoto => 'Thêm ảnh';
+
+  @override
+  String get rvUploading => 'Đang tải ảnh...';
+
+  @override
+  String get rvSubmit => 'Gửi đánh giá';
+
+  @override
+  String get rvSaveChanges => 'Lưu thay đổi';
+
+  @override
+  String get rvCancel => 'Đóng';
+
+  @override
+  String get rvLoadMore => 'Xem thêm đánh giá';
+
+  @override
+  String get rvErrMinComment =>
+      'Vui lòng nhập nội dung đánh giá tối thiểu 10 ký tự';
+
+  @override
+  String get rvErrRating => 'Vui lòng chọn số sao tổng thể từ 1 đến 5';
+
+  @override
+  String get rvErrMaxPhotos => 'Tối đa 5 ảnh cho mỗi đánh giá';
+
+  @override
+  String rvHiddenNotice(String reason) {
+    return 'Đánh giá đang bị ẩn bởi kiểm duyệt viên: $reason';
+  }
+
+  @override
+  String get rvSavedToast => 'Đã lưu đánh giá xác thực của bạn!';
+
+  @override
+  String get rvDeletedToast => 'Đã xóa đánh giá.';
 }

@@ -229,11 +229,36 @@ class TourCard extends StatelessWidget {
                           .join(' · '),
                     ),
                     const Spacer(),
-                    Text(
-                      priceFromLabel(tour, l10n),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppCultureColors.price),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            priceFromLabel(tour, l10n),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppCultureColors.price),
+                          ),
+                        ),
+                        if (tour.reviewCount > 0 && tour.averageRating != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppCultureColors.brass50,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.star_rounded, size: 13, color: AppCultureColors.goldBright),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '${tour.averageRating!.toStringAsFixed(1)} (${tour.reviewCount})',
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppCultureColors.amberDark),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -333,9 +358,34 @@ class TourListTile extends StatelessWidget {
                     TourMeta(icon: Icons.stars_rounded, text: reward, color: AppCultureColors.amberDark),
                   ],
                   const SizedBox(height: 6),
-                  Text(
-                    priceFromLabel(tour, l10n),
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppCultureColors.price),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          priceFromLabel(tour, l10n),
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppCultureColors.price),
+                        ),
+                      ),
+                      if (tour.reviewCount > 0 && tour.averageRating != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppCultureColors.brass50,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.star_rounded, size: 13, color: AppCultureColors.goldBright),
+                              const SizedBox(width: 2),
+                              Text(
+                                '${tour.averageRating!.toStringAsFixed(1)} (${tour.reviewCount})',
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppCultureColors.amberDark),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),

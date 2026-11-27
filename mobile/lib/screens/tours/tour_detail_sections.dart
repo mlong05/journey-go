@@ -9,6 +9,7 @@ import 'tour_cards.dart' show TourMeta, themeIcon;
 import 'tour_route_map.dart';
 import 'departure_info.dart';
 import 'tour_style.dart';
+import 'tour_reviews_widgets.dart';
 
 /// Thân trang chi tiết của tour 5 bước: ảnh, thông tin chung, điểm nổi bật, mô tả, lịch trình,
 /// các điểm dừng (bản đồ + xem trước), bảng giá, ngày khởi hành, chính sách và liên hệ.
@@ -67,6 +68,7 @@ class _TourWizardDetailBodyState extends State<TourWizardDetailBody> {
       if (!widget.owned && (d.prices.isNotEmpty || d.upcomingDepartureDates.isNotEmpty || d.hasDepartureInfo))
         ('prices', l10n.tdTabPrices),
       if (d.hasPolicies || d.contactInfo != null || (widget.owned && d.hasDepartureInfo)) ('notes', l10n.tdTabNotes),
+      ('reviews', l10n.rvTabLabel),
     ];
   }
 
@@ -318,6 +320,11 @@ class _TourWizardDetailBodyState extends State<TourWizardDetailBody> {
             ],
           )),
         ],
+        _anchor('reviews'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: TourReviewsSection(tourId: d.id),
+        ),
         const SizedBox(height: 32),
       ],
     );

@@ -67,6 +67,8 @@ public class SecurityConfig {
             // Danh mục tour cho du khách: danh sách tour đã xuất bản và trang chi tiết công khai
             "/api/v1/tours/published",
             "/api/v1/tours/*/public-detail",
+            "/api/v1/tours/*/reviews",
+            "/api/v1/tours/*/reviews/summary",
             // Số chỗ còn theo ngày — du khách cần xem trước khi đặt (không cần đăng nhập).
             "/api/v1/tours/*/availability",
             // Lịch khởi hành theo ngày (màn "Xem tour theo ngày") — xem trước khi đăng nhập.

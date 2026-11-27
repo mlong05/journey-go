@@ -5918,4 +5918,163 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tkMatchingClear => 'Unlink';
+
+  @override
+  String get rvTabLabel => 'Reviews';
+
+  @override
+  String get rvSectionTitle => 'Verified Traveler Reviews';
+
+  @override
+  String get rvVerifiedBadge => 'Verified Experience';
+
+  @override
+  String rvVerifiedDate(String date) {
+    return 'Experienced on $date';
+  }
+
+  @override
+  String get rvEditedLabel => 'Edited';
+
+  @override
+  String get rvEmptyTitle => 'No verified reviews yet';
+
+  @override
+  String get rvEmptyDesc =>
+      'Verified reviews from travelers who completed this tour will appear here.';
+
+  @override
+  String rvTotalCount(int count) {
+    return '$count verified reviews';
+  }
+
+  @override
+  String rvReplyRate(int rate) {
+    return '$rate% provider reply rate';
+  }
+
+  @override
+  String get rvFilterAll => 'All';
+
+  @override
+  String rvFilterStars(int star) {
+    return '$star★';
+  }
+
+  @override
+  String get rvFilterPhotos => 'With photos';
+
+  @override
+  String get rvSortNewest => 'Newest';
+
+  @override
+  String get rvSortHighest => 'Highest rated';
+
+  @override
+  String get rvSortLowest => 'Lowest rated';
+
+  @override
+  String get rvCriteriaGuide => 'Tour Guide';
+
+  @override
+  String get rvCriteriaCulture => 'Cultural Depth';
+
+  @override
+  String get rvCriteriaSchedule => 'Schedule Punctuality';
+
+  @override
+  String get rvCriteriaValue => 'Value for Money';
+
+  @override
+  String get rvProviderReplyTitle => 'Response from Tour Provider';
+
+  @override
+  String get rvWriteReview => 'Write a Verified Review';
+
+  @override
+  String get rvEditReview => 'Edit';
+
+  @override
+  String get rvDeleteReview => 'Delete';
+
+  @override
+  String get rvDeleteConfirmTitle => 'Delete your review?';
+
+  @override
+  String get rvDeleteConfirmDesc =>
+      'Your review will be permanently removed from the tour page.';
+
+  @override
+  String get rvTripCardTitle => 'Rate Your Experience';
+
+  @override
+  String get rvTripEligibleDesc =>
+      'Your trip is complete! Share your genuine feedback with fellow travelers.';
+
+  @override
+  String get rvModalCreateTitle => 'Review Your Completed Tour';
+
+  @override
+  String get rvModalEditTitle => 'Edit Review (within 7 days)';
+
+  @override
+  String get rvOverallLabel => 'Overall Rating *';
+
+  @override
+  String get rvCriteriaOptional => 'Detailed Criteria (optional)';
+
+  @override
+  String get rvTitleLabel => 'Headline (optional)';
+
+  @override
+  String get rvTitlePlaceholder => 'e.g. Inspiring cultural journey';
+
+  @override
+  String get rvCommentLabel => 'Your Review *';
+
+  @override
+  String get rvCommentPlaceholder =>
+      'Share your experience with the guide and stops (at least 10 characters)...';
+
+  @override
+  String get rvPhotosLabel => 'Trip Photos (up to 5)';
+
+  @override
+  String get rvAddPhoto => 'Add photo';
+
+  @override
+  String get rvUploading => 'Uploading...';
+
+  @override
+  String get rvSubmit => 'Submit Review';
+
+  @override
+  String get rvSaveChanges => 'Save Changes';
+
+  @override
+  String get rvCancel => 'Cancel';
+
+  @override
+  String get rvLoadMore => 'Load more reviews';
+
+  @override
+  String get rvErrMinComment =>
+      'Please enter at least 10 characters for your review';
+
+  @override
+  String get rvErrRating => 'Please select an overall rating from 1 to 5 stars';
+
+  @override
+  String get rvErrMaxPhotos => 'Maximum 5 photos per review';
+
+  @override
+  String rvHiddenNotice(String reason) {
+    return 'This review has been hidden by a moderator: $reason';
+  }
+
+  @override
+  String get rvSavedToast => 'Your verified review has been saved!';
+
+  @override
+  String get rvDeletedToast => 'Review deleted.';
 }

@@ -5382,4 +5382,158 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get tkMatchingClear => '解除';
+
+  @override
+  String get rvTabLabel => 'レビュー';
+
+  @override
+  String get rvSectionTitle => '体験者による認証済みレビュー';
+
+  @override
+  String get rvVerifiedBadge => '体験認証済み';
+
+  @override
+  String rvVerifiedDate(String date) {
+    return '体験日: $date';
+  }
+
+  @override
+  String get rvEditedLabel => '編集済み';
+
+  @override
+  String get rvEmptyTitle => 'まだレビューがありません';
+
+  @override
+  String get rvEmptyDesc => 'ツアーを完了した旅行者の認証済みレビューがここに表示されます。';
+
+  @override
+  String rvTotalCount(int count) {
+    return '認証済みレビュー $count件';
+  }
+
+  @override
+  String rvReplyRate(int rate) {
+    return '事業者返信率 $rate%';
+  }
+
+  @override
+  String get rvFilterAll => 'すべて';
+
+  @override
+  String rvFilterStars(int star) {
+    return '$starつ星';
+  }
+
+  @override
+  String get rvFilterPhotos => '写真あり';
+
+  @override
+  String get rvSortNewest => '新着順';
+
+  @override
+  String get rvSortHighest => '評価が高い順';
+
+  @override
+  String get rvSortLowest => '評価が低い順';
+
+  @override
+  String get rvCriteriaGuide => 'ガイド対応';
+
+  @override
+  String get rvCriteriaCulture => '文化体験の充実度';
+
+  @override
+  String get rvCriteriaSchedule => 'スケジュール遵守';
+
+  @override
+  String get rvCriteriaValue => 'コストパフォーマンス';
+
+  @override
+  String get rvProviderReplyTitle => 'ツアー事業者からの返信';
+
+  @override
+  String get rvWriteReview => 'レビューを書く';
+
+  @override
+  String get rvEditReview => '編集';
+
+  @override
+  String get rvDeleteReview => '削除';
+
+  @override
+  String get rvDeleteConfirmTitle => 'レビューを削除しますか？';
+
+  @override
+  String get rvDeleteConfirmDesc => 'ツアーページから完全に削除され、元に戻せません。';
+
+  @override
+  String get rvTripCardTitle => 'ツアー体験を評価する';
+
+  @override
+  String get rvTripEligibleDesc => 'ツアー完了お疲れさまでした！他の旅行者のために感想を共有しましょう。';
+
+  @override
+  String get rvModalCreateTitle => '体験済みツアーを評価';
+
+  @override
+  String get rvModalEditTitle => 'レビューを編集（7日以内）';
+
+  @override
+  String get rvOverallLabel => '総合評価 *';
+
+  @override
+  String get rvCriteriaOptional => '項目別評価（任意）';
+
+  @override
+  String get rvTitleLabel => 'タイトル（任意）';
+
+  @override
+  String get rvTitlePlaceholder => '例：歴史と文化を深く学べる素晴らしい旅でした';
+
+  @override
+  String get rvCommentLabel => 'レビュー内容 *';
+
+  @override
+  String get rvCommentPlaceholder => 'ガイドの案内や立ち寄り先の感想を10文字以上でご記入ください...';
+
+  @override
+  String get rvPhotosLabel => '現地写真（最大5枚）';
+
+  @override
+  String get rvAddPhoto => '写真を追加';
+
+  @override
+  String get rvUploading => 'アップロード中...';
+
+  @override
+  String get rvSubmit => 'レビューを投稿';
+
+  @override
+  String get rvSaveChanges => '変更を保存';
+
+  @override
+  String get rvCancel => '閉じる';
+
+  @override
+  String get rvLoadMore => 'さらに表示';
+
+  @override
+  String get rvErrMinComment => 'レビュー内容は10文字以上で入力してください';
+
+  @override
+  String get rvErrRating => '総合評価を1〜5つ星で選択してください';
+
+  @override
+  String get rvErrMaxPhotos => '写真は最大5枚まで添付できます';
+
+  @override
+  String rvHiddenNotice(String reason) {
+    return 'このレビューはモデレーターにより非表示にされています: $reason';
+  }
+
+  @override
+  String get rvSavedToast => '認証済みレビューを保存しました！';
+
+  @override
+  String get rvDeletedToast => 'レビューを削除しました。';
 }
