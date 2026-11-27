@@ -26,14 +26,15 @@ public class AnswerController {
 
     @GetMapping("/answers/{id}")
     @Operation(summary = "Lấy Answer theo ID",
-            description = "?forTourist=true ẩn isCorrect & explanation (BR-TASK-5)")
+            description = "Server tự ẩn isCorrect & explanation cho du khách (BR-TASK-5). "
+                    + "Tham số ?forTourist không còn quyết định việc này (giữ lại để tương thích, bị bỏ qua).")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404")
     })
     public ResponseEntity<ApiResponse<AnswerResponse>> getById(
             @PathVariable Long id,
-            @RequestParam(defaultValue = "false") boolean forTourist) {
+            @RequestParam(defaultValue = "false") @Deprecated boolean forTourist) {
         return ResponseEntity.ok(ApiResponse.success(answerService.getById(id, forTourist)));
     }
 

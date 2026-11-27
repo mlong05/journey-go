@@ -23,11 +23,22 @@ public class AnswerService {
 
     private final AnswerRepository answerRepository;
     private final QuestionRepository questionRepository;
+    /** ⚠️ SECURITY (P1-3): server tự quyết định có lộ đáp án hay không — không tin client. */
+    private final com.journeygo.modules.experience.security.AnswerVisibilityGuard answerVisibilityGuard;
 
+    /**
+     * Lấy chi tiết một đáp án.
+     *
+     * <p>⚠️ SECURITY (P1-3): tham số {@code forTourist} từ client KHÔNG còn quyết định
+     * việc ẩn đáp án nữa. Server tự mask {@code isCorrect} / {@code explanation}
+     * cho mọi role không phải ADMIN / CONTENT_PROVIDER / CONTENT_MODERATOR.
+     */
     @Transactional(readOnly = true)
     public AnswerResponse getById(Long id, boolean forTourist) {
         Answer a = findOrThrow(id);
-        return forTourist ? AnswerResponse.forTourist(a) : AnswerResponse.fromEntity(a);
+        return answerVisibilityGuard.canSeeAnswers()
+                ? AnswerResponse.fromEntity(a)
+                : AnswerResponse.forTourist(a);
     }
 
     @Transactional
