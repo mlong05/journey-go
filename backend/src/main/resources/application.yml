@@ -207,7 +207,11 @@ app:
     # ── Chính sách hoàn tiền (mới) ──────────────────────────────────────────────
     # Cửa sổ no-show: yêu cầu của nhóm cá nhân gửi trong vòng N giờ trước ngày trải
     # nghiệm (hoặc muộn hơn) sẽ bị tính tỷ lệ hoàn 0%.
-    refund-no-show-window-hours: ${REFUND_NO_SHOW_WINDOW_HOURS:48}
+    # ⚠️ KHÔNG đặt override 48 ở đây — mặc định 72 giờ nằm trong FinanceProperties và
+    # phải khớp với PersonalRefundPolicy.LATE_CANCEL_HOURS (72) + bảng chính sách V50.
+    # Nếu đặt 48 ⇒ backend tính 0% trong khoảng 48-72h trong khi frontend hiển thị 72h
+    # ⇒ số tiền hiện ra lệch với số tiền thực hoàn.
+    refund-no-show-window-hours: ${REFUND_NO_SHOW_WINDOW_HOURS:72}
     # Số giờ trước ngày trải nghiệm mà Tourist được gửi lại yêu cầu sau khi bị từ chối
     # (0 = không cho gửi lại).
     refund-resubmit-hours-before-start: ${REFUND_RESUBMIT_HOURS_BEFORE_START:0}
