@@ -173,8 +173,10 @@ app:
 
   # ── Finance (Booking / Payment / Refund / Wallet & Settlement) ────────────
   finance:
-    # Thời hạn gửi yêu cầu hoàn tiền kể từ thời điểm thanh toán thành công đã xác minh.
-    refund-window-hours: ${REFUND_WINDOW_HOURS:24}
+    # ⚠️ KHÔNG dùng `refund-window-hours` nữa — thời hạn gửi yêu cầu hoàn tiền
+    # được quyết định bởi 3 BẬC chính sách V50 (80% / 50% / 0%) tính theo thời điểm
+    # hủy so với ngày trải nghiệm (xem PersonalRefundPolicy). Cấu hình thời hạn
+    # riêng biệt chỉ tạo mâu thuẫn giữa tài liệu, UI và code thực thi.
     # Tỷ lệ hoa hồng nền tảng mặc định (0.20 = 20%).
     default-commission-rate: ${DEFAULT_COMMISSION_RATE:0.2000}
     # Tỷ lệ hoàn tiền theo nguyên nhân.
