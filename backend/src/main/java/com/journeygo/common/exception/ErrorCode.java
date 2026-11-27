@@ -221,7 +221,18 @@ public enum ErrorCode {
     TOUR_CUSTOMER_REVIEW_HIDDEN("Đánh giá này đang bị ẩn bởi kiểm duyệt viên", HttpStatus.CONFLICT),
     TOUR_CUSTOMER_REVIEW_INVALID_IMAGES("Danh sách ảnh đính kèm không hợp lệ (tối đa 5 ảnh http/https)", HttpStatus.BAD_REQUEST),
     TOUR_CUSTOMER_REVIEW_HIDE_REASON_REQUIRED("Vui lòng nhập lý do khi ẩn đánh giá", HttpStatus.BAD_REQUEST),
-    TOUR_CUSTOMER_REVIEW_SELF_MODERATION_FORBIDDEN("Không thể tự kiểm duyệt đánh giá thuộc tour của mình hoặc do chính mình viết", HttpStatus.FORBIDDEN);
+    TOUR_CUSTOMER_REVIEW_SELF_MODERATION_FORBIDDEN("Không thể tự kiểm duyệt đánh giá thuộc tour của mình hoặc do chính mình viết", HttpStatus.FORBIDDEN),
+
+    // ── Phản hồi của đối tác cần kiểm duyệt (E2c) ────────────────────────────
+    TOUR_CUSTOMER_REVIEW_REPLY_NOT_FOUND("Phản hồi của đối tác không tồn tại", HttpStatus.NOT_FOUND),
+    TOUR_CUSTOMER_REVIEW_REPLY_ALREADY_PENDING("Phản hồi của bạn đang chờ kiểm duyệt — vui lòng đợi kết quả", HttpStatus.CONFLICT),
+    TOUR_CUSTOMER_REVIEW_REPLY_ALREADY_HANDLED("Phản hồi này đã được xử lý", HttpStatus.CONFLICT),
+
+    // ── Báo cáo đánh giá vi phạm (E2e / D1) ─────────────────────────────────
+    TOUR_CUSTOMER_REVIEW_REPORT_DUPLICATED("Bạn đã báo cáo đánh giá này trước đó", HttpStatus.CONFLICT),
+    TOUR_CUSTOMER_REVIEW_REPORT_SELF_FORBIDDEN("Không thể báo cáo đánh giá do chính bạn viết", HttpStatus.FORBIDDEN),
+    TOUR_CUSTOMER_REVIEW_REPORT_NOT_FOUND("Báo cáo không tồn tại", HttpStatus.NOT_FOUND),
+    TOUR_CUSTOMER_REVIEW_REPORT_ALREADY_HANDLED("Báo cáo này đã được xử lý", HttpStatus.CONFLICT);
 
     private final String message;
     private final HttpStatus httpStatus;
