@@ -642,11 +642,22 @@ public class PaymentService {
      *
      * <p>Được dùng khi: cần xác minh giao dịch trước khi thử lại (UC-03),
      * thanh toán đến muộn (UC-05), hoặc Admin cần đối soát.
+     *
+     * <p>⚠️ SECURITY (P1-4): {@code callerId} là bắt buộc — nếu KHÔNG phải Admin thì
+     * chỉ được truy vấn giao dịch của chính mình. Trước đây endpoint này không kiểm tra
+     * quyền sở hữu ⇒ bất kỳ du khách nào cũng đoán được {@code paymentId} và xem/trigger
+     * trạng thái giao dịch của người khác.
      */
     @Transactional
-    public PaymentOutcome queryAndResolve(Long paymentId, String clientIp) {
+    public PaymentOutcome queryAndResolve(Long paymentId, String clientIp, Long callerId, boolean isAdmin) {
         Payment payment = paymentRepository.findByIdForUpdate(paymentId)
                 .orElseThrow(() -> new AppException(ErrorCode.PAYMENT_NOT_FOUND));
+
+        // ⚠️ Kiểm tra quyền sở hữu TRƯỚC khi hỏi VNPay (tránh lộ trạng thái & tránh
+        // kích hoạt giao dịch của người khác).
+        if (!isAdmin) {
+            checkOwnership(payment.getBooking(), callerId);
+        }
 
         if (payment.getStatus().isFinal()) {
             if (payment.getStatus() == PaymentStatus.SUPERSEDED) {
@@ -936,7 +947,7 @@ public class PaymentService {
      * Khi khách bấm "Kiểm tra lại" trên giao dịch #1, hệ thống phải nhận ra
      * "đơn này đã được thanh toán rồi" chứ không phải "đang chờ kết quả".
      *
-     * <p>⇒ Gọi từ {@link #queryAndResolve(Long, String)} TRƯỚC khi hỏi VNPay:
+     * <p>⇒ Gọi từ {@link #queryAndResolve(Long, String, Long, boolean)} TRƯỚC khi hỏi VNPay:
      * nếu Booking đã {@code CONFIRMED}/{@code COMPLETED} mà giao dịch này chưa có
      * kết quả ⇒ đóng nó lại (SUPERSEDED) ⇒ trả về kết quả DỨT KHOÁT.
      *
