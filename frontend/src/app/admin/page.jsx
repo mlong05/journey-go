@@ -241,12 +241,15 @@ export default function AdminDashboardPage() {
       tone: "sky",
     },
     {
-      id: "tourists",
+      id: "providers",
       label: "Đối tác đang hoạt động",
-      tooltip: KPI_HINTS.tourists,
-      value: (kpis?.activeTourists ?? 0).toLocaleString("vi-VN"),
-      unit: "khách",
-      change: percentChange(kpis?.activeTourists, previousKpis?.activeTourists),
+      // ⚠️ Trước đây thẻ này lấy `activeTourists` (số KHÁCH du lịch có đặt tour) ⇒
+      // nhãn "Đối tác" nhưng số liệu là số khách ⇒ sai hoàn toàn.
+      // Đối tác = `activeProviders` (số chủ tour có tour đang publish trong kỳ).
+      tooltip: KPI_HINTS.providers,
+      value: (kpis?.activeProviders ?? 0).toLocaleString("vi-VN"),
+      unit: "đối tác",
+      change: percentChange(kpis?.activeProviders, previousKpis?.activeProviders),
       icon: Users,
       tone: "slate",
       href: "/admin/partners",
