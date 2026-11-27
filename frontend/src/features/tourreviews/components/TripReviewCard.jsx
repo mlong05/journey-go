@@ -39,7 +39,7 @@ export default function TripReviewCard({ booking }) {
 
   const refresh = () => {
     setLoading(true);
-    setReloadTick((t) => t + 1);
+    setReloadTick((tick) => tick + 1);
   };
 
   const handleDelete = async (reviewId) => {
@@ -75,6 +75,15 @@ export default function TripReviewCard({ booking }) {
   const existing = eligibility.existingReview;
   if (!eligibility.eligible && !existing) return null;
 
+  const subCriteria = existing
+    ? [
+        [t("reviews.criteriaGuide"), existing.guideRating],
+        [t("reviews.criteriaCulture"), existing.cultureRating],
+        [t("reviews.criteriaSchedule"), existing.scheduleRating],
+        [t("reviews.criteriaValue"), existing.valueRating],
+      ].filter(([, val]) => val != null)
+    : [];
+
   return (
     <section className="mt-5 rounded-3xl border border-amber-200/80 bg-white p-5">
       {confirmDialog}
@@ -88,7 +97,12 @@ export default function TripReviewCard({ booking }) {
               </span>
               <h2 className="mt-1.5 text-base font-extrabold text-slate-900">{t("reviews.tripCardTitle")}</h2>
             </div>
-            <StarDisplay value={existing.overallRating} size={16} />
+            <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1">
+              <StarDisplay value={existing.overallRating} size={15} />
+              <span className="text-xs font-extrabold tabular-nums text-amber-800">
+                {Number(existing.overallRating || 0).toFixed(1)}
+              </span>
+            </div>
           </div>
 
           {existing.hidden && (
@@ -103,6 +117,20 @@ export default function TripReviewCard({ booking }) {
 
           {existing.title && <p className="mt-3 text-sm font-bold text-slate-900">{existing.title}</p>}
           <p className="mt-1 whitespace-pre-line text-sm text-slate-700">{existing.comment}</p>
+
+          {subCriteria.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {subCriteria.map(([label, val]) => (
+                <span
+                  key={label}
+                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700"
+                >
+                  <span>{label}:</span>
+                  <span className="font-extrabold tabular-nums text-amber-700">{val}/5</span>
+                </span>
+              ))}
+            </div>
+          )}
 
           {existing.imageUrls?.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
