@@ -126,6 +126,10 @@ class TourModel {
   final String? providerName;
   final int? providerId;
 
+  /// Đánh giá xác thực từ du khách đã trải nghiệm.
+  final double? averageRating;
+  final int reviewCount;
+
   const TourModel({
     required this.id,
     required this.title,
@@ -149,6 +153,8 @@ class TourModel {
     this.nextDepartureDate,
     this.providerName,
     this.providerId,
+    this.averageRating,
+    this.reviewCount = 0,
   });
 
   factory TourModel.fromJson(Map<String, dynamic> json) {
@@ -184,6 +190,8 @@ class TourModel {
       providerName: json['providerName']?.toString() ??
           json['createdBy']?.toString(),
       providerId: _asIntOrNull(json['providerId']),
+      averageRating: _asDoubleOrNull(json['averageRating']),
+      reviewCount: _asInt(json['reviewCount']),
     );
   }
 

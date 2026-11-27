@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/tour_journey_model.dart';
 import '../common/photo.dart';
+import '../tours/tour_reviews_widgets.dart';
 import 'heritage_passport.dart';
 import 'journey_map.dart';
 import 'journey_share_card.dart';
@@ -177,6 +178,13 @@ class JourneySummaryScreen extends StatelessWidget {
               ],
             ),
           ),
+          if (journey.bookingId != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                child: BookingReviewCard(bookingId: journey.bookingId!),
+              ),
+            ),
           SliverToBoxAdapter(
             child: SafeArea(
               top: false,

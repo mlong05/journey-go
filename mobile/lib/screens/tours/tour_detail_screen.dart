@@ -22,6 +22,7 @@ import '../culture/cultural_stories.dart';
 import '../rewards/rewards_widgets.dart' show buildRewardsAppBar;
 import 'booking_group_sheet.dart';
 import 'tour_detail_sections.dart';
+import 'tour_reviews_widgets.dart';
 import 'tour_route_map.dart';
 import 'tour_style.dart';
 import 'experience_date_calendar.dart';
@@ -648,6 +649,8 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                   isLast: e.key == _tour.destinations.length - 1,
                 ),
               ),
+            const SizedBox(height: 22),
+            TourReviewsSection(tourId: _tour.id),
           ],
         ),
       ),

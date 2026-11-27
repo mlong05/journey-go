@@ -26,6 +26,7 @@ import '../../core/services/token_storage.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/navigation.dart';
 import '../tours/departure_info.dart';
+import '../tours/tour_reviews_widgets.dart';
 import 'payment_screen.dart';
 import 'refund_form_screen.dart';
 
@@ -588,6 +589,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               ],
             ),
           ),
+        ],
+        if (!_hasOpenRefund && (booking.isCompleted || booking.isConfirmed)) ...[
+          const SizedBox(height: 14),
+          BookingReviewCard(bookingId: booking.id),
         ],
       ],
     );
