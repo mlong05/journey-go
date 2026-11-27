@@ -44,6 +44,26 @@
     "errMinComment": "Vui lòng nhập nội dung đánh giá tối thiểu 10 ký tự",
     "errRating": "Vui lòng chọn số sao tổng thể từ 1 đến 5",
     "errMaxPhotos": "Tối đa 5 ảnh cho mỗi đánh giá",
-    "starLabel": "{count} sao"
+    "starLabel": "{count} sao",
+    "myReviewsTitle": "Đánh giá của tôi",
+    "myReviewsDesc": "Tất cả đánh giá bạn đã gửi cho các chuyến đi đã trải nghiệm, kèm phản hồi của nhà tour.",
+    "myReviewsEmptyTitle": "Bạn chưa viết đánh giá nào",
+    "myReviewsEmptyDesc": "Sau khi hoàn thành chuyến đi, hãy chia sẻ trải nghiệm thực tế để giúp du khách khác.",
+    "myReviewsGoTrips": "Xem chuyến đi của tôi",
+    "hiddenByModerator": "Đã bị ẩn",
+    "visibleBadge": "Đang hiển thị",
+    "replyPending": "Phản hồi của nhà tour đang chờ kiểm duyệt.",
+    "hideReasonLabel": "Lý do ẩn",
+    "loadError": "Không tải được danh sách đánh giá của bạn.",
+    "deleteError": "Không xoá được đánh giá.",
+    "reportButton": "Báo cáo vi phạm",
+    "reportTitle": "Báo cáo đánh giá này",
+    "reportDesc": "Đánh giá sẽ được gửi tới đội ngũ kiểm duyệt. Vui lòng mô tả rõ lý do.",
+    "reportReasonLabel": "Lý do báo cáo",
+    "reportReasonPlaceholder": "Ví dụ: ngôn từ xúc phạm, quảng cáo, thông tin cá nhân...",
+    "reportSubmit": "Gửi báo cáo",
+    "reportSuccess": "Đã gửi báo cáo — chúng tôi sẽ xem xét đánh giá này.",
+    "reportFailed": "Không gửi được báo cáo.",
+    "reportReasonRequired": "Vui lòng nhập lý do báo cáo."
   }
 }

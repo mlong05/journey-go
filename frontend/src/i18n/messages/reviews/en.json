@@ -44,6 +44,26 @@
     "errMinComment": "Please enter at least 10 characters for your review",
     "errRating": "Please select an overall rating from 1 to 5 stars",
     "errMaxPhotos": "Maximum 5 photos per review",
-    "starLabel": "{count} stars"
+    "starLabel": "{count} stars",
+    "myReviewsTitle": "My reviews",
+    "myReviewsDesc": "All reviews you have written for completed trips, including replies from tour providers.",
+    "myReviewsEmptyTitle": "You have not written any reviews yet",
+    "myReviewsEmptyDesc": "After completing a trip, share your real experience to help other travellers.",
+    "myReviewsGoTrips": "View my trips",
+    "hiddenByModerator": "Hidden",
+    "visibleBadge": "Visible",
+    "replyPending": "The provider reply is awaiting moderation.",
+    "hideReasonLabel": "Hidden because",
+    "loadError": "Could not load your reviews.",
+    "deleteError": "Could not delete the review.",
+    "reportButton": "Report violation",
+    "reportTitle": "Report this review",
+    "reportDesc": "The review will be sent to our moderation team. Please describe the reason.",
+    "reportReasonLabel": "Reason for report",
+    "reportReasonPlaceholder": "E.g. offensive language, advertising, personal information...",
+    "reportSubmit": "Submit report",
+    "reportSuccess": "Report submitted — we will review this review.",
+    "reportFailed": "Could not submit the report.",
+    "reportReasonRequired": "Please enter a reason for the report."
   }
 }

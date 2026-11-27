@@ -44,6 +44,26 @@
     "errMinComment": "レビュー内容は10文字以上で入力してください",
     "errRating": "総合評価を1〜5つ星で選択してください",
     "errMaxPhotos": "写真は最大5枚まで添付できます",
-    "starLabel": "{count}つ星"
+    "starLabel": "{count}つ星",
+    "myReviewsTitle": "自分のレビュー",
+    "myReviewsDesc": "完了した旅行について書いたすべてのレビューと、事業者からの返信。",
+    "myReviewsEmptyTitle": "まだレビューを書いていません",
+    "myReviewsEmptyDesc": "旅行を完了したら、実際の体験を共有して他の旅行者をサポートしてください。",
+    "myReviewsGoTrips": "マイ旅行を見る",
+    "hiddenByModerator": "非表示",
+    "visibleBadge": "公開中",
+    "replyPending": "事業者の返信はモデレーション待ちです。",
+    "hideReasonLabel": "非表示の理由",
+    "loadError": "レビューを読み込めませんでした。",
+    "deleteError": "レビューを削除できませんでした。",
+    "reportButton": "違反を報告",
+    "reportTitle": "このレビューを報告",
+    "reportDesc": "レビューはモデレーションチームに送信されます。理由を詳しくお知らせください。",
+    "reportReasonLabel": "報告の理由",
+    "reportReasonPlaceholder": "例：侮辱的な表現、広告、個人情報など",
+    "reportSubmit": "報告を送信",
+    "reportSuccess": "報告を送信しました。レビューを確認します。",
+    "reportFailed": "報告を送信できませんでした。",
+    "reportReasonRequired": "報告の理由を入力してください。"
   }
 }
