@@ -138,6 +138,12 @@ app:
   oauth2:
     default-redirect-uri: ${OAUTH2_DEFAULT_REDIRECT_URI:http://localhost:3000/oauth2/redirect}
     authorized-redirect-uris: ${OAUTH2_AUTHORIZED_REDIRECT_URIS:http://localhost:3000/oauth2/redirect,http://127.0.0.1:3000/oauth2/redirect,journeygo://oauth2/redirect,journeygo://auth/callback}
+  auth:
+    google:
+      # ⚠️ SECURITY (P1-2): danh sách client id được phép nhận idToken (kiểm tra `aud`/`azp`).
+      # Mặc định dùng client id của Spring OAuth2 ở trên (Web Client ID — Mobile cũng dùng
+      # chung Web Client ID làm audience). Thêm client id khác bằng dấu phẩy.
+      allowed-client-ids: ${GOOGLE_ALLOWED_CLIENT_IDS:}
   mail:
     from-name: ${MAIL_FROM_NAME:JourneyGo Platform}
     otp-expiration-minutes: ${MAIL_OTP_EXPIRATION_MINUTES:10}
