@@ -2,8 +2,10 @@ package com.journeygo.modules.tourfeedback.controller;
 
 import com.journeygo.common.dto.ApiResponse;
 import com.journeygo.common.dto.PageResponse;
+import com.journeygo.modules.tourfeedback.dto.request.CreateReviewReportRequest;
 import com.journeygo.modules.tourfeedback.dto.request.CreateTourCustomerReviewRequest;
 import com.journeygo.modules.tourfeedback.dto.request.UpdateTourCustomerReviewRequest;
+import com.journeygo.modules.tourfeedback.dto.response.ReviewReportResponse;
 import com.journeygo.modules.tourfeedback.dto.response.TourCustomerReviewResponse;
 import com.journeygo.modules.tourfeedback.dto.response.TourRatingSummaryResponse;
 import com.journeygo.modules.tourfeedback.dto.response.TourReviewEligibilityResponse;
@@ -123,6 +125,20 @@ public class TourCustomerReviewController {
         return ResponseEntity.ok(ApiResponse.success(
                 "Lấy danh sách đánh giá của tôi thành công",
                 reviewService.getMyReviews(principal.getId(), page, size)));
+    }
+
+    @PostMapping("/tour-reviews/{reviewId}/reports")
+    @PreAuthorize("isAuthenticated()")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(summary = "Báo cáo một đánh giá vi phạm (spam, xúc phạm, quảng cáo…)")
+    public ResponseEntity<ApiResponse<ReviewReportResponse>> reportReview(
+            @PathVariable Long reviewId,
+            @Valid @RequestBody CreateReviewReportRequest request,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Đã gửi báo cáo — chúng tôi sẽ xem xét đánh giá này",
+                        reviewService.reportReview(reviewId, request.reason(), principal.getId())));
     }
 
     private static boolean hasRole(UserPrincipal principal, String role) {
