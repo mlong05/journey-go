@@ -1,8 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/auth_models.dart';
+import '../../core/services/api_client.dart';
 import '../../core/services/auth_service.dart';
 import '../../l10n/locale_controller.dart';
+import '../forum/forum_widgets.dart';
 
 class EditProfileModal extends StatefulWidget {
   final UserModel currentUser;
@@ -20,8 +24,10 @@ class EditProfileModal extends StatefulWidget {
 
 class _EditProfileModalState extends State<EditProfileModal> {
   final AuthService _authService = AuthService();
+  final ImagePicker _picker = ImagePicker();
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
+  String? _pickedImagePath;
   bool _isSaving = false;
 
   @override
@@ -38,6 +44,29 @@ class _EditProfileModalState extends State<EditProfileModal> {
     super.dispose();
   }
 
+  Future<void> _pickAvatar() async {
+    try {
+      final picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      if (picked != null && mounted) {
+        setState(() => _pickedImagePath = picked.path);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: AppCultureColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   void _handleSave() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
@@ -50,10 +79,18 @@ class _EditProfileModalState extends State<EditProfileModal> {
     setState(() => _isSaving = true);
 
     try {
+      var avatarUrl = widget.currentUser.avatarUrl;
+      if (_pickedImagePath != null) {
+        avatarUrl = await ApiClient.uploadImage(
+          _pickedImagePath!,
+          folder: 'journeygo/avatars',
+        );
+      }
+
       final updatedUser = await _authService.updateProfile(
         fullName: name,
         phone: _phoneController.text.trim(),
-        avatarUrl: widget.currentUser.avatarUrl,
+        avatarUrl: avatarUrl,
       );
 
       if (mounted) {
@@ -130,32 +167,48 @@ class _EditProfileModalState extends State<EditProfileModal> {
 
           const SizedBox(height: 16),
 
-          // Avatar display
+          // Avatar display & picker
           Center(
-            child: Stack(
-              children: [
-                CircleAvatar(
-                  radius: 36,
-                  backgroundColor: AppCultureColors.jadeLight,
-                  child: const Icon(
-                    Icons.face_retouching_natural_rounded,
-                    size: 40,
-                    color: AppCultureColors.heritageJade,
-                  ),
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: AppCultureColors.heritageJade,
-                      shape: BoxShape.circle,
+            child: GestureDetector(
+              onTap: _isSaving ? null : _pickAvatar,
+              child: Stack(
+                children: [
+                  if (_pickedImagePath != null)
+                    CircleAvatar(
+                      radius: 36,
+                      backgroundColor: AppCultureColors.jadeLight,
+                      backgroundImage: FileImage(File(_pickedImagePath!)),
+                    )
+                  else if ((widget.currentUser.avatarUrl ?? '').trim().isNotEmpty)
+                    ForumAvatar(
+                      name: widget.currentUser.fullName,
+                      url: widget.currentUser.avatarUrl,
+                      size: 72,
+                    )
+                  else
+                    CircleAvatar(
+                      radius: 36,
+                      backgroundColor: AppCultureColors.jadeLight,
+                      child: const Icon(
+                        Icons.face_retouching_natural_rounded,
+                        size: 40,
+                        color: AppCultureColors.heritageJade,
+                      ),
                     ),
-                    child: const Icon(Icons.edit, size: 14, color: Colors.white),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: AppCultureColors.heritageJade,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.edit, size: 14, color: Colors.white),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
 
