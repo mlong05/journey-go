@@ -20,6 +20,7 @@ class AiGuideChatScreen extends StatefulWidget {
   final int? taskId;
   final String? taskName;
   final String? initialSessionId;
+  final String? initialPrompt;
   final bool isSheet;
 
   const AiGuideChatScreen({
@@ -29,6 +30,7 @@ class AiGuideChatScreen extends StatefulWidget {
     this.taskId,
     this.taskName,
     this.initialSessionId,
+    this.initialPrompt,
     this.isSheet = false,
   });
 
@@ -39,6 +41,7 @@ class AiGuideChatScreen extends StatefulWidget {
     String? destinationName,
     int? taskId,
     String? taskName,
+    String? initialPrompt,
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -54,6 +57,7 @@ class AiGuideChatScreen extends StatefulWidget {
             destinationName: destinationName,
             taskId: taskId,
             taskName: taskName,
+            initialPrompt: initialPrompt,
             isSheet: true,
           ),
         ),
@@ -129,6 +133,9 @@ class _AiGuideChatScreenState extends State<AiGuideChatScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialPrompt != null && widget.initialPrompt!.trim().isNotEmpty) {
+      _inputCtrl.text = widget.initialPrompt!.trim();
+    }
     _initSession(forceNew: false, targetSessionId: widget.initialSessionId);
   }
 

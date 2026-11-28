@@ -92,6 +92,18 @@ public class TourStop {
     @Column(name = "cultural_content", columnDefinition = "TEXT")
     private String culturalContent;
 
+    /** Điểm nhấn / "Bạn có biết?" ngắn gọn cho câu chuyện văn hóa. */
+    @Column(name = "fun_fact", columnDefinition = "TEXT")
+    private String funFact;
+
+    /** Dòng thời gian lịch sử (JSON array: [{period, event}]). */
+    @Column(name = "cultural_timeline", columnDefinition = "TEXT")
+    private String culturalTimeline;
+
+    /** Từ điển thuật ngữ văn hóa mini (JSON array: [{term, meaning}]). */
+    @Column(name = "cultural_glossary", columnDefinition = "TEXT")
+    private String culturalGlossary;
+
     @ElementCollection
     @CollectionTable(name = "tour_stop_cultural_images", joinColumns = @JoinColumn(name = "stop_id"))
     @OrderColumn(name = "position")

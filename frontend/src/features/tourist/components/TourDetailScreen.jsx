@@ -513,8 +513,6 @@ export default function TourDetailScreen({ tourId }) {
               </Section>
             )}
 
-            <TourReviewsSection tourId={tour.tourId} />
-
             <CommunityPosts tourId={tour.tourId} />
 
             <Section title={t("tour.policies")} icon={ShieldCheck}>
@@ -530,6 +528,8 @@ export default function TourDetailScreen({ tourId }) {
                   ))}
               </dl>
             </Section>
+
+            <TourReviewsSection tourId={tour.tourId} />
           </div>
 
           <aside className="lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pb-1 [scrollbar-width:thin]">

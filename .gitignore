@@ -1,4 +1,4 @@
-﻿# Compiled class file
+# Compiled class file
 *.class
 
 # Log file
@@ -72,3 +72,8 @@ scripts/tmp_*.js
 scripts/tmp_*.mjs
 scripts/tmp_*.sql
 scripts/*.tmp
+
+# Playwright test artifacts
+frontend/playwright-report/
+frontend/test-results/
+playwright/.cache/

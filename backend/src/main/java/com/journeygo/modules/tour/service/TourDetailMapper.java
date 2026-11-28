@@ -1,5 +1,7 @@
 package com.journeygo.modules.tour.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.journeygo.modules.moderation.entity.TourReview;
 import com.journeygo.modules.moderation.repository.TourReviewRepository;
 import com.journeygo.modules.reward.entity.RewardSettingCode;
@@ -23,6 +25,26 @@ public class TourDetailMapper {
     private final RewardSettingService rewardSettingService;
     private final TourReviewRepository reviewRepository;
     private final TourSlotRepository slotRepository;
+    private static final ObjectMapper JSON = new ObjectMapper();
+
+    static <T> List<T> parseJsonList(String raw, TypeReference<List<T>> type) {
+        if (raw == null || raw.isBlank()) return List.of();
+        try {
+            List<T> list = JSON.readValue(raw, type);
+            return list == null ? List.of() : list;
+        } catch (Exception ignored) {
+            return List.of();
+        }
+    }
+
+    static String toJsonOrNull(List<?> list) {
+        if (list == null || list.isEmpty()) return null;
+        try {
+            return JSON.writeValueAsString(list);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
 
     @Transactional(readOnly = true)
     public TourDetailResponse toResponse(Tour tour) {
@@ -141,7 +163,10 @@ public class TourDetailMapper {
                         .sorted(Comparator.comparingInt(TourStopThenNow::getSequenceOrder))
                         .map(t -> new TourDetailResponse.ThenNow(t.getId(), t.getThenImageUrl(), t.getNowImageUrl(),
                                 t.getThenLabel(), t.getCaption(), t.getCredit()))
-                        .toList());
+                        .toList(),
+                stop.getFunFact(),
+                parseJsonList(stop.getCulturalTimeline(), new TypeReference<>() {}),
+                parseJsonList(stop.getCulturalGlossary(), new TypeReference<>() {}));
     }
 
     private TourDetailResponse.Question toQuestion(TourStopQuestion q, Integer points) {

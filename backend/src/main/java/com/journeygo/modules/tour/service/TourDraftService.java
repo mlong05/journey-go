@@ -312,6 +312,23 @@ public class TourDraftService {
         stop.setVideoSource(videoUrl == null ? null : item.videoSource());
         stop.setCulturalContent(trimToNull(item.culturalContent()));
         replaceList(stop.getCulturalImages(), cleanList(item.culturalImages()));
+        stop.setFunFact(trimToNull(item.funFact()));
+        if (item.timeline() != null) {
+            var cleanedTimeline = item.timeline().stream()
+                    .filter(m -> m != null && (trimToNull(m.period()) != null || trimToNull(m.event()) != null))
+                    .map(m -> new TourWizardRequests.TimelineItem(trimToNull(m.period()), trimToNull(m.event())))
+                    .limit(10)
+                    .toList();
+            stop.setCulturalTimeline(TourDetailMapper.toJsonOrNull(cleanedTimeline));
+        }
+        if (item.glossary() != null) {
+            var cleanedGlossary = item.glossary().stream()
+                    .filter(g -> g != null && (trimToNull(g.term()) != null || trimToNull(g.meaning()) != null))
+                    .map(g -> new TourWizardRequests.GlossaryItem(trimToNull(g.term()), trimToNull(g.meaning())))
+                    .limit(10)
+                    .toList();
+            stop.setCulturalGlossary(TourDetailMapper.toJsonOrNull(cleanedGlossary));
+        }
 
         stop.getArtifacts().clear();
         int a = 1;
@@ -639,7 +656,10 @@ public class TourDraftService {
                 s.getLatitude(), s.getLongitude(), s.getCheckInRadiusMeters(),
                 null, // tour nhân bản: mã QR trạm mới, không dùng chung với tour gốc
                 s.getThenNow().stream().map(t -> new TourWizardRequests.ThenNowItem(t.getThenImageUrl(),
-                        t.getNowImageUrl(), t.getThenLabel(), t.getCaption(), t.getCredit())).toList());
+                        t.getNowImageUrl(), t.getThenLabel(), t.getCaption(), t.getCredit())).toList(),
+                s.getFunFact(),
+                TourDetailMapper.parseJsonList(s.getCulturalTimeline(), new com.fasterxml.jackson.core.type.TypeReference<>() {}),
+                TourDetailMapper.parseJsonList(s.getCulturalGlossary(), new com.fasterxml.jackson.core.type.TypeReference<>() {}));
     }
 
     /**

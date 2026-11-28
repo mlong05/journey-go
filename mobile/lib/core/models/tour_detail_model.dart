@@ -123,6 +123,30 @@ class TourArtifact {
 }
 
 /// Nội dung văn hoá của điểm dừng, chỉ có sau khi check-in: `GET /journeys/{id}/destinations/{stopId}/culture`.
+class CulturalTimelineItem {
+  final String? period;
+  final String? event;
+
+  const CulturalTimelineItem({this.period, this.event});
+
+  factory CulturalTimelineItem.fromJson(Map<String, dynamic> json) => CulturalTimelineItem(
+        period: _text(json['period']),
+        event: _text(json['event']),
+      );
+}
+
+class CulturalGlossaryItem {
+  final String? term;
+  final String? meaning;
+
+  const CulturalGlossaryItem({this.term, this.meaning});
+
+  factory CulturalGlossaryItem.fromJson(Map<String, dynamic> json) => CulturalGlossaryItem(
+        term: _text(json['term']),
+        meaning: _text(json['meaning']),
+      );
+}
+
 class StopCulture {
   final int stopId;
   final int sequenceOrder;
@@ -133,6 +157,9 @@ class StopCulture {
   final String? culturalContent;
   final List<String> culturalImages;
   final List<TourArtifact> artifacts;
+  final String? funFact;
+  final List<CulturalTimelineItem> timeline;
+  final List<CulturalGlossaryItem> glossary;
 
   const StopCulture({
     required this.stopId,
@@ -144,6 +171,9 @@ class StopCulture {
     this.culturalContent,
     this.culturalImages = const [],
     this.artifacts = const [],
+    this.funFact,
+    this.timeline = const [],
+    this.glossary = const [],
   });
 
   factory StopCulture.fromJson(Map<String, dynamic> json) => StopCulture(
@@ -156,10 +186,19 @@ class StopCulture {
         culturalContent: _text(json['culturalContent']),
         culturalImages: _urls(json['culturalImages']),
         artifacts: _maps(json['artifacts']).map(TourArtifact.fromJson).toList(),
+        funFact: _text(json['funFact']),
+        timeline: _maps(json['timeline']).map(CulturalTimelineItem.fromJson).toList(),
+        glossary: _maps(json['glossary']).map(CulturalGlossaryItem.fromJson).toList(),
       );
 
   bool get isEmpty =>
-      culturalContent == null && culturalImages.isEmpty && artifacts.isEmpty && videoUrl == null;
+      culturalContent == null &&
+      culturalImages.isEmpty &&
+      artifacts.isEmpty &&
+      videoUrl == null &&
+      funFact == null &&
+      timeline.isEmpty &&
+      glossary.isEmpty;
 }
 
 /// Hoạt động thực địa tại điểm dừng (tên, thời lượng, điểm).

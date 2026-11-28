@@ -19,13 +19,28 @@ public record StopCultureResponse(
         String culturalContent,
         List<String> culturalImages,
         List<TourDetailResponse.Artifact> artifacts,
-        List<TourDetailResponse.ThenNow> thenNow
+        List<TourDetailResponse.ThenNow> thenNow,
+        String funFact,
+        List<TourDetailResponse.TimelineItem> timeline,
+        List<TourDetailResponse.GlossaryItem> glossary
 ) {
+    public StopCultureResponse(
+            Long stopId, int sequenceOrder, String name, String shortDescription, String imageUrl,
+            String videoUrl, VideoSource videoSource, String culturalContent, List<String> culturalImages,
+            List<TourDetailResponse.Artifact> artifacts, List<TourDetailResponse.ThenNow> thenNow
+    ) {
+        this(stopId, sequenceOrder, name, shortDescription, imageUrl, videoUrl, videoSource, culturalContent,
+                culturalImages, artifacts, thenNow, null, List.of(), List.of());
+    }
+
     public static StopCultureResponse from(TourDetailResponse.Stop s) {
         return new StopCultureResponse(s.id(), s.sequenceOrder(), s.name(), s.shortDescription(), s.imageUrl(),
                 s.videoUrl(), s.videoSource(), s.culturalContent(),
                 s.culturalImages() == null ? List.of() : s.culturalImages(),
                 s.artifacts() == null ? List.of() : s.artifacts(),
-                s.thenNow() == null ? List.of() : s.thenNow());
+                s.thenNow() == null ? List.of() : s.thenNow(),
+                s.funFact(),
+                s.timeline() == null ? List.of() : s.timeline(),
+                s.glossary() == null ? List.of() : s.glossary());
     }
 }

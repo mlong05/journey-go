@@ -194,6 +194,18 @@ public final class TourWizardRequests {
             @Valid QuestionItem question
     ) {}
 
+    @Schema(description = "Mốc thời gian lịch sử")
+    public record TimelineItem(
+            @Size(max = 80) String period,
+            @Size(max = 500) String event
+    ) {}
+
+    @Schema(description = "Thuật ngữ văn hóa & giải thích")
+    public record GlossaryItem(
+            @Size(max = 100) String term,
+            @Size(max = 500) String meaning
+    ) {}
+
     @Schema(description = "Một điểm đến của tour. Có id = cập nhật điểm đến đã có; không có id = thêm mới")
     public record StopItem(
             Long id,
@@ -222,14 +234,29 @@ public final class TourWizardRequests {
             @Schema(description = "Mã QR check-in trạm (JGS- + 16 ký tự hex). Gửi lại mã cũ để giữ QR đã in; để trống thì sinh mã mới")
             @Size(max = 40) String qrToken,
             @Schema(description = "Ảnh xưa và nay (không bắt buộc, tối đa 3 cặp)")
-            @Valid @Size(max = 3, message = "Tối đa 3 cặp ảnh xưa và nay") List<ThenNowItem> thenNow
+            @Valid @Size(max = 3, message = "Tối đa 3 cặp ảnh xưa và nay") List<ThenNowItem> thenNow,
+            @Schema(description = "Điểm nhấn / Bạn có biết? (không bắt buộc)")
+            @Size(max = 1000) String funFact,
+            @Schema(description = "Dòng thời gian lịch sử (không bắt buộc, tối đa 10 mốc)")
+            @Valid @Size(max = 10, message = "Tối đa 10 mốc thời gian") List<TimelineItem> timeline,
+            @Schema(description = "Từ điển thuật ngữ văn hóa (không bắt buộc, tối đa 10 mục)")
+            @Valid @Size(max = 10, message = "Tối đa 10 thuật ngữ") List<GlossaryItem> glossary
     ) {
         public StopItem(Long id, String name, String shortDescription, String guestNote, String imageUrl,
                         String videoUrl, VideoSource videoSource, String culturalContent, List<String> culturalImages,
                         List<ArtifactItem> artifacts, List<QuestionItem> quiz, List<ExperienceItem> experiences,
                         BigDecimal latitude, BigDecimal longitude, Integer checkInRadiusMeters, String qrToken) {
             this(id, name, shortDescription, guestNote, imageUrl, videoUrl, videoSource, culturalContent, culturalImages,
-                    artifacts, quiz, experiences, latitude, longitude, checkInRadiusMeters, qrToken, null);
+                    artifacts, quiz, experiences, latitude, longitude, checkInRadiusMeters, qrToken, null, null, null, null);
+        }
+
+        public StopItem(Long id, String name, String shortDescription, String guestNote, String imageUrl,
+                        String videoUrl, VideoSource videoSource, String culturalContent, List<String> culturalImages,
+                        List<ArtifactItem> artifacts, List<QuestionItem> quiz, List<ExperienceItem> experiences,
+                        BigDecimal latitude, BigDecimal longitude, Integer checkInRadiusMeters, String qrToken,
+                        List<ThenNowItem> thenNow) {
+            this(id, name, shortDescription, guestNote, imageUrl, videoUrl, videoSource, culturalContent, culturalImages,
+                    artifacts, quiz, experiences, latitude, longitude, checkInRadiusMeters, qrToken, thenNow, null, null, null);
         }
     }
 

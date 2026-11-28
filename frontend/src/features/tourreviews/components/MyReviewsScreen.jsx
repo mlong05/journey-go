@@ -32,27 +32,30 @@ export default function MyReviewsScreen() {
   const t = useT();
   const router = useRouter();
   const { confirm, confirmDialog } = useConfirm();
-  const [state, setState] = useState({ loading: true, items: [], totalPages: 1, page: 0, error: "" });
+  const [state, setState] = useState({ loading: true, items: [], totalPages: 1, totalElements: 0, page: 0, error: "" });
   const [busyId, setBusyId] = useState(null);
 
   const load = useCallback((page = 0) => {
     setState((s) => ({ ...s, loading: true }));
     return tourReviewService
       .getMyReviews({ page, size: PAGE_SIZE })
-      .then((res) =>
+      .then((res) => {
+        const items = Array.isArray(res?.content) ? res.content : [];
         setState({
           loading: false,
-          items: Array.isArray(res?.content) ? res.content : [],
+          items,
           totalPages: Math.max(1, Number(res?.totalPages || 1)),
+          totalElements: Number(res?.totalElements ?? items.length),
           page,
           error: "",
-        }),
-      )
+        });
+      })
       .catch((err) =>
         setState({
           loading: false,
           items: [],
           totalPages: 1,
+          totalElements: 0,
           page,
           error: err?.payload?.message || err?.message || t("reviews.loadError"),
         }),
@@ -192,9 +195,16 @@ export default function MyReviewsScreen() {
         </ul>
       )}
 
-      {state.totalPages > 1 && (
+      {!state.loading && state.items.length > 0 && (
         <div className="mt-4">
-          <PaginationBar page={state.page} totalPages={state.totalPages} onPageChange={(p) => load(p)} />
+          <PaginationBar
+            page={state.page}
+            totalPages={state.totalPages}
+            totalElements={state.totalElements}
+            unit={t("reviews.unit")}
+            onChange={(p) => load(p)}
+            className="rounded-2xl border border-slate-200/80"
+          />
         </div>
       )}
     </AccountLayout>

@@ -92,6 +92,12 @@ public record TourDetailResponse(
     public record ThenNow(Long id, String thenImageUrl, String nowImageUrl, String thenLabel, String caption,
                           String credit) {}
 
+    /** Mốc thời gian lịch sử trong câu chuyện văn hóa. */
+    public record TimelineItem(String period, String event) {}
+
+    /** Thuật ngữ văn hóa & giải thích ngắn. */
+    public record GlossaryItem(String term, String meaning) {}
+
     /** dayNumber bắt đầu từ 1. */
     public record ItineraryDay(int dayNumber, String title, String mainActivity, String content) {}
 
@@ -121,7 +127,10 @@ public record TourDetailResponse(
                        @Schema(description = "Kinh độ vị trí check-in trạm") BigDecimal longitude,
                        @Schema(description = "Bán kính check-in trạm (mét)") Integer checkInRadiusMeters,
                        @Schema(description = "Mã QR check-in trạm (chỉ đối tác / Moderator thấy)") String qrToken,
-                       @Schema(description = "Ảnh xưa và nay") List<ThenNow> thenNow) {
+                       @Schema(description = "Ảnh xưa và nay") List<ThenNow> thenNow,
+                       @Schema(description = "Điểm nhấn / Bạn có biết?") String funFact,
+                       @Schema(description = "Dòng thời gian lịch sử") List<TimelineItem> timeline,
+                       @Schema(description = "Từ điển thuật ngữ văn hóa") List<GlossaryItem> glossary) {
         public Stop(Long id, int sequenceOrder, String name, String shortDescription, String guestNote,
                     String imageUrl, String videoUrl, VideoSource videoSource,
                     String culturalContent, List<String> culturalImages,
@@ -129,7 +138,18 @@ public record TourDetailResponse(
                     BigDecimal latitude, BigDecimal longitude, Integer checkInRadiusMeters, String qrToken) {
             this(id, sequenceOrder, name, shortDescription, guestNote, imageUrl, videoUrl, videoSource, culturalContent,
                     culturalImages, artifacts, quiz, experiences, maxPoints, latitude, longitude, checkInRadiusMeters,
-                    qrToken, List.of());
+                    qrToken, List.of(), null, List.of(), List.of());
+        }
+
+        public Stop(Long id, int sequenceOrder, String name, String shortDescription, String guestNote,
+                    String imageUrl, String videoUrl, VideoSource videoSource,
+                    String culturalContent, List<String> culturalImages,
+                    List<Artifact> artifacts, List<Question> quiz, List<Experience> experiences, int maxPoints,
+                    BigDecimal latitude, BigDecimal longitude, Integer checkInRadiusMeters, String qrToken,
+                    List<ThenNow> thenNow) {
+            this(id, sequenceOrder, name, shortDescription, guestNote, imageUrl, videoUrl, videoSource, culturalContent,
+                    culturalImages, artifacts, quiz, experiences, maxPoints, latitude, longitude, checkInRadiusMeters,
+                    qrToken, thenNow, null, List.of(), List.of());
         }
     }
 

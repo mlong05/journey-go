@@ -18,11 +18,13 @@ let keySeq = 0;
 export const newKey = () => `k${Date.now().toString(36)}${(keySeq++).toString(36)}`;
 
 export const emptyArtifact = () => ({ _key: newKey(), name: "", imageUrl: "", shortDescription: "" });
+export const emptyTimelineItem = () => ({ _key: newKey(), period: "", event: "" });
+export const emptyGlossaryItem = () => ({ _key: newKey(), term: "", meaning: "" });
 
 /** Ba bước thiết lập điểm đến, làm lần lượt: Thông tin → Nội dung văn hóa → Trải nghiệm. */
 const TABS = [
   { key: "info", label: "Thông tin", Icon: Info, fields: ["name", "location", "checkInRadiusMeters", "shortDescription", "guestNote", "imageUrl"] },
-  { key: "culture", label: "Nội dung văn hóa", Icon: BookOpen, fields: ["videoUrl", "videoSource", "culturalContent", "culturalImages", "artifacts"] },
+  { key: "culture", label: "Nội dung văn hóa", Icon: BookOpen, fields: ["videoUrl", "videoSource", "culturalContent", "funFact", "timeline", "glossary", "culturalImages", "artifacts"] },
   { key: "experience", label: "Trải nghiệm", Icon: Gamepad2, fields: ["quiz", "experiences"] },
 ];
 
@@ -226,11 +228,85 @@ export default function StopDrawer({ stop: savedStop, index, onSave, onClose, re
               <VideoField url={stop.videoUrl} source={stop.videoSource} disabled={readOnly}
                 onChange={(videoUrl, videoSource) => set({ videoUrl, videoSource })} />
             </Field>
-            <Field label="Nội dung văn hóa (câu chuyện)" required error={stopErr("culturalContent")}>
+            <Field label="Nội dung văn hóa (câu chuyện)" required error={stopErr("culturalContent")}
+              hint="Mỗi đoạn cách nhau 1 dòng trống sẽ tự tách thành 1 thẻ kể chuyện riêng trên Mobile.">
               <TextArea rows={7} value={stop.culturalContent} limit={LIMITS.TEXT.CULTURE} disabled={readOnly}
                 placeholder="Câu chuyện lịch sử, văn hóa của điểm đến, viết dựa trên nguồn đáng tin cậy…"
                 onChange={(e) => set({ culturalContent: e.target.value })} error={stopErr("culturalContent")} />
             </Field>
+            <Field label="Điểm nhấn / Bạn có biết?" hint="Không bắt buộc. 1–2 câu ngắn gọn, thú vị để làm nổi bật trên Mobile."
+              error={stopErr("funFact")}>
+              <TextArea rows={2} value={stop.funFact || ""} limit={1000} disabled={readOnly}
+                placeholder="Ví dụ: Đại hồng chung nặng 36 tấn, là một trong những quả chuông đồng lớn nhất Việt Nam."
+                onChange={(e) => set({ funFact: e.target.value })} error={stopErr("funFact")} />
+            </Field>
+
+            {/* Dòng thời gian lịch sử */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-800">Dòng thời gian lịch sử ({(stop.timeline || []).length}/10)</h4>
+                {!readOnly && (stop.timeline || []).length < 10 && (
+                  <button type="button" onClick={() => set({ timeline: [...(stop.timeline || []), emptyTimelineItem()] })}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline cursor-pointer">
+                    <Plus size={14} /> Thêm mốc thời gian
+                  </button>
+                )}
+              </div>
+              {(stop.timeline || []).length === 0 && <p className="text-[11px] text-slate-400">Chưa có mốc thời gian nào (không bắt buộc).</p>}
+              {(stop.timeline || []).map((item, i) => (
+                <div key={item._key} className="p-3 rounded-xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase">Mốc {i + 1}</span>
+                    {!readOnly && (
+                      <button type="button" onClick={() => set({ timeline: stop.timeline.filter((_, j) => j !== i) })}
+                        className="text-slate-400 hover:text-rose-600 cursor-pointer" aria-label="Xóa mốc thời gian">
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                  <TextInput value={item.period} disabled={readOnly} limit={80}
+                    placeholder="Thời kỳ / Năm (vd: Thời Lý - 1136)"
+                    onChange={(e) => set({ timeline: stop.timeline.map((x, j) => (j === i ? { ...x, period: e.target.value } : x)) })} />
+                  <TextArea rows={2} value={item.event} disabled={readOnly} limit={500}
+                    placeholder="Sự kiện hoặc nhân vật gắn liền..."
+                    onChange={(e) => set({ timeline: stop.timeline.map((x, j) => (j === i ? { ...x, event: e.target.value } : x)) })} />
+                </div>
+              ))}
+            </div>
+
+            {/* Từ điển thuật ngữ văn hóa */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-800">Thuật ngữ văn hóa ({(stop.glossary || []).length}/10)</h4>
+                {!readOnly && (stop.glossary || []).length < 10 && (
+                  <button type="button" onClick={() => set({ glossary: [...(stop.glossary || []), emptyGlossaryItem()] })}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline cursor-pointer">
+                    <Plus size={14} /> Thêm thuật ngữ
+                  </button>
+                )}
+              </div>
+              {(stop.glossary || []).length === 0 && <p className="text-[11px] text-slate-400">Chưa có thuật ngữ nào (không bắt buộc).</p>}
+              {(stop.glossary || []).map((item, i) => (
+                <div key={item._key} className="p-3 rounded-xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase">Thuật ngữ {i + 1}</span>
+                    {!readOnly && (
+                      <button type="button" onClick={() => set({ glossary: stop.glossary.filter((_, j) => j !== i) })}
+                        className="text-slate-400 hover:text-rose-600 cursor-pointer" aria-label="Xóa thuật ngữ">
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                  <TextInput value={item.term} disabled={readOnly} limit={100}
+                    placeholder="Thuật ngữ (vd: Ngói mũi hài)"
+                    onChange={(e) => set({ glossary: stop.glossary.map((x, j) => (j === i ? { ...x, term: e.target.value } : x)) })} />
+                  <TextArea rows={2} value={item.meaning} disabled={readOnly} limit={500}
+                    placeholder="Giải thích ngắn gọn dễ hiểu cho du khách..."
+                    onChange={(e) => set({ glossary: stop.glossary.map((x, j) => (j === i ? { ...x, meaning: e.target.value } : x)) })} />
+                </div>
+              ))}
+            </div>
+
             <Field label="Hình ảnh kèm nội dung văn hóa">
               <ImageStrip value={stop.culturalImages} disabled={readOnly} onChange={(culturalImages) => set({ culturalImages })} />
             </Field>

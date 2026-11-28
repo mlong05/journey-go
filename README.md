@@ -1,1 +1,1 @@
-# journey-go
+# journey-gol

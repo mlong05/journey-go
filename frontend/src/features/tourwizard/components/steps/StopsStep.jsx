@@ -26,6 +26,9 @@ const stopFromServer = (s) => ({
   videoSource: s.videoSource || "YOUTUBE",
   culturalContent: s.culturalContent || "",
   culturalImages: s.culturalImages || [],
+  funFact: s.funFact || "",
+  timeline: (s.timeline || []).map((t) => ({ _key: newKey(), period: t.period || "", event: t.event || "" })),
+  glossary: (s.glossary || []).map((g) => ({ _key: newKey(), term: g.term || "", meaning: g.meaning || "" })),
   artifacts: (s.artifacts || []).map((a) => ({
     _key: newKey(), name: a.name || "", imageUrl: a.imageUrl || "", shortDescription: a.shortDescription || "",
   })),
@@ -50,7 +53,7 @@ const emptyStop = () => ({
   _key: newKey(), id: null, name: "", shortDescription: "", guestNote: "", imageUrl: "",
   // Mã QR check-in trạm sinh ngay để đối tác thấy và in trước khi lưu (backend giữ mã hợp lệ).
   latitude: null, longitude: null, checkInRadiusMeters: LIMITS.STOP_RADIUS_DEFAULT, qrToken: newStopQrToken(),
-  videoUrl: "", videoSource: "YOUTUBE", culturalContent: "", culturalImages: [], artifacts: [], thenNow: [],
+  videoUrl: "", videoSource: "YOUTUBE", culturalContent: "", culturalImages: [], funFact: "", timeline: [], glossary: [], artifacts: [], thenNow: [],
   // Điểm đến mới chưa có câu hỏi / trải nghiệm nào — đối tác bấm "Thêm" để soạn từng mục.
   quiz: [],
   experiences: [],
@@ -71,6 +74,9 @@ const stopsBody = (stops) => ({
     videoSource: s.videoUrl ? s.videoSource : null,
     culturalContent: s.culturalContent,
     culturalImages: s.culturalImages,
+    funFact: s.funFact || null,
+    timeline: (s.timeline || []).map(({ _key, ...t }) => t),
+    glossary: (s.glossary || []).map(({ _key, ...g }) => g),
     // Video đã chuyển lên cấp điểm đến — cổ vật không còn video riêng.
     artifacts: s.artifacts.map(({ _key, ...a }) => ({ ...a, videoUrl: null, videoSource: null })),
     thenNow: (s.thenNow || []).map(({ _key, ...t }) => t),

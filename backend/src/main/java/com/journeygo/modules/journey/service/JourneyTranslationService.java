@@ -106,6 +106,23 @@ public class JourneyTranslationService {
         putIfText(payload, "name", culture.name());
         putIfText(payload, "shortDescription", culture.shortDescription());
         putIfText(payload, "culturalContent", culture.culturalContent());
+        putIfText(payload, "funFact", culture.funFact());
+        if (culture.timeline() != null && !culture.timeline().isEmpty()) {
+            ArrayNode arr = payload.putArray("timeline");
+            for (TourDetailResponse.TimelineItem item : culture.timeline()) {
+                ObjectNode node = arr.addObject();
+                putIfText(node, "period", item.period());
+                putIfText(node, "event", item.event());
+            }
+        }
+        if (culture.glossary() != null && !culture.glossary().isEmpty()) {
+            ArrayNode arr = payload.putArray("glossary");
+            for (TourDetailResponse.GlossaryItem item : culture.glossary()) {
+                ObjectNode node = arr.addObject();
+                putIfText(node, "term", item.term());
+                putIfText(node, "meaning", item.meaning());
+            }
+        }
         if (culture.artifacts() != null && !culture.artifacts().isEmpty()) {
             ArrayNode arr = payload.putArray("artifacts");
             for (TourDetailResponse.Artifact a : culture.artifacts()) {
@@ -157,6 +174,36 @@ public class JourneyTranslationService {
             thenNow = next;
         }
 
+        List<TourDetailResponse.TimelineItem> timeline = culture.timeline();
+        JsonNode tTimeline = t.get("timeline");
+        if (timeline != null && tTimeline != null && tTimeline.isArray() && tTimeline.size() == timeline.size()) {
+            List<TourDetailResponse.TimelineItem> next = new ArrayList<>(timeline.size());
+            for (int i = 0; i < timeline.size(); i++) {
+                var orig = timeline.get(i);
+                var tn = tTimeline.get(i);
+                next.add(new TourDetailResponse.TimelineItem(
+                        textOr(tn, "period", orig.period()),
+                        textOr(tn, "event", orig.event())
+                ));
+            }
+            timeline = next;
+        }
+
+        List<TourDetailResponse.GlossaryItem> glossary = culture.glossary();
+        JsonNode tGlossary = t.get("glossary");
+        if (glossary != null && tGlossary != null && tGlossary.isArray() && tGlossary.size() == glossary.size()) {
+            List<TourDetailResponse.GlossaryItem> next = new ArrayList<>(glossary.size());
+            for (int i = 0; i < glossary.size(); i++) {
+                var orig = glossary.get(i);
+                var gn = tGlossary.get(i);
+                next.add(new TourDetailResponse.GlossaryItem(
+                        textOr(gn, "term", orig.term()),
+                        textOr(gn, "meaning", orig.meaning())
+                ));
+            }
+            glossary = next;
+        }
+
         return new StopCultureResponse(
                 culture.stopId(),
                 culture.sequenceOrder(),
@@ -168,7 +215,10 @@ public class JourneyTranslationService {
                 textOr(t, "culturalContent", culture.culturalContent()),
                 culture.culturalImages(),
                 artifacts,
-                thenNow
+                thenNow,
+                textOr(t, "funFact", culture.funFact()),
+                timeline,
+                glossary
         );
     }
 

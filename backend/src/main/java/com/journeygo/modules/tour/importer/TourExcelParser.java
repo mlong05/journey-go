@@ -76,13 +76,16 @@ final class TourExcelParser {
     /** Điểm đến đang dựng — gom quiz / trải nghiệm / cổ vật theo mã. */
     private static final class StopDraft {
         final int index;
-        final String name, shortDescription, guestNote, imageUrl, videoUrl, culturalContent;
+        final String name, shortDescription, guestNote, imageUrl, videoUrl, culturalContent, funFact;
+        final List<TourWizardRequests.TimelineItem> timeline;
+        final List<TourWizardRequests.GlossaryItem> glossary;
         final List<TourWizardRequests.QuestionItem> quiz = new ArrayList<>();
         final List<TourWizardRequests.ExperienceItem> experiences = new ArrayList<>();
         final List<TourWizardRequests.ArtifactItem> artifacts = new ArrayList<>();
 
         StopDraft(int index, String name, String shortDescription, String guestNote, String imageUrl,
-                  String videoUrl, String culturalContent) {
+                  String videoUrl, String culturalContent, String funFact,
+                  List<TourWizardRequests.TimelineItem> timeline, List<TourWizardRequests.GlossaryItem> glossary) {
             this.index = index;
             this.name = name;
             this.shortDescription = shortDescription;
@@ -90,6 +93,9 @@ final class TourExcelParser {
             this.imageUrl = imageUrl;
             this.videoUrl = videoUrl;
             this.culturalContent = culturalContent;
+            this.funFact = funFact;
+            this.timeline = timeline;
+            this.glossary = glossary;
         }
 
         TourWizardRequests.StopItem toItem() {
@@ -97,7 +103,7 @@ final class TourExcelParser {
                     videoUrl, videoSourceOf(videoUrl), culturalContent, List.of(),
                     List.copyOf(artifacts), List.copyOf(quiz), List.copyOf(experiences),
                     // File Excel không có vị trí check-in: đối tác chọn trên bản đồ sau khi nhập.
-                    null, null, null, null);
+                    null, null, null, null, null, funFact, timeline, glossary);
         }
     }
 
@@ -463,7 +469,8 @@ final class TourExcelParser {
             result.locator.put(path + ".videoSource", SHEET_STOPS, r, STOP_COLUMNS[5]);
             byCode.put(key, new StopDraft(i, cellText(row.getCell(1)), cellText(row.getCell(2)),
                     cellText(row.getCell(3)), cellText(row.getCell(4)), cellText(row.getCell(5)),
-                    cellText(row.getCell(6))));
+                    cellText(row.getCell(6)), cellText(row.getCell(7)),
+                    parseTimeline(cellText(row.getCell(8))), parseGlossary(cellText(row.getCell(9)))));
         });
 
         eachDataRow(workbook.getSheet(SHEET_QUIZ), SHEET_QUIZ, QUIZ_COLUMNS, (row, r) -> {
@@ -729,6 +736,36 @@ final class TourExcelParser {
         if (url == null) return null;
         String lower = url.toLowerCase(Locale.ROOT);
         return lower.contains("youtube.com") || lower.contains("youtu.be") ? VideoSource.YOUTUBE : VideoSource.MP4_LINK;
+    }
+
+    private static List<TourWizardRequests.TimelineItem> parseTimeline(String raw) {
+        if (raw == null) return List.of();
+        List<TourWizardRequests.TimelineItem> items = new ArrayList<>();
+        for (String line : raw.split("\\r?\\n")) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) continue;
+            int sep = trimmed.indexOf('|');
+            if (sep > 0 && sep < trimmed.length() - 1) {
+                items.add(new TourWizardRequests.TimelineItem(
+                        trimmed.substring(0, sep).trim(), trimmed.substring(sep + 1).trim()));
+            }
+        }
+        return items;
+    }
+
+    private static List<TourWizardRequests.GlossaryItem> parseGlossary(String raw) {
+        if (raw == null) return List.of();
+        List<TourWizardRequests.GlossaryItem> items = new ArrayList<>();
+        for (String line : raw.split("\\r?\\n")) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) continue;
+            int sep = trimmed.indexOf('|');
+            if (sep > 0 && sep < trimmed.length() - 1) {
+                items.add(new TourWizardRequests.GlossaryItem(
+                        trimmed.substring(0, sep).trim(), trimmed.substring(sep + 1).trim()));
+            }
+        }
+        return items;
     }
 
     private static TourImportIssue issue(String sheet, Integer rowIndex, String column, String message) {
